@@ -1,7 +1,7 @@
 {
  "repos": {
   "tune": {
-   "fixture": "bench/fixtures/tune",
+   "fixture": "bench/testdata/fixtures/tune",
    "history": [
     [
      "queue/ticket_queue.go",
@@ -49,7 +49,7 @@
    ]
   },
   "eval": {
-   "fixture": "bench/fixtures/eval",
+   "fixture": "bench/testdata/fixtures/eval",
    "history": [
     [
      "orders/order_service.go",
