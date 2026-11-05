@@ -241,7 +241,7 @@ func innermost(symbols []Symbol, i int, accept func(Symbol) bool, pos ...uint32)
 		if accept != nil && !accept(c) {
 			continue
 		}
-		if c.startByte <= start && end <= c.endByte && !(c.startByte == start && c.endByte == end) {
+		if c.startByte <= start && end <= c.endByte && (c.startByte != start || c.endByte != end) {
 			span := c.endByte - c.startByte
 			if best < 0 || span < bestSpan {
 				best, bestSpan = j, span

@@ -67,7 +67,7 @@ func Explain(root, prompt string) (ExplainReport, error) {
 	if err != nil {
 		return ExplainReport{}, err
 	}
-	defer ix.Close()
+	defer func() { _ = ix.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	t := time.Now()
@@ -113,50 +113,50 @@ func WriteExplain(w io.Writer, rep ExplainReport, asJSON bool) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(rep)
 	}
-	fmt.Fprintf(w, "Repositório: %s\n", rep.Root)
-	fmt.Fprintf(w, "Índice: %d arquivos (%d reprocessados), completo=%v\n\n", rep.Sync.Files, rep.Sync.Parsed, rep.Sync.Complete)
-	fmt.Fprintf(w, "Termos: %s\n", strings.Join(rep.Terms, ", "))
+	_, _ = fmt.Fprintf(w, "Repositório: %s\n", rep.Root)
+	_, _ = fmt.Fprintf(w, "Índice: %d arquivos (%d reprocessados), completo=%v\n\n", rep.Sync.Files, rep.Sync.Parsed, rep.Sync.Complete)
+	_, _ = fmt.Fprintf(w, "Termos: %s\n", strings.Join(rep.Terms, ", "))
 	keys := make([]string, 0, len(rep.Translations))
 	for k := range rep.Translations {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		fmt.Fprintf(w, "Tradução %s → %s\n", k, strings.Join(rep.Translations[k], ", "))
+		_, _ = fmt.Fprintf(w, "Tradução %s → %s\n", k, strings.Join(rep.Translations[k], ", "))
 	}
-	fmt.Fprintf(w, "Candidatos: léxicos=%d exatos=%d estruturais=%d · orçamento=%d tokens\n\n", rep.Lexical, rep.Exact, rep.Structural, rep.Budget)
-	fmt.Fprintln(w, "Evidências:")
+	_, _ = fmt.Fprintf(w, "Candidatos: léxicos=%d exatos=%d estruturais=%d · orçamento=%d tokens\n\n", rep.Lexical, rep.Exact, rep.Structural, rep.Budget)
+	_, _ = fmt.Fprintln(w, "Evidências:")
 	if len(rep.Evidence) == 0 {
-		fmt.Fprintln(w, "  (nenhuma — o prompt não gera contexto)")
+		_, _ = fmt.Fprintln(w, "  (nenhuma — o prompt não gera contexto)")
 	}
 	for _, e := range rep.Evidence {
-		fmt.Fprintf(w, "  [%s] %s %s  %s:%s  seção=%s score=%.4f\n", e.Verdict, e.Kind, e.Name, e.Path, e.Lines, e.Section, e.Score)
+		_, _ = fmt.Fprintf(w, "  [%s] %s %s  %s:%s  seção=%s score=%.4f\n", e.Verdict, e.Kind, e.Name, e.Path, e.Lines, e.Section, e.Score)
 		for _, r := range e.Relations {
-			fmt.Fprintf(w, "       ↳ %s\n", r)
+			_, _ = fmt.Fprintf(w, "       ↳ %s\n", r)
 		}
 	}
-	fmt.Fprintln(w, "\nCandidatos considerados:")
+	_, _ = fmt.Fprintln(w, "\nCandidatos considerados:")
 	for _, c := range rep.Candidates {
 		mark := " "
 		if c.Kept {
 			mark = "*"
 		}
-		fmt.Fprintf(w, "  %s %-28s lex=%-3d cov=%.2f exact=%-5v %s — %s\n", mark, c.Name, c.Lexical, c.Coverage, c.Exact, c.Path, c.Reason)
+		_, _ = fmt.Fprintf(w, "  %s %-28s lex=%-3d cov=%.2f exact=%-5v %s — %s\n", mark, c.Name, c.Lexical, c.Coverage, c.Exact, c.Path, c.Reason)
 	}
-	fmt.Fprintln(w, "\nTempos (ms):")
+	_, _ = fmt.Fprintln(w, "\nTempos (ms):")
 	tkeys := make([]string, 0, len(rep.TimingsMS))
 	for k := range rep.TimingsMS {
 		tkeys = append(tkeys, k)
 	}
 	sort.Strings(tkeys)
 	for _, k := range tkeys {
-		fmt.Fprintf(w, "  %-12s %.3f\n", k, rep.TimingsMS[k])
+		_, _ = fmt.Fprintf(w, "  %-12s %.3f\n", k, rep.TimingsMS[k])
 	}
-	fmt.Fprintln(w, "\nContexto injetado:")
+	_, _ = fmt.Fprintln(w, "\nContexto injetado:")
 	if rep.Context == "" {
-		fmt.Fprintln(w, "  (vazio)")
+		_, _ = fmt.Fprintln(w, "  (vazio)")
 	}
-	fmt.Fprintln(w, rep.Context)
+	_, _ = fmt.Fprintln(w, rep.Context)
 	return nil
 }
 
@@ -213,15 +213,14 @@ func Doctor(env install.Env, cwd string) []Check {
 			} else {
 				add("índice do repositório", "fail", "quick_check: "+check)
 			}
-			st.Close()
+			_ = st.Close()
 		}
 	}
 
 	errs, p50, p95, n := hookLogSummary(paths.HookLog())
-	switch {
-	case n == 0:
+	if n == 0 {
 		add("hook", "info", "nenhuma execução registrada ainda")
-	default:
+	} else {
 		status := "ok"
 		if errs > 0 {
 			status = "warn"
@@ -236,12 +235,12 @@ func sqliteOK() error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 	st, err := store.Open(filepath.Join(dir, "probe.db"))
 	if err != nil {
 		return err
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	_, err = st.SearchSymbols("probe", 1)
 	return err
 }
@@ -321,7 +320,7 @@ func hookLogSummary(path string) (errs int, p50, p95 float64, n int) {
 	if err != nil {
 		return 0, 0, 0, 0
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var totals []float64
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 64*1024), 1<<20)
@@ -364,7 +363,7 @@ func Status(root string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	files, _ := st.FileRecords()
 	symbols, _ := st.SymbolCount()
 	commits, _ := st.CommitCount()

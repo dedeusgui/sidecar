@@ -7,6 +7,7 @@ package retrieve
 import (
 	"context"
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -26,6 +27,17 @@ type Options struct {
 	MaxPerFile int // items per file (default 2)
 	Candidates int // lexical candidates examined (default 60)
 	Seeds      int // strongest matches expanded structurally (default 8)
+	Ablate     Ablation
+}
+
+// Ablation switches off parts of the pipeline. It exists to measure each component's
+// contribution (see cmd/sidecar-eval); the product always runs with the zero value.
+type Ablation struct {
+	NoTranslation bool // do not use PT→EN translations
+	NoExact       bool // do not match identifiers exactly
+	NoStructure   bool // do not expand structural neighbours
+	NoGit         bool // do not use uncommitted state or co-change
+	LexicalOnly   bool // return the raw lexical ranking, without gating or fusion
 }
 
 // Evidence is one item of retrieved context.
@@ -78,6 +90,7 @@ type concept struct {
 	term        string
 	termPresent bool
 	alts        []string
+	weight      float64 // inverse document frequency: rare terms discriminate more
 }
 
 type candidate struct {
@@ -112,7 +125,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	if err != nil {
 		return res, err
 	}
-	concepts, err := buildConcepts(st, terms, res.Trace.Phrases, total, res.Trace.Translations)
+	concepts, err := buildConcepts(st, terms, res.Trace.Phrases, total, res.Trace.Translations, opts.Ablate.NoTranslation)
 	if err != nil {
 		return res, err
 	}
@@ -139,9 +152,12 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	res.Trace.Timings["lexical"] = time.Since(t)
 
 	t = time.Now()
-	exactHits, err := st.ExactSymbols(identifierKeys(prompt), 20)
-	if err != nil {
-		return res, err
+	var exactHits []store.SymbolHit
+	if !opts.Ablate.NoExact {
+		exactHits, err = st.ExactSymbols(identifierKeys(prompt), 20)
+		if err != nil {
+			return res, err
+		}
 	}
 	for _, h := range exactHits {
 		c := ensure(cands, h)
@@ -153,19 +169,39 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	}
 	res.Trace.Timings["exact"] = time.Since(t)
 
+	if opts.Ablate.LexicalOnly {
+		for i, id := range lexOrder {
+			if i >= opts.MaxItems {
+				break
+			}
+			c := cands[id]
+			res.Evidence = append(res.Evidence, Evidence{Hit: c.hit, Verdict: "INFERRED", Section: ctxbuild.Code, Score: 1 / float64(i+1), Matched: c.matched})
+		}
+		res.Trace.Final = len(res.Evidence)
+		res.Trace.Budget = budgetFor(res.Evidence)
+		res.Trace.Timings["total"] = time.Since(start)
+		return res, nil
+	}
+
 	t = time.Now()
 	seeds := pickSeeds(cands, opts.Seeds)
-	added, err := expand(st, seeds, cands)
-	if err != nil {
-		return res, err
+	added := 0
+	if !opts.Ablate.NoStructure {
+		added, err = expand(st, seeds, cands, !opts.Ablate.NoGit)
+		if err != nil {
+			return res, err
+		}
 	}
 	res.Trace.Structural = added
 	res.Trace.Timings["structural"] = time.Since(t)
 
 	t = time.Now()
-	dirty, err := st.DirtyPaths()
-	if err != nil {
-		return res, err
+	var dirty []string
+	if !opts.Ablate.NoGit {
+		dirty, err = st.DirtyPaths()
+		if err != nil {
+			return res, err
+		}
 	}
 	dirtySet := map[string]bool{}
 	for _, p := range dirty {
@@ -208,41 +244,63 @@ func withDefaults(o Options) Options {
 
 // buildConcepts keeps only prompt terms that can discriminate: present in the repository
 // (or with a present translation) and not so common that they match a large share of symbols.
-func buildConcepts(st *store.Store, terms, phrases []string, total int, trans map[string][]string) ([]concept, error) {
-	maxDF := max(40, total*3/10)
+func buildConcepts(st *store.Store, terms, phrases []string, total int, trans map[string][]string, noTranslation bool) ([]concept, error) {
+	// No frequency cut-off: a topical word (owner, in a repository about owners) is still the
+	// best discriminator available. Common terms are down-weighted by IDF and BM25 instead.
+	maxDF := total + 1
 	var out []concept
 	for _, term := range terms {
-		df, err := st.TermDocFreq(term)
+		present, err := st.TermDocFreq(term)
+		if err != nil {
+			return nil, err
+		}
+		df, err := st.TermSymbolFreq(term)
 		if err != nil {
 			return nil, err
 		}
 		c := concept{term: term}
-		if df > 0 && df <= maxDF {
+		if present > 0 && df <= maxDF {
 			c.termPresent = true
 		}
-		for _, en := range lexical.Translations(term) {
-			edf, err := st.TermDocFreq(en)
+		translations := lexical.Translations(term)
+		if noTranslation {
+			translations = nil
+		}
+		for _, en := range translations {
+			epresent, err := st.TermDocFreq(en)
 			if err != nil {
 				return nil, err
 			}
-			if edf > 0 && edf <= maxDF {
+			edf, err := st.TermSymbolFreq(en)
+			if err != nil {
+				return nil, err
+			}
+			if epresent > 0 && edf <= maxDF {
 				c.alts = append(c.alts, en)
 			}
 		}
 		if len(c.alts) > 0 {
 			trans[term] = c.alts
 		}
+		c.weight = idf(df, total)
 		if c.termPresent || len(c.alts) > 0 {
 			out = append(out, c)
 		}
 	}
 	for _, en := range phrases {
-		df, err := st.TermDocFreq(en)
+		if noTranslation {
+			break
+		}
+		present, err := st.TermDocFreq(en)
 		if err != nil {
 			return nil, err
 		}
-		if df > 0 && df <= maxDF {
-			out = append(out, concept{term: en, termPresent: true})
+		df, err := st.TermSymbolFreq(en)
+		if err != nil {
+			return nil, err
+		}
+		if present > 0 && df <= maxDF {
+			out = append(out, concept{term: en, termPresent: true, weight: idf(df, total)})
 			trans["phrase"] = append(trans["phrase"], en)
 		}
 	}
@@ -273,7 +331,7 @@ func ftsMatch(concepts []concept) string {
 
 func isWord(t string) bool {
 	for _, r := range t {
-		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r > 127) {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r <= 127 {
 			return false
 		}
 	}
@@ -282,12 +340,14 @@ func isWord(t string) bool {
 
 var identRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]{2,}`)
 
-// identifierKeys finds identifier-like tokens in the prompt for exact matching.
+// identifierKeys finds code-like identifiers in the prompt for exact matching. A token
+// counts only when it carries code signals (underscore, digit or an inner capital), so
+// plain words that happen to equal a table or file name stay ordinary lexical matches.
 func identifierKeys(prompt string) []string {
 	seen := map[string]bool{}
 	var keys []string
 	for _, tok := range identRe.FindAllString(prompt, -1) {
-		if len(lexical.Analyze(tok)) == 0 {
+		if !codeLike(tok) || len(lexical.Analyze(tok)) == 0 {
 			continue
 		}
 		k := store.KeyOf(tok)
@@ -297,6 +357,18 @@ func identifierKeys(prompt string) []string {
 		}
 	}
 	return keys
+}
+
+func codeLike(tok string) bool {
+	if strings.ContainsAny(tok, "_0123456789") {
+		return true
+	}
+	for i, r := range tok {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			return true
+		}
+	}
+	return false
 }
 
 func ensure(cands map[int64]*candidate, h store.SymbolHit) *candidate {
@@ -340,18 +412,40 @@ func scoreOwnText(c *candidate, concepts []concept) {
 				c.literal = true
 			}
 		default:
+			// A translation match is a match, but never a literal one: only the prompt's own
+			// word appearing in the name counts as VERIFIED or as uncommitted-state boost.
 			for _, a := range cp.alts {
 				if all[a] {
 					c.matched = append(c.matched, cp.term+"→"+a)
-					if nameSet[a] {
-						c.literal = true
-					}
 					break
 				}
 			}
 		}
 	}
-	c.coverage = float64(len(c.matched)) / float64(len(concepts))
+	var matchedWeight, totalWeight float64
+	for _, cp := range concepts {
+		totalWeight += cp.weight
+	}
+	for _, m := range c.matched {
+		term := strings.SplitN(m, "→", 2)[0]
+		for _, cp := range concepts {
+			if cp.term == term {
+				matchedWeight += cp.weight
+				break
+			}
+		}
+	}
+	if totalWeight > 0 {
+		c.coverage = matchedWeight / totalWeight
+	}
+}
+
+// idf weights a term by how rarely it occurs among the indexed symbols.
+func idf(df, total int) float64 {
+	if total <= 0 {
+		return 1
+	}
+	return math.Log(float64(total+1)/float64(df+1)) + 1
 }
 
 // pickSeeds chooses the strongest matches to expand: exact first, then coverage, then BM25.
@@ -391,7 +485,7 @@ func rankOrMax(r int) int {
 
 // expand adds structural neighbours of the seeds. Each link is labelled with its kind so
 // the context and the trace can say why an item is there.
-func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate) (int, error) {
+func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate, withHistory bool) (int, error) {
 	added := 0
 	addNeighbor := func(seed *candidate, h store.SymbolHit, label, basis string) {
 		c, ok := cands[h.ID]
@@ -421,26 +515,26 @@ func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate) (in
 			return added, err
 		}
 		for _, m := range members {
-			addNeighbor(seed, m.SymbolHit, "member:"+m.Name, m.Basis)
+			addNeighbor(seed, m.SymbolHit, "member_of:"+seed.hit.Name, m.Basis)
 		}
 		if parent, ok, err := st.ParentOf(id); err != nil {
 			return added, err
 		} else if ok {
-			addNeighbor(seed, parent, "member_of:"+parent.Name, "same_file")
+			addNeighbor(seed, parent, "contains:"+seed.hit.Name, "same_file")
 		}
 		callees, err := st.CalleesOf(id, 6)
 		if err != nil {
 			return added, err
 		}
 		for _, r := range callees {
-			addNeighbor(seed, r.SymbolHit, fmt.Sprintf("calls:%s(%s)", r.Name, r.Basis), r.Basis)
+			addNeighbor(seed, r.SymbolHit, fmt.Sprintf("called_by:%s(%s)", seed.hit.Name, r.Basis), r.Basis)
 		}
 		callers, err := st.CallersOf(id, 4)
 		if err != nil {
 			return added, err
 		}
 		for _, r := range callers {
-			addNeighbor(seed, r.SymbolHit, fmt.Sprintf("called_by:%s(%s)", r.Name, r.Basis), r.Basis)
+			addNeighbor(seed, r.SymbolHit, fmt.Sprintf("calls:%s(%s)", seed.hit.Name, r.Basis), r.Basis)
 		}
 		tests, err := st.TestFilesReferencing(seed.hit.Name, 2)
 		if err != nil {
@@ -448,6 +542,9 @@ func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate) (in
 		}
 		for _, f := range tests {
 			addNeighbor(seed, f, "tested_by:"+f.Path, "same_file")
+		}
+		if !withHistory {
+			continue
 		}
 		co, err := st.CoChanged(seed.hit.Path, 3)
 		if err != nil {
@@ -458,16 +555,11 @@ func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate) (in
 			paths = append(paths, p)
 		}
 		sort.Strings(paths)
+		// Co-change annotates the seed rather than adding new items: history explains a
+		// match, it is not a reason to show an unrelated file. One shared commit is not evidence.
 		for _, p := range paths {
-			if co[p] < 2 {
-				continue // one shared commit is not evidence of a relation
-			}
-			fh, ok, err := st.FileSymbol(p)
-			if err != nil {
-				return added, err
-			}
-			if ok {
-				addNeighbor(seed, fh, fmt.Sprintf("cochange:%s(%d)", p, co[p]), "history")
+			if co[p] >= 2 && !hasString(seed.rels, fmt.Sprintf("cochange:%s(%d)", p, co[p])) {
+				seed.rels = append(seed.rels, fmt.Sprintf("cochange:%s(%d)", p, co[p]))
 			}
 		}
 	}
@@ -514,7 +606,7 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 			c.reason = "dropped: partial word match next to an exact identifier"
 			continue
 		}
-		if c.hit.Kind == "file" && specificFiles[c.hit.Path] && !c.git && !hasPrefixAny(c.rels, "tested_by:") && !hasPrefixAny(c.rels, "cochange:") {
+		if c.hit.Kind == "file" && specificFiles[c.hit.Path] && !hasPrefixAny(c.rels, "tested_by:") {
 			c.suppressed = true
 			c.reason = "dropped: more specific symbols from the same file"
 		}
@@ -553,8 +645,9 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 			structList = append(structList, idx(c))
 		}
 	}
+	// Uncommitted state only reinforces symbols whose own name matches the prompt.
 	for _, c := range byCoverage {
-		if c.git {
+		if c.git && c.literal {
 			gitList = append(gitList, idx(c))
 		}
 	}
@@ -570,6 +663,12 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 		c := byKey[key]
 		scored = append(scored, fusion.Scored{Key: key, File: c.hit.Path, Score: c.score})
 	}
+	// Direct matches claim the per-file budget before structural neighbours do: a neighbour
+	// that matches nothing in the prompt is supporting context, not the answer.
+	sort.SliceStable(scored, func(i, j int) bool {
+		di, dj := byKey[scored[i].Key].direct(), byKey[scored[j].Key].direct()
+		return di && !dj
+	})
 	kept := fusion.Diversify(scored, opts.MaxPerFile, opts.MaxItems)
 	keptSet := map[string]bool{}
 	for _, k := range kept {
@@ -588,6 +687,9 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 	}
 	return out
 }
+
+// direct reports whether the candidate matches the prompt through its own text.
+func (c *candidate) direct() bool { return c.exact || c.coverage > 0 }
 
 func evidenceOf(c *candidate) Evidence {
 	ev := Evidence{Hit: c.hit, Score: c.score, Matched: c.matched, Relations: c.rels, Dirty: c.git}

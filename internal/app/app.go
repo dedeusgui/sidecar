@@ -27,6 +27,10 @@ import (
 // a background indexer, so the first prompt in a large repository still gets an answer.
 const SyncBudget = 1500 * time.Millisecond
 
+// hookMaxFiles bounds the files one prompt may parse. Cold starts of large repositories
+// therefore cost a prompt a fraction of a second, not minutes.
+const hookMaxFiles = 300
+
 // HookOptions configures one hook invocation. Spawn lets tests replace the background indexer.
 type HookOptions struct {
 	Agent      adapter.Agent
@@ -114,7 +118,7 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	if err != nil {
 		return "", err
 	}
-	defer ix.Close()
+	defer func() { _ = ix.Close() }()
 	rec["open_ms"] = ms(time.Since(t))
 	if rep.Recovered {
 		rec["index_recovered"] = true
@@ -122,7 +126,8 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 
 	t = time.Now()
 	syncCtx, cancelSync := context.WithTimeout(ctx, opts.Budget)
-	sync, err := ix.Sync(syncCtx, index.Options{})
+	// A prompt parses a bounded batch; the rest is left to the background indexer.
+	sync, err := ix.Sync(syncCtx, index.Options{MaxFiles: hookMaxFiles})
 	cancelSync()
 	if err != nil {
 		return "", err
@@ -241,7 +246,7 @@ func writeLog(path string, rec logRecord) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, _ = f.Write(append(line, '\n'))
 }
 
@@ -259,7 +264,7 @@ func RunIndexer(root string, history bool) error {
 	if err != nil {
 		return err
 	}
-	defer ix.Close()
+	defer func() { _ = ix.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	_, err = ix.Sync(ctx, index.Options{WithHistory: history})
@@ -285,6 +290,3 @@ func acquireLock(path string) (release func(), ok bool, err error) {
 	_ = f.Close()
 	return func() { _ = os.Remove(path) }, true, nil
 }
-
-// indexDBPath is exposed to tests that need to damage the database on purpose.
-func indexDBPath(root string) string { return paths.IndexDB(root) }

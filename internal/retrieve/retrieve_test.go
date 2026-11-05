@@ -88,7 +88,7 @@ func buildIndex(t *testing.T) *index.Index {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { ix.Close() })
+	t.Cleanup(func() { _ = ix.Close() })
 	if _, err := ix.Sync(context.Background(), index.Options{}); err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestStructuralRelationsAddSameFileCallees(t *testing.T) {
 	var sawRelation bool
 	for _, e := range res.Evidence {
 		for _, r := range e.Relations {
-			if strings.HasPrefix(r, "calls:") || strings.HasPrefix(r, "called_by:") || strings.HasPrefix(r, "member:") {
+			if strings.HasPrefix(r, "calls:") || strings.HasPrefix(r, "called_by:") || strings.HasPrefix(r, "member_of:") || strings.HasPrefix(r, "contains:") {
 				sawRelation = true
 			}
 		}
@@ -273,5 +273,23 @@ func TestPortugueseVerbAndAdverbReachEnglishMethod(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("method Release not retrieved for 'libera manualmente ... fila': %v (trace %v)", names(res.Evidence), res.Trace.Translations)
+	}
+}
+
+func TestOnlyCodeLikeTokensCountAsExactIdentifiers(t *testing.T) {
+	keys := identifierKeys("quais owners e Owner no MAX_ACTIVE_TICKETS e processManualRelease?")
+	has := func(k string) bool {
+		for _, x := range keys {
+			if x == k {
+				return true
+			}
+		}
+		return false
+	}
+	if has("owners") || has("owner") {
+		t.Fatalf("plain English words must not be exact identifiers: %v", keys)
+	}
+	if !has("maxactivetickets") || !has("processmanualrelease") {
+		t.Fatalf("code identifiers missing: %v", keys)
 	}
 }

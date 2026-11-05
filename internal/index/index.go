@@ -26,9 +26,10 @@ import (
 	"github.com/dedeusgui/sidecar/internal/store"
 )
 
-// extractVersion identifies the extraction and row layout. Changing it rebuilds every index
-// on the next sync, so rows written by older logic are never served.
-const extractVersion = "2"
+// extractVersion identifies the extraction and row layout. Each file records the version
+// that produced its rows; bumping this makes every file stale, and syncs re-parse stale
+// files a bounded batch at a time, so the rebuild completes across several prompts.
+const extractVersion = 1
 
 const (
 	maxSymbolsPerFile = 5000
@@ -41,6 +42,7 @@ const (
 type Options struct {
 	WithHistory bool // also ingest Git history (slower; the hook leaves this to a background run)
 	Workers     int  // parse workers; 0 means min(GOMAXPROCS, 8)
+	MaxFiles    int  // stop after parsing this many files; 0 means no limit
 }
 
 // Report summarizes one Sync.
@@ -97,18 +99,11 @@ func (ix *Index) Sync(ctx context.Context, opts Options) (Report, error) {
 	}
 	rep.Head = plan.head
 
-	stored, err := ix.st.GetMeta("extract_version")
+	stale, err := ix.st.StaleFilePaths(extractVersion, 1<<30)
 	if err != nil {
 		return rep, err
 	}
-	rebuild := stored != extractVersion
-	if rebuild {
-		all, err := ix.allFiles(ctx)
-		if err != nil {
-			return rep, err
-		}
-		plan.changed = cleanPaths(append(plan.changed, all...))
-	}
+	plan.changed = cleanPaths(append(plan.changed, stale...))
 
 	for _, p := range plan.removed {
 		if err := ix.st.DeleteFile(p); err != nil {
@@ -121,10 +116,7 @@ func (ix *Index) Sync(ctx context.Context, opts Options) (Report, error) {
 	if err != nil {
 		return rep, err
 	}
-	if rebuild {
-		records = map[string]store.FileRecord{} // nothing is trusted: every file is parsed again
-	}
-	parsed, complete, err := ix.parseAll(ctx, plan.changed, records, opts.Workers)
+	parsed, complete, err := ix.parseAll(ctx, plan.changed, records, opts.Workers, opts.MaxFiles)
 	if err != nil {
 		if ctx.Err() != nil {
 			rep.Duration = time.Since(start)
@@ -142,13 +134,24 @@ func (ix *Index) Sync(ctx context.Context, opts Options) (Report, error) {
 			prev, _ := ix.st.DirtyPaths()
 			dirty = append(append([]string{}, prev...), plan.dirty...)
 		}
-		if err := ix.st.SetDirtyPaths(dirty); err != nil {
+		// Writes are the expensive, contended part of a prompt: skip them when nothing moved.
+		prev, err := ix.st.DirtyPaths()
+		if err != nil {
 			return rep, err
+		}
+		if !sameStrings(prev, cleanPaths(dirty)) {
+			if err := ix.st.SetDirtyPaths(dirty); err != nil {
+				return rep, err
+			}
 		}
 	}
 	if complete {
-		if err := ix.resolveImports(ctx); err != nil {
-			return rep, err
+		// Import targets only change when files appear or disappear. Unresolved external
+		// imports would otherwise be searched again on every prompt.
+		if rep.Parsed > 0 || rep.Removed > 0 {
+			if err := ix.resolveImports(ctx); err != nil {
+				return rep, err
+			}
 		}
 		if opts.WithHistory && ix.isGit && plan.head != "" {
 			if err := ix.ingestHistory(ctx, plan.head); err != nil {
@@ -156,15 +159,16 @@ func (ix *Index) Sync(ctx context.Context, opts Options) (Report, error) {
 			}
 		}
 		if ix.isGit {
-			if err := ix.st.SetMeta("indexed_head", plan.head); err != nil {
-				return rep, err
+			if cur, _ := ix.st.GetMeta("indexed_head"); cur != plan.head {
+				if err := ix.st.SetMeta("indexed_head", plan.head); err != nil {
+					return rep, err
+				}
 			}
 		}
-		if err := ix.st.SetMeta("last_sync", time.Now().UTC().Format(time.RFC3339)); err != nil {
-			return rep, err
-		}
-		if err := ix.st.SetMeta("extract_version", extractVersion); err != nil {
-			return rep, err
+		if rep.Parsed > 0 || rep.Removed > 0 {
+			if err := ix.st.SetMeta("last_sync", time.Now().UTC().Format(time.RFC3339)); err != nil {
+				return rep, err
+			}
 		}
 	}
 
@@ -183,14 +187,6 @@ func (ix *Index) Sync(ctx context.Context, opts Options) (Report, error) {
 	rep.Complete = complete && ctx.Err() == nil
 	rep.Duration = time.Since(start)
 	return rep, nil
-}
-
-// allFiles lists every file the index may contain, using the same rules as a normal sync.
-func (ix *Index) allFiles(ctx context.Context) ([]string, error) {
-	if ix.isGit {
-		return gitx.ListFiles(ctx, ix.root)
-	}
-	return repo.Walk(ix.root)
 }
 
 type plan struct {
@@ -294,7 +290,7 @@ func (ix *Index) statPlan() (plan, error) {
 		if statErr != nil {
 			continue
 		}
-		if !ok || rec.Size != info.Size() || rec.MtimeNS != info.ModTime().UnixNano() {
+		if !ok || rec.Size != info.Size() || rec.MtimeNS != info.ModTime().UnixNano() || rec.ExtractVer != extractVersion {
 			p.changed = append(p.changed, rel)
 		}
 	}
@@ -314,10 +310,14 @@ type parseTotals struct {
 
 // parseAll reads changed files with a worker pool and writes results from one goroutine.
 // It reports complete=false when ctx ended before every file was handled.
-func (ix *Index) parseAll(ctx context.Context, changed []string, records map[string]store.FileRecord, workers int) (parseTotals, bool, error) {
+func (ix *Index) parseAll(ctx context.Context, changed []string, records map[string]store.FileRecord, workers, maxFiles int) (parseTotals, bool, error) {
 	var totals parseTotals
 	if workers <= 0 {
 		workers = min(runtime.GOMAXPROCS(0), 8)
+	}
+	truncated := maxFiles > 0 && len(changed) > maxFiles
+	if truncated {
+		changed = changed[:maxFiles]
 	}
 	jobs := make(chan string)
 	results := make(chan outcome)
@@ -379,7 +379,7 @@ func (ix *Index) parseAll(ctx context.Context, changed []string, records map[str
 	if firstErr != nil {
 		return totals, false, firstErr
 	}
-	complete := ctx.Err() == nil && handled == len(uniqueCount(changed))
+	complete := ctx.Err() == nil && handled == len(uniqueCount(changed)) && !truncated
 	return totals, complete, nil
 }
 
@@ -427,7 +427,7 @@ func (ix *Index) parse(ex *extract.Extractor, rel string, prev store.FileRecord,
 	lang, kind := repo.Classify(rel)
 	out.file = store.FileRecord{
 		Path: rel, Lang: lang, Kind: kind, Size: info.Size(),
-		MtimeNS: info.ModTime().UnixNano(), PathTerms: pathTerms(rel),
+		MtimeNS: info.ModTime().UnixNano(), PathTerms: pathTerms(rel), ExtractVer: extractVersion,
 	}
 	switch {
 	case !info.Mode().IsRegular():
@@ -450,7 +450,7 @@ func (ix *Index) parse(ex *extract.Extractor, rel string, prev store.FileRecord,
 	}
 	sum := sha256.Sum256(data)
 	out.file.Hash = hex.EncodeToString(sum[:])
-	if hasPrev && prev.Hash == out.file.Hash && prev.Skipped == "" {
+	if hasPrev && prev.Hash == out.file.Hash && prev.Skipped == "" && prev.ExtractVer == extractVersion {
 		out.unchanged = true
 		out.file.Kind, out.file.Lang = prev.Kind, prev.Lang
 		return out
@@ -596,4 +596,16 @@ func (ix *Index) ingestHistory(ctx context.Context, head string) error {
 		return err
 	}
 	return ix.st.SetMeta("indexed_history_head", head)
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

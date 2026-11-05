@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Test
+        run: go test -count=1 ./...
+      - name: Race detector (concurrency-sensitive packages)
+        if: runner.os == 'Linux'
+        run: go test -race -count=1 ./internal/store/ ./internal/index/ ./internal/app/ ./internal/gitx/
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.5.0
+
+  cross-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - { os: linux, arch: amd64 }
+          - { os: linux, arch: arm64 }
+          - { os: darwin, arch: amd64 }
+          - { os: darwin, arch: arm64 }
+          - { os: windows, arch: amd64 }
+          - { os: windows, arch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Build without CGo
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.target.os }}
+          GOARCH: ${{ matrix.target.arch }}
+        run: go build -trimpath -o dist/sidecar ./cmd/sidecar
+
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Retrieval benchmark (tune / eval / holdout)
+        run: go run ./cmd/sidecar-eval --cases bench/cases.json --out bench/results/ci.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: retrieval-benchmark
+          path: bench/results/ci.json

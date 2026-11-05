@@ -89,7 +89,9 @@ func TestCorruptSessionStateFailsOpen(t *testing.T) {
 
 func TestEmptySessionPathDisablesDeduplication(t *testing.T) {
 	res := sampleResult()
-	if RenderForSession(res, "") == "" || RenderForSession(res, "") == "" {
+	first := RenderForSession(res, "")
+	second := RenderForSession(res, "")
+	if first == "" || second == "" {
 		t.Fatal("without a session id every prompt should receive context")
 	}
 }

@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
+	"github.com/dedeusgui/sidecar/internal/paths"
 )
 
 func setupHome(t *testing.T) string {
@@ -163,7 +163,7 @@ func TestHookRecoversFromCorruptIndex(t *testing.T) {
 	root := makeProject(t)
 	var spawned []string
 	runHook(t, adapter.Claude, payload(t, root, "MAX_ACTIVE_TICKETS", "s7"), &spawned)
-	if err := os.WriteFile(dbOf(t, root), []byte("garbage garbage garbage garbage"), 0o600); err != nil {
+	if err := os.WriteFile(paths.IndexDB(root), []byte("garbage garbage garbage garbage"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	out, log := runHook(t, adapter.Claude, payload(t, root, "MAX_ACTIVE_TICKETS", "s8"), &spawned)
@@ -179,11 +179,4 @@ func TestUnsafeRootIsNotIndexed(t *testing.T) {
 	if out != "" || !strings.Contains(log, "skipped_unsafe_root") {
 		t.Fatalf("filesystem root should never be indexed: out=%q log=%s", out, log)
 	}
-}
-
-func dbOf(t *testing.T, root string) string {
-	t.Helper()
-	cmd := exec.Command("true")
-	_ = cmd
-	return indexDBPath(root)
 }

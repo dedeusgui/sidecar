@@ -127,18 +127,18 @@ func Install(opts Options) ([]string, error) {
 	}
 	plan := describe(opts.Env, agents)
 	for _, line := range plan {
-		fmt.Fprintln(opts.Out, "  "+line)
+		_, _ = fmt.Fprintln(opts.Out, "  "+line)
 	}
 	if !opts.Yes {
 		if opts.In == nil {
 			return nil, errors.New("this is not an interactive terminal; re-run with --yes to confirm the changes above")
 		}
-		fmt.Fprint(opts.Out, "Aplicar estas alterações? [s/N] ")
+		_, _ = fmt.Fprint(opts.Out, "Aplicar estas alterações? [s/N] ")
 		answer, _ := bufio.NewReader(opts.In).ReadString('\n')
 		switch strings.ToLower(strings.TrimSpace(answer)) {
 		case "s", "sim", "y", "yes":
 		default:
-			fmt.Fprintln(opts.Out, "Nada foi alterado.")
+			_, _ = fmt.Fprintln(opts.Out, "Nada foi alterado.")
 			return nil, nil
 		}
 	}

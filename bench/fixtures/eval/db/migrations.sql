@@ -1,0 +1,9 @@
+CREATE TABLE customers (
+  id INTEGER PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE coupons (
+  code TEXT PRIMARY KEY,
+  percent_off INTEGER NOT NULL
+);

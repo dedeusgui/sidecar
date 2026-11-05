@@ -1,0 +1,888 @@
+{
+ "repos": {
+  "tune": {
+   "fixture": "bench/fixtures/tune",
+   "history": [
+    [
+     "queue/ticket_queue.go",
+     "queue/ticket_queue_test.go"
+    ],
+    [
+     "queue/ticket_queue.go",
+     "queue/ticket_queue_test.go"
+    ],
+    [
+     "gate/gate_controller.py",
+     "gate/test_gate_controller.py"
+    ],
+    [
+     "gate/gate_controller.py",
+     "gate/test_gate_controller.py"
+    ],
+    [
+     "billing/supplier_invoice.ts",
+     "billing/supplier_invoice.test.ts"
+    ],
+    [
+     "billing/supplier_invoice.ts",
+     "billing/supplier_invoice.test.ts"
+    ],
+    [
+     "dispatch/DispatchService.java",
+     "dispatch/DispatchServiceTest.java"
+    ],
+    [
+     "dispatch/DispatchService.java",
+     "dispatch/DispatchServiceTest.java"
+    ],
+    [
+     "weighing/scale_station.go",
+     "weighing/scale_station_test.go"
+    ],
+    [
+     "weighing/scale_station.go",
+     "weighing/scale_station_test.go"
+    ]
+   ],
+   "dirty": [
+    "weighing/scale_station.go"
+   ]
+  },
+  "eval": {
+   "fixture": "bench/fixtures/eval",
+   "history": [
+    [
+     "orders/order_service.go",
+     "orders/order_service_test.go"
+    ],
+    [
+     "orders/order_service.go",
+     "orders/order_service_test.go"
+    ],
+    [
+     "inventory/stock_ledger.py",
+     "inventory/test_stock_ledger.py"
+    ],
+    [
+     "inventory/stock_ledger.py",
+     "inventory/test_stock_ledger.py"
+    ],
+    [
+     "payments/payment_gateway.ts",
+     "payments/payment_gateway.test.ts"
+    ],
+    [
+     "payments/payment_gateway.ts",
+     "payments/payment_gateway.test.ts"
+    ],
+    [
+     "customers/CustomerRepository.java",
+     "customers/CustomerRepositoryTest.java"
+    ],
+    [
+     "customers/CustomerRepository.java",
+     "customers/CustomerRepositoryTest.java"
+    ]
+   ],
+   "dirty": [
+    "payments/payment_gateway.ts"
+   ]
+  }
+ },
+ "cases": [
+  {
+   "id": "T01",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "Adiantar um caminhão na fila sem afetar a liberação automática",
+   "relevant": [
+    {
+     "path": "queue/ticket_queue.go",
+     "name": "ManualRelease"
+    },
+    {
+     "path": "queue/ticket_queue.go",
+     "name": "TicketQueueService"
+    }
+   ]
+  },
+  {
+   "id": "T02",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "quantos caminhões podem ser pesados ao mesmo tempo na balança?",
+   "relevant": [
+    {
+     "path": "weighing/scale_station.go",
+     "name": "MaxWeighingSlots"
+    }
+   ]
+  },
+  {
+   "id": "T03",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "onde um caminhão entra na fila de espera?",
+   "relevant": [
+    {
+     "path": "queue/ticket_queue.go",
+     "name": "Enqueue"
+    }
+   ]
+  },
+  {
+   "id": "T04",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "confirmar o peso do caminhão na balança",
+   "relevant": [
+    {
+     "path": "weighing/scale_station.go",
+     "name": "ConfirmWeight"
+    }
+   ]
+  },
+  {
+   "id": "T05",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "qual o limite de tickets ativos na portaria?",
+   "relevant": [
+    {
+     "path": "gate/gate_controller.py",
+     "name": "MAX_ACTIVE_TICKETS"
+    }
+   ]
+  },
+  {
+   "id": "T06",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "levantar a cancela para o veículo que foi admitido",
+   "relevant": [
+    {
+     "path": "gate/gate_controller.py",
+     "name": "open_barrier"
+    }
+   ]
+  },
+  {
+   "id": "T07",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "dar baixa na nota fiscal do fornecedor depois do pagamento",
+   "relevant": [
+    {
+     "path": "billing/supplier_invoice.ts",
+     "name": "settleInvoice"
+    }
+   ]
+  },
+  {
+   "id": "T08",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "quantos dias de carência existem para pagamento do boleto?",
+   "relevant": [
+    {
+     "path": "billing/supplier_invoice.ts",
+     "name": "PAYMENT_GRACE_DAYS"
+    }
+   ]
+  },
+  {
+   "id": "T09",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "rota da API que lista os caminhões",
+   "relevant": [
+    {
+     "path": "api/truck_routes.ts",
+     "name": "listTrucks"
+    }
+   ]
+  },
+  {
+   "id": "T10",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "despachar o veículo para o carregamento",
+   "relevant": [
+    {
+     "path": "dispatch/DispatchService.java",
+     "name": "advanceVehicle"
+    }
+   ]
+  },
+  {
+   "id": "T11",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "limite de cargas simultâneas no despacho",
+   "relevant": [
+    {
+     "path": "dispatch/DispatchService.java",
+     "name": "MAX_CONCURRENT_LOADS"
+    }
+   ]
+  },
+  {
+   "id": "T12",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "registrar a entrada de um caminhão no terminal",
+   "relevant": [
+    {
+     "path": "admission/AdmissionController.cs",
+     "name": "RegisterEntry"
+    }
+   ]
+  },
+  {
+   "id": "T13",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "tamanho máximo da fila de admissão",
+   "relevant": [
+    {
+     "path": "admission/AdmissionController.cs",
+     "name": "MaxQueueLength"
+    }
+   ]
+  },
+  {
+   "id": "T14",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "tabela de registros de pesagem",
+   "relevant": [
+    {
+     "path": "sql/schema.sql",
+     "name": "weighing_records"
+    }
+   ]
+  },
+  {
+   "id": "T15",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "cadastrar fornecedor pelo CNPJ",
+   "relevant": [
+    {
+     "path": "supplier/SupplierRegistry.go",
+     "name": "RegisterSupplier"
+    }
+   ]
+  },
+  {
+   "id": "T16",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "procedimento de liberação manual pelo operador",
+   "relevant": [
+    {
+     "path": "docs/operacao.md",
+     "name": "Liberação manual"
+    }
+   ]
+  },
+  {
+   "id": "T17",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "teste que verifica a liberação manual da fila",
+   "relevant": [
+    {
+     "path": "queue/ticket_queue_test.go",
+     "name": "TestManualReleaseAdvancesTheLine"
+    }
+   ]
+  },
+  {
+   "id": "T18",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "quantos caminhões estão esperando na fila",
+   "relevant": [
+    {
+     "path": "queue/ticket_queue.go",
+     "name": "Length"
+    }
+   ]
+  },
+  {
+   "id": "T19",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "qual é o próximo caminhão da fila",
+   "relevant": [
+    {
+     "path": "queue/ticket_queue.go",
+     "name": "PeekNext"
+    }
+   ]
+  },
+  {
+   "id": "T20",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "limite de caminhões na balança em um instante",
+   "relevant": [
+    {
+     "path": "weighing/scale_station.go",
+     "name": "MaxWeighingSlots"
+    }
+   ]
+  },
+  {
+   "id": "N1",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "bom dia pessoal, tudo certo?",
+   "negative": true
+  },
+  {
+   "id": "N2",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "obrigado pela ajuda de ontem",
+   "negative": true
+  },
+  {
+   "id": "N3",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "explique a história do império romano",
+   "negative": true
+  },
+  {
+   "id": "N4",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "qual é a capital da França?",
+   "negative": true
+  },
+  {
+   "id": "N5",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "me recomende um filme de comédia",
+   "negative": true
+  },
+  {
+   "id": "N6",
+   "split": "tune",
+   "repo": "tune",
+   "prompt": "quanto é dois mais dois?",
+   "negative": true
+  },
+  {
+   "id": "E01",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "processar o pedido de um cliente quando há estoque",
+   "relevant": [
+    {
+     "path": "orders/order_service.go",
+     "name": "PlaceOrder"
+    }
+   ]
+  },
+  {
+   "id": "E02",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "quantos itens cabem em um único pedido",
+   "relevant": [
+    {
+     "path": "orders/order_service.go",
+     "name": "MaxItemsPerOrder"
+    }
+   ]
+  },
+  {
+   "id": "E03",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "reservar unidades de um produto por meia hora",
+   "relevant": [
+    {
+     "path": "inventory/stock_ledger.py",
+     "name": "reserve_stock"
+    },
+    {
+     "path": "inventory/stock_ledger.py",
+     "name": "STOCK_RESERVE_MINUTES"
+    }
+   ]
+  },
+  {
+   "id": "E04",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "devolver ao estoque a reserva que expirou",
+   "relevant": [
+    {
+     "path": "inventory/stock_ledger.py",
+     "name": "release_stock"
+    }
+   ]
+  },
+  {
+   "id": "E05",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "estornar um pagamento que já foi cobrado",
+   "relevant": [
+    {
+     "path": "payments/payment_gateway.ts",
+     "name": "refundPayment"
+    }
+   ]
+  },
+  {
+   "id": "E06",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "quantas tentativas de cobrança antes de desistir",
+   "relevant": [
+    {
+     "path": "payments/payment_gateway.ts",
+     "name": "MAX_RETRY_ATTEMPTS"
+    }
+   ]
+  },
+  {
+   "id": "E07",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "buscar o cliente pelo endereço de email",
+   "relevant": [
+    {
+     "path": "customers/CustomerRepository.java",
+     "name": "findByEmail"
+    }
+   ]
+  },
+  {
+   "id": "E08",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "tamanho mínimo da senha no cadastro",
+   "relevant": [
+    {
+     "path": "auth/password_policy.go",
+     "name": "PasswordMinLength"
+    },
+    {
+     "path": "auth/password_policy.go",
+     "name": "ValidatePassword"
+    }
+   ]
+  },
+  {
+   "id": "E09",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "imposto que aparece no recibo impresso",
+   "relevant": [
+    {
+     "path": "receipts/ReceiptPrinter.cs",
+     "name": "TaxRatePercent"
+    }
+   ]
+  },
+  {
+   "id": "E10",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "cobrança mensal das assinaturas recorrentes",
+   "relevant": [
+    {
+     "path": "subscriptions/recurring_billing.go",
+     "name": "ChargeRecurringSubscriptions"
+    }
+   ]
+  },
+  {
+   "id": "E11",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "acompanhar o rastreamento de uma encomenda",
+   "relevant": [
+    {
+     "path": "shipping/delivery_tracker.py",
+     "name": "track_shipment"
+    }
+   ]
+  },
+  {
+   "id": "E12",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "marcar a entrega como concluída",
+   "relevant": [
+    {
+     "path": "shipping/delivery_tracker.py",
+     "name": "mark_delivered"
+    }
+   ]
+  },
+  {
+   "id": "E13",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "tabela de cupons de desconto",
+   "relevant": [
+    {
+     "path": "db/migrations.sql",
+     "name": "coupons"
+    }
+   ]
+  },
+  {
+   "id": "E14",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "criar um cupom pela API",
+   "relevant": [
+    {
+     "path": "api/coupon_routes.ts",
+     "name": "createCoupon"
+    }
+   ]
+  },
+  {
+   "id": "E15",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "prazo para reembolso do pagamento",
+   "relevant": [
+    {
+     "path": "docs/devolucoes.md",
+     "name": "Reembolso de pagamento"
+    }
+   ]
+  },
+  {
+   "id": "E16",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "teste da reserva de estoque",
+   "relevant": [
+    {
+     "path": "inventory/test_stock_ledger.py",
+     "name": "test_reserve_then_release"
+    }
+   ]
+  },
+  {
+   "id": "E17",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "alíquota do imposto no cupom fiscal",
+   "relevant": [
+    {
+     "path": "receipts/ReceiptPrinter.cs",
+     "name": "TaxRatePercent"
+    }
+   ]
+  },
+  {
+   "id": "E18",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "cancelar um pedido antes do envio",
+   "relevant": [
+    {
+     "path": "orders/order_service.go",
+     "name": "CancelOrder"
+    }
+   ]
+  },
+  {
+   "id": "E19",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "validar a senha escolhida pelo usuário",
+   "relevant": [
+    {
+     "path": "auth/password_policy.go",
+     "name": "ValidatePassword"
+    }
+   ]
+  },
+  {
+   "id": "E20",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "registro de clientes com email único",
+   "relevant": [
+    {
+     "path": "db/migrations.sql",
+     "name": "customers"
+    }
+   ]
+  },
+  {
+   "id": "N7",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "bom dia, tudo certo?",
+   "negative": true
+  },
+  {
+   "id": "N8",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "me indique um bom filme de ação",
+   "negative": true
+  },
+  {
+   "id": "N9",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "resuma a segunda guerra mundial",
+   "negative": true
+  },
+  {
+   "id": "N10",
+   "split": "eval",
+   "repo": "eval",
+   "prompt": "quanto é cinco vezes sete?",
+   "negative": true
+  },
+  {
+   "id": "H01",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "quanto tempo fica reservado o estoque antes de expirar",
+   "relevant": [
+    {
+     "path": "inventory/stock_ledger.py",
+     "name": "STOCK_RESERVE_MINUTES"
+    }
+   ]
+  },
+  {
+   "id": "H02",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "criar um pedido novo para um cliente logado",
+   "relevant": [
+    {
+     "path": "orders/order_service.go",
+     "name": "PlaceOrder"
+    }
+   ]
+  },
+  {
+   "id": "H03",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "tentar cobrar novamente um pagamento recusado",
+   "relevant": [
+    {
+     "path": "payments/payment_gateway.ts",
+     "name": "MAX_RETRY_ATTEMPTS"
+    }
+   ]
+  },
+  {
+   "id": "H04",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "encontrar um usuário cadastrado pelo email",
+   "relevant": [
+    {
+     "path": "customers/CustomerRepository.java",
+     "name": "findByEmail"
+    }
+   ]
+  },
+  {
+   "id": "H05",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "quantas letras a senha precisa ter",
+   "relevant": [
+    {
+     "path": "auth/password_policy.go",
+     "name": "PasswordMinLength"
+    }
+   ]
+  },
+  {
+   "id": "H06",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "percentual de imposto no total do comprovante",
+   "relevant": [
+    {
+     "path": "receipts/ReceiptPrinter.cs",
+     "name": "TaxRatePercent"
+    }
+   ]
+  },
+  {
+   "id": "H07",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "gerar cobrança das assinaturas todo mês",
+   "relevant": [
+    {
+     "path": "subscriptions/recurring_billing.go",
+     "name": "ChargeRecurringSubscriptions"
+    }
+   ]
+  },
+  {
+   "id": "H08",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "saber em que status está a encomenda pelo código de rastreio",
+   "relevant": [
+    {
+     "path": "shipping/delivery_tracker.py",
+     "name": "track_shipment"
+    }
+   ]
+  },
+  {
+   "id": "H09",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "registrar que o pacote chegou ao cliente",
+   "relevant": [
+    {
+     "path": "shipping/delivery_tracker.py",
+     "name": "mark_delivered"
+    }
+   ]
+  },
+  {
+   "id": "H10",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "lista de cupons de desconto no banco de dados",
+   "relevant": [
+    {
+     "path": "db/migrations.sql",
+     "name": "coupons"
+    }
+   ]
+  },
+  {
+   "id": "H11",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "endpoint para criar cupom de desconto",
+   "relevant": [
+    {
+     "path": "api/coupon_routes.ts",
+     "name": "createCoupon"
+    }
+   ]
+  },
+  {
+   "id": "H12",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "política de devolução e prazo de reembolso",
+   "relevant": [
+    {
+     "path": "docs/devolucoes.md",
+     "name": "Reembolso de pagamento"
+    }
+   ]
+  },
+  {
+   "id": "H13",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "teste de reserva de estoque",
+   "relevant": [
+    {
+     "path": "inventory/test_stock_ledger.py",
+     "name": "test_reserve_then_release"
+    }
+   ]
+  },
+  {
+   "id": "H14",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "cancelar pedido que ainda não saiu",
+   "relevant": [
+    {
+     "path": "orders/order_service.go",
+     "name": "CancelOrder"
+    }
+   ]
+  },
+  {
+   "id": "H15",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "tabela de clientes com email único",
+   "relevant": [
+    {
+     "path": "db/migrations.sql",
+     "name": "customers"
+    }
+   ]
+  },
+  {
+   "id": "H16",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "limite de itens por pedido",
+   "relevant": [
+    {
+     "path": "orders/order_service.go",
+     "name": "MaxItemsPerOrder"
+    }
+   ]
+  },
+  {
+   "id": "H17",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "validação da senha no cadastro",
+   "relevant": [
+    {
+     "path": "auth/password_policy.go",
+     "name": "ValidatePassword"
+    }
+   ]
+  },
+  {
+   "id": "H18",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "bom dia, pode me ajudar?",
+   "negative": true
+  },
+  {
+   "id": "H19",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "qual é a receita de bolo de chocolate?",
+   "negative": true
+  },
+  {
+   "id": "H20",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "quem ganhou a copa de 1998?",
+   "negative": true
+  },
+  {
+   "id": "H21",
+   "split": "holdout",
+   "repo": "eval",
+   "prompt": "obrigado, até mais",
+   "negative": true
+  }
+ ]
+}

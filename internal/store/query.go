@@ -118,7 +118,7 @@ func (s *Store) CalleesOf(id int64, limit int) ([]Related, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []Related
 	for rows.Next() {
 		var basis string
@@ -153,7 +153,7 @@ func (s *Store) CallersOf(id int64, limit int) ([]Related, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []Related
 	for rows.Next() {
 		var basis string
@@ -187,7 +187,7 @@ func collectHits(rows interface {
 	Err() error
 	Close() error
 }) ([]SymbolHit, error) {
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []SymbolHit
 	for rows.Next() {
 		h, err := scanHit(rows.Scan)
@@ -219,4 +219,14 @@ func (s *Store) IntegrityCheck() (string, error) {
 	var out string
 	err := s.db.QueryRow(`PRAGMA quick_check`).Scan(&out)
 	return out, err
+}
+
+// AllSymbols returns every indexed definition except per-file rows, for baselines and tests.
+func (s *Store) AllSymbols() ([]SymbolHit, error) {
+	rows, err := s.db.Query(`SELECT ` + symbolColumns("s") + `
+		FROM symbols s JOIN files f ON f.id = s.file_id WHERE s.kind <> 'file' ORDER BY s.id`)
+	if err != nil {
+		return nil, err
+	}
+	return collectHits(rows)
 }

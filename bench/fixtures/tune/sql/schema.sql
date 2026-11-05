@@ -1,0 +1,10 @@
+CREATE TABLE trucks (
+  id INTEGER PRIMARY KEY,
+  plate TEXT NOT NULL
+);
+
+CREATE TABLE weighing_records (
+  id INTEGER PRIMARY KEY,
+  truck_id INTEGER NOT NULL,
+  kilos INTEGER NOT NULL
+);

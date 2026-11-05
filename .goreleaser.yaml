@@ -1,0 +1,49 @@
+# Release builds. CGo is disabled: every binary is static and cross-compiles from any host.
+# Only the grammars Sidecar uses are embedded (grammar_subset), which keeps binaries near 16 MB.
+version: 2
+
+project_name: sidecar
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: sidecar
+    main: ./cmd/sidecar
+    binary: sidecar
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    tags:
+      - grammar_subset
+      - grammar_subset_go
+      - grammar_subset_python
+      - grammar_subset_typescript
+      - grammar_subset_tsx
+      - grammar_subset_javascript
+      - grammar_subset_java
+      - grammar_subset_c_sharp
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: sidecar
+    formats: [tar.gz]
+    name_template: "sidecar_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  use: github

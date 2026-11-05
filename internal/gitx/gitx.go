@@ -172,7 +172,7 @@ func ReadHistory(ctx context.Context, root, since string, max int) ([]Commit, er
 			continue
 		}
 		var ts int64
-		fmt.Sscanf(header[1], "%d", &ts)
+		_, _ = fmt.Sscanf(header[1], "%d", &ts)
 		c := Commit{Hash: header[0], Time: ts, Subject: header[2]}
 		for _, line := range lines[1:] {
 			if fc, ok := parseNameStatus(line); ok {

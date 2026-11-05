@@ -171,7 +171,7 @@ func ReadSource(p string, max int64) (data []byte, reason string) {
 	if err != nil {
 		return nil, "read_error"
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	data, err = io.ReadAll(io.LimitReader(f, max+1))
 	if err != nil {
 		return nil, "read_error"

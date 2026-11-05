@@ -46,19 +46,19 @@ func run(args []string, in io.Reader, out, errOut io.Writer) int {
 	case "explain":
 		return cmdExplain(rest, in, out, errOut)
 	case "version", "--version":
-		fmt.Fprintln(out, "sidecar", version)
+		_, _ = fmt.Fprintln(out, "sidecar", version)
 		return 0
 	case "help", "-h", "--help":
 		usage(out)
 		return 0
 	}
-	fmt.Fprintf(errOut, "comando desconhecido: %q\n\n", cmd)
+	_, _ = fmt.Fprintf(errOut, "comando desconhecido: %q\n\n", cmd)
 	usage(errOut)
 	return 2
 }
 
 func usage(w io.Writer) {
-	fmt.Fprint(w, `sidecar — contexto de repositório para Claude Code e Codex
+	_, _ = fmt.Fprint(w, `sidecar — contexto de repositório para Claude Code e Codex
 
 Uso:
   sidecar install [--yes] [--agent claude|codex]...   configura os hooks (com autorização)
@@ -92,7 +92,7 @@ func cmdHook(args []string, in io.Reader, out, errOut io.Writer) int {
 	}
 	agent, err := adapter.ParseAgent(*agentName)
 	if err != nil {
-		fmt.Fprintln(errOut, err)
+		_, _ = fmt.Fprintln(errOut, err)
 		return 0
 	}
 	return app.Hook(app.HookOptions{Agent: agent, Stdin: in, Stdout: out})
@@ -104,11 +104,11 @@ func cmdIndex(args []string, errOut io.Writer) int {
 	root := fs.String("root", "", "worktree root to index")
 	history := fs.Bool("history", false, "also ingest Git history")
 	if err := fs.Parse(args); err != nil || *root == "" {
-		fmt.Fprintln(errOut, "uso interno: sidecar index --root DIR [--history]")
+		_, _ = fmt.Fprintln(errOut, "uso interno: sidecar index --root DIR [--history]")
 		return 2
 	}
 	if err := app.RunIndexer(*root, *history); err != nil {
-		fmt.Fprintln(errOut, "sidecar index:", err)
+		_, _ = fmt.Fprintln(errOut, "sidecar index:", err)
 		return 1
 	}
 	return 0
@@ -125,7 +125,7 @@ func cmdInstall(args []string, in io.Reader, out, errOut io.Writer) int {
 	}
 	env, err := install.DefaultEnv()
 	if err != nil {
-		fmt.Fprintln(errOut, err)
+		_, _ = fmt.Fprintln(errOut, err)
 		return 1
 	}
 	opts := install.Options{Env: env, Agents: agents, Yes: *yes, Out: out, In: in}
@@ -134,14 +134,17 @@ func cmdInstall(args []string, in io.Reader, out, errOut io.Writer) int {
 	}
 	done, err := install.Install(opts)
 	for _, d := range done {
-		fmt.Fprintln(out, "✓", d)
+		_, _ = fmt.Fprintln(out, "✓", d)
 	}
 	if err != nil {
-		fmt.Fprintln(errOut, "erro:", err)
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
 		return 1
 	}
-	fmt.Fprintln(out, "\nPronto. Abra um repositório e envie um prompt normalmente.")
-	fmt.Fprintln(out, "Verifique com: sidecar doctor")
+	if len(done) == 0 {
+		return 0 // declined: install already reported that nothing changed
+	}
+	_, _ = fmt.Fprintln(out, "\nPronto. Abra um repositório e envie um prompt normalmente.")
+	_, _ = fmt.Fprintln(out, "Verifique com: sidecar doctor")
 	return 0
 }
 
@@ -154,26 +157,26 @@ func cmdUninstall(args []string, out, errOut io.Writer) int {
 	}
 	env, err := install.DefaultEnv()
 	if err != nil {
-		fmt.Fprintln(errOut, err)
+		_, _ = fmt.Fprintln(errOut, err)
 		return 1
 	}
 	done, err := install.Uninstall(install.UninstallOptions{Env: env, Out: out})
 	for _, d := range done {
-		fmt.Fprintln(out, "✓", d)
+		_, _ = fmt.Fprintln(out, "✓", d)
 	}
 	if err != nil {
-		fmt.Fprintln(errOut, "erro:", err)
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
 		return 1
 	}
 	if *purge {
 		if err := os.RemoveAll(paths.Home()); err == nil {
-			fmt.Fprintln(out, "✓ cache removido:", paths.Home())
+			_, _ = fmt.Fprintln(out, "✓ cache removido:", paths.Home())
 		}
 		if err := os.RemoveAll(paths.ConfigHome()); err == nil {
-			fmt.Fprintln(out, "✓ configuração removida:", paths.ConfigHome())
+			_, _ = fmt.Fprintln(out, "✓ configuração removida:", paths.ConfigHome())
 		}
 	}
-	fmt.Fprintln(out, "Sidecar desinstalado. Suas demais configurações foram preservadas.")
+	_, _ = fmt.Fprintln(out, "Sidecar desinstalado. Suas demais configurações foram preservadas.")
 	return 0
 }
 
@@ -188,12 +191,12 @@ func cmdStatus(args []string, out, errOut io.Writer) int {
 	rootDir, _ := repo.FindRoot(abs)
 	info, err := app.Status(rootDir)
 	if err != nil {
-		fmt.Fprintln(errOut, "erro:", err)
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
 		return 1
 	}
 	for _, k := range []string{"root", "database", "files", "symbols", "commits", "dirty_files", "indexed_head", "last_sync", "index"} {
 		if v, ok := info[k]; ok {
-			fmt.Fprintf(out, "%-14s %v\n", k+":", v)
+			_, _ = fmt.Fprintf(out, "%-14s %v\n", k+":", v)
 		}
 	}
 	return 0
@@ -202,14 +205,14 @@ func cmdStatus(args []string, out, errOut io.Writer) int {
 func cmdDoctor(out, errOut io.Writer) int {
 	env, err := install.DefaultEnv()
 	if err != nil {
-		fmt.Fprintln(errOut, err)
+		_, _ = fmt.Fprintln(errOut, err)
 		return 1
 	}
 	cwd, _ := os.Getwd()
 	failed := false
 	for _, c := range app.Doctor(env, cwd) {
 		icon := map[string]string{"ok": "✓", "warn": "!", "fail": "✗", "info": "·"}[c.Status]
-		fmt.Fprintf(out, "%s %-22s %s\n", icon, c.Name, c.Detail)
+		_, _ = fmt.Fprintf(out, "%s %-22s %s\n", icon, c.Name, c.Detail)
 		if c.Status == "fail" {
 			failed = true
 		}
@@ -230,18 +233,18 @@ func cmdExplain(args []string, in io.Reader, out, errOut io.Writer) int {
 	}
 	prompt, err := io.ReadAll(io.LimitReader(in, adapter.MaxInputBytes))
 	if err != nil {
-		fmt.Fprintln(errOut, "erro lendo stdin:", err)
+		_, _ = fmt.Fprintln(errOut, "erro lendo stdin:", err)
 		return 1
 	}
 	abs, _ := filepath.Abs(*root)
 	rootDir, _ := repo.FindRoot(abs)
 	rep, err := app.Explain(rootDir, strings.TrimSpace(string(prompt)))
 	if err != nil {
-		fmt.Fprintln(errOut, "erro:", err)
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
 		return 1
 	}
 	if err := app.WriteExplain(out, rep, *asJSON); err != nil {
-		fmt.Fprintln(errOut, "erro:", err)
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
 		return 1
 	}
 	return 0

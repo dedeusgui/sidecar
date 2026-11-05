@@ -48,7 +48,7 @@ func openIndex(t *testing.T, root string) *Index {
 	if rep.Recovered {
 		t.Fatal("fresh index reported recovery")
 	}
-	t.Cleanup(func() { ix.Close() })
+	t.Cleanup(func() { _ = ix.Close() })
 	return ix
 }
 
@@ -327,7 +327,7 @@ func TestIndexRebuildsWhenExtractionLogicChanges(t *testing.T) {
 	ix := openIndex(t, root)
 	mustSync(t, ix, Options{})
 	// Simulate an index written by an older extraction: rows are stale even though files are unchanged.
-	if err := ix.Store().SetMeta("extract_version", "0"); err != nil {
+	if err := ix.Store().ResetExtractVersion(0); err != nil {
 		t.Fatal(err)
 	}
 	rep := mustSync(t, ix, Options{})
@@ -336,5 +336,27 @@ func TestIndexRebuildsWhenExtractionLogicChanges(t *testing.T) {
 	}
 	if rep := mustSync(t, ix, Options{}); rep.Parsed != 0 {
 		t.Fatalf("rebuilt index should be incremental again, parsed %d", rep.Parsed)
+	}
+}
+
+func TestBoundedSyncParsesAtMostNFilesAndResumes(t *testing.T) {
+	root := mkRepo(t)
+	for i := 0; i < 30; i++ {
+		put(t, root, filepathFor(i), "package p\n\nfunc F"+strings.Repeat("y", i%7)+"() {}\n")
+	}
+	git(t, root, "add", ".")
+	git(t, root, "commit", "-q", "-m", "init")
+
+	ix := openIndex(t, root)
+	rep, err := ix.Sync(context.Background(), Options{MaxFiles: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Parsed > 10 || rep.Complete {
+		t.Fatalf("bounded sync parsed %d files (complete=%v), want at most 10 and incomplete", rep.Parsed, rep.Complete)
+	}
+	rep2 := mustSync(t, ix, Options{})
+	if rep.Parsed+rep2.Parsed != 30 {
+		t.Fatalf("work was not resumed exactly: %d + %d, want 30", rep.Parsed, rep2.Parsed)
 	}
 }

@@ -3,19 +3,21 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver with FTS5; keeps the binary CGo-free
 )
 
 // SchemaVersion is bumped whenever the on-disk layout changes. Databases with a
 // newer version are refused; older ones are migrated in place.
-const SchemaVersion = 1
+const SchemaVersion = 3
 
 // ErrSchemaTooNew reports an index written by a newer Sidecar build.
 var ErrSchemaTooNew = errors.New("index schema is newer than this sidecar build")
@@ -28,14 +30,15 @@ type Store struct {
 
 // FileRecord describes an indexed (or deliberately skipped) file.
 type FileRecord struct {
-	Path      string
-	Lang      string
-	Kind      string // code | test | doc | config | binary
-	Size      int64
-	MtimeNS   int64
-	Hash      string
-	Skipped   string // non-empty when content was not parsed (too_large, binary, sensitive...)
-	PathTerms string // analyzed path words for full-text search
+	Path       string
+	Lang       string
+	Kind       string // code | test | doc | config | binary
+	Size       int64
+	MtimeNS    int64
+	Hash       string
+	Skipped    string // non-empty when content was not parsed (too_large, binary, sensitive...)
+	PathTerms  string // analyzed path words for full-text search
+	ExtractVer int    // version of the extraction logic that produced these rows
 }
 
 // SymbolRecord is one definition. Parent indexes the symbol slice passed to ReplaceFile
@@ -101,13 +104,31 @@ type CommitRecord struct {
 	Files        []CommitFile
 }
 
-const pragmas = "_pragma=busy_timeout(3000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)"
+const pragmas = "_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)"
 
 // Open opens or creates the index at path and migrates it to SchemaVersion.
 func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
+	var lastErr error
+	for attempt := 0; attempt < 4; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 25 * time.Millisecond)
+		}
+		s, err := openOnce(path)
+		if err == nil {
+			return s, nil
+		}
+		lastErr = err
+		if errors.Is(err, ErrSchemaTooNew) || !transient(err) {
+			break
+		}
+	}
+	return nil, lastErr
+}
+
+func openOnce(path string) (*Store, error) {
 	db, err := sql.Open("sqlite", "file:"+path+"?"+pragmas)
 	if err != nil {
 		return nil, err
@@ -116,10 +137,18 @@ func Open(path string) (*Store, error) {
 	db.SetMaxOpenConns(1)
 	s := &Store{db: db, path: path}
 	if err := s.migrate(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return s, nil
+}
+
+// transient reports errors caused by another process touching the same files at the same
+// moment (locks, WAL file creation or removal). They are worth one more try.
+func transient(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "database is locked") || strings.Contains(msg, "disk I/O error") ||
+		strings.Contains(msg, "SQLITE_BUSY") || strings.Contains(msg, "unable to open database")
 }
 
 // OpenOrRecover opens the index, moving an unreadable or incompatible file aside
@@ -170,20 +199,56 @@ func (s *Store) SetMeta(key, value string) error {
 	return err
 }
 
-// ReplaceFile atomically replaces everything indexed for file.Path.
-func (s *Store) ReplaceFile(file FileRecord, syms []SymbolRecord, refs []RefRecord, imports []ImportRecord) error {
-	tx, err := s.db.Begin()
+// execer is satisfied by *sql.Conn and *sql.Tx.
+type execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+// withWriteTx runs fn inside BEGIN IMMEDIATE. Taking the write lock up front makes a busy
+// database wait (busy_timeout) instead of failing: a deferred transaction that reads and
+// then writes gets SQLITE_BUSY at once when another process is writing.
+func (s *Store) withWriteTx(fn func(q execer) error) error {
+	ctx := context.Background()
+	conn, err := s.db.Conn(ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = conn.Close() }()
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		return err
+	}
+	if err := fn(connExec{ctx, conn}); err != nil {
+		_, _ = conn.ExecContext(ctx, "ROLLBACK")
+		return err
+	}
+	_, err = conn.ExecContext(ctx, "COMMIT")
+	return err
+}
 
+// connExec adapts a dedicated connection to execer.
+type connExec struct {
+	ctx  context.Context
+	conn *sql.Conn
+}
+
+func (c connExec) Exec(query string, args ...any) (sql.Result, error) {
+	return c.conn.ExecContext(c.ctx, query, args...)
+}
+
+// ReplaceFile atomically replaces everything indexed for file.Path.
+func (s *Store) ReplaceFile(file FileRecord, syms []SymbolRecord, refs []RefRecord, imports []ImportRecord) error {
+	return s.withWriteTx(func(tx execer) error {
+		return replaceFileTx(tx, file, syms, refs, imports)
+	})
+}
+
+func replaceFileTx(tx execer, file FileRecord, syms []SymbolRecord, refs []RefRecord, imports []ImportRecord) error {
 	if err := deleteFile(tx, file.Path); err != nil {
 		return err
 	}
-	res, err := tx.Exec(`INSERT INTO files(path, lang, kind, size, mtime_ns, hash, skipped)
-		VALUES(?, ?, ?, ?, ?, ?, ?)`,
-		file.Path, file.Lang, file.Kind, file.Size, file.MtimeNS, file.Hash, file.Skipped)
+	res, err := tx.Exec(`INSERT INTO files(path, lang, kind, size, mtime_ns, hash, skipped, extract_ver)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+		file.Path, file.Lang, file.Kind, file.Size, file.MtimeNS, file.Hash, file.Skipped, file.ExtractVer)
 	if err != nil {
 		return err
 	}
@@ -233,23 +298,15 @@ func (s *Store) ReplaceFile(file FileRecord, syms []SymbolRecord, refs []RefReco
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 // DeleteFile removes a file and everything derived from it.
 func (s *Store) DeleteFile(path string) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := deleteFile(tx, path); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return s.withWriteTx(func(tx execer) error { return deleteFile(tx, path) })
 }
 
-func deleteFile(tx *sql.Tx, path string) error {
+func deleteFile(tx execer, path string) error {
 	if _, err := tx.Exec(`DELETE FROM symbol_fts WHERE rowid IN
 		(SELECT s.id FROM symbols s JOIN files f ON f.id = s.file_id WHERE f.path = ?)`, path); err != nil {
 		return err
@@ -260,15 +317,15 @@ func deleteFile(tx *sql.Tx, path string) error {
 
 // FileRecords returns every indexed file keyed by path.
 func (s *Store) FileRecords() (map[string]FileRecord, error) {
-	rows, err := s.db.Query(`SELECT path, lang, kind, size, mtime_ns, hash, skipped FROM files`)
+	rows, err := s.db.Query(`SELECT path, lang, kind, size, mtime_ns, hash, skipped, extract_ver FROM files`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := map[string]FileRecord{}
 	for rows.Next() {
 		var f FileRecord
-		if err := rows.Scan(&f.Path, &f.Lang, &f.Kind, &f.Size, &f.MtimeNS, &f.Hash, &f.Skipped); err != nil {
+		if err := rows.Scan(&f.Path, &f.Lang, &f.Kind, &f.Size, &f.MtimeNS, &f.Hash, &f.Skipped, &f.ExtractVer); err != nil {
 			return nil, err
 		}
 		out[f.Path] = f
@@ -290,7 +347,7 @@ func (s *Store) SearchSymbols(match string, limit int) ([]SymbolHit, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []SymbolHit
 	for rows.Next() {
 		var h SymbolHit
@@ -303,10 +360,21 @@ func (s *Store) SearchSymbols(match string, limit int) ([]SymbolHit, error) {
 	return out, rows.Err()
 }
 
-// TermDocFreq returns how many indexed symbols contain an analyzed term.
+// TermDocFreq counts how often an analyzed term occurs in any indexed column, including
+// the path. It answers whether the term is present in the repository at all.
 func (s *Store) TermDocFreq(term string) (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COALESCE(SUM(doc), 0) FROM symbol_vocab WHERE term = ?`, term).Scan(&n)
+	return n, err
+}
+
+// TermSymbolFreq counts symbols whose own name, signature or documentation contains the term.
+// Path words are excluded: they are copied into every symbol row of a file and would make
+// a distinctive folder name look common.
+func (s *Store) TermSymbolFreq(term string) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COALESCE(SUM(doc), 0) FROM symbol_vocab
+		WHERE term = ? AND col IN ('name_terms', 'sig_terms', 'doc_terms')`, term).Scan(&n)
 	return n, err
 }
 
@@ -316,7 +384,7 @@ func (s *Store) DirtyPaths() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []string
 	for rows.Next() {
 		var p string
@@ -330,20 +398,17 @@ func (s *Store) DirtyPaths() ([]string, error) {
 
 // SetDirtyPaths replaces the set of files that differ from HEAD.
 func (s *Store) SetDirtyPaths(paths []string) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.Exec(`DELETE FROM dirty_paths`); err != nil {
-		return err
-	}
-	for _, p := range paths {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO dirty_paths(path) VALUES(?)`, p); err != nil {
+	return s.withWriteTx(func(tx execer) error {
+		if _, err := tx.Exec(`DELETE FROM dirty_paths`); err != nil {
 			return err
 		}
-	}
-	return tx.Commit()
+		for _, p := range paths {
+			if _, err := tx.Exec(`INSERT OR IGNORE INTO dirty_paths(path) VALUES(?)`, p); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // PendingImports lists imports whose target is still unresolved.
@@ -354,7 +419,7 @@ func (s *Store) PendingImports() ([]PendingImport, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []PendingImport
 	for rows.Next() {
 		var p PendingImport
@@ -375,7 +440,7 @@ func (s *Store) ResolvedImportPaths(fromPath string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []string
 	for rows.Next() {
 		var p string
@@ -393,6 +458,32 @@ func (s *Store) SetImportTarget(importID, fileID int64) error {
 	return err
 }
 
+// StaleFilePaths lists files whose rows were produced by another extraction version. They
+// are re-parsed a few at a time, so a large repository makes progress across syncs.
+func (s *Store) StaleFilePaths(version, limit int) ([]string, error) {
+	rows, err := s.db.Query(`SELECT path FROM files WHERE extract_ver <> ? ORDER BY path LIMIT ?`, version, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// ResetExtractVersion marks every file as produced by version v. Tests use it to simulate
+// an index written by an older extraction.
+func (s *Store) ResetExtractVersion(v int) error {
+	_, err := s.db.Exec(`UPDATE files SET extract_ver = ?`, v)
+	return err
+}
+
 // SetFileStat records the stat fingerprint of a file whose content did not change.
 func (s *Store) SetFileStat(path string, size, mtimeNS int64) error {
 	_, err := s.db.Exec(`UPDATE files SET size = ?, mtime_ns = ? WHERE path = ?`, size, mtimeNS, path)
@@ -406,7 +497,7 @@ func (s *Store) FileIDsWithSuffix(suffix string) ([]int64, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []int64
 	for rows.Next() {
 		var id int64
@@ -437,27 +528,24 @@ func (s *Store) FileIDByPath(path string) (int64, bool, error) {
 // touch more than maxFiles paths keep their subject but not their file list, so bulk
 // commits (formatting, vendoring) never contribute to co-change. Re-inserts are ignored.
 func (s *Store) InsertCommits(commits []CommitRecord, maxFiles int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	for _, c := range commits {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO commits(hash, ts, subject, subject_terms, file_count)
-			VALUES(?, ?, ?, ?, ?)`, c.Hash, c.Time, c.Subject, c.SubjectTerms, len(c.Files)); err != nil {
-			return err
-		}
-		if len(c.Files) > maxFiles {
-			continue
-		}
-		for _, f := range c.Files {
-			if _, err := tx.Exec(`INSERT OR IGNORE INTO commit_files(commit_hash, path, old_path, status)
-				VALUES(?, ?, ?, ?)`, c.Hash, f.Path, f.OldPath, f.Status); err != nil {
+	return s.withWriteTx(func(tx execer) error {
+		for _, c := range commits {
+			if _, err := tx.Exec(`INSERT OR IGNORE INTO commits(hash, ts, subject, subject_terms, file_count)
+				VALUES(?, ?, ?, ?, ?)`, c.Hash, c.Time, c.Subject, c.SubjectTerms, len(c.Files)); err != nil {
 				return err
 			}
+			if len(c.Files) > maxFiles {
+				continue
+			}
+			for _, f := range c.Files {
+				if _, err := tx.Exec(`INSERT OR IGNORE INTO commit_files(commit_hash, path, old_path, status)
+					VALUES(?, ?, ?, ?)`, c.Hash, f.Path, f.OldPath, f.Status); err != nil {
+					return err
+				}
+			}
 		}
-	}
-	return tx.Commit()
+		return nil
+	})
 }
 
 // CoChanged returns the paths most often committed together with path, with counts.
@@ -472,7 +560,7 @@ func (s *Store) CoChanged(path string, limit int) (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := map[string]int{}
 	for rows.Next() {
 		var p string
@@ -495,34 +583,48 @@ func (s *Store) LastCommitHash() (string, error) {
 	return h, err
 }
 
-// migrate brings the schema up to SchemaVersion inside one transaction per step.
+// migrate brings the schema up to SchemaVersion. The write lock is taken before the
+// version is read, so processes opening a new index at the same moment run the migration
+// one at a time, and the losers see the finished schema instead of half of it.
 func (s *Store) migrate() error {
-	current, err := s.SchemaVersion()
+	ctx := context.Background()
+	conn, err := s.db.Conn(ctx)
 	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close() }()
+
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		return err
+	}
+	finished := false
+	defer func() {
+		if !finished {
+			_, _ = conn.ExecContext(ctx, "ROLLBACK")
+		}
+	}()
+
+	var current int
+	if err := conn.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&current); err != nil {
 		return err
 	}
 	if current > SchemaVersion {
 		return ErrSchemaTooNew
 	}
 	for v := current; v < SchemaVersion; v++ {
-		tx, err := s.db.Begin()
-		if err != nil {
-			return err
-		}
 		for _, stmt := range migrations[v] {
-			if _, err := tx.Exec(stmt); err != nil {
-				tx.Rollback()
+			if _, err := conn.ExecContext(ctx, stmt); err != nil {
 				return fmt.Errorf("migration to v%d: %w", v+1, err)
 			}
 		}
-		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", v+1)); err != nil {
-			tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", v+1)); err != nil {
 			return err
 		}
 	}
+	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+		return err
+	}
+	finished = true
 	return nil
 }
 
@@ -560,7 +662,7 @@ var migrations = [][]string{
 		`CREATE VIRTUAL TABLE symbol_fts USING fts5(
 			name_terms, sig_terms, doc_terms, path_terms,
 			tokenize = 'unicode61 remove_diacritics 2')`,
-		`CREATE VIRTUAL TABLE symbol_vocab USING fts5vocab(symbol_fts, 'row')`,
+		`CREATE VIRTUAL TABLE symbol_vocab USING fts5vocab(symbol_fts, 'col')`,
 		`CREATE TABLE refs (
 			id INTEGER PRIMARY KEY,
 			file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
@@ -596,6 +698,13 @@ var migrations = [][]string{
 			PRIMARY KEY (commit_hash, path)
 		)`,
 		`CREATE INDEX commit_files_path ON commit_files(path)`,
+	},
+	{ // v1 -> v2: vocabulary per column, so path words do not inflate symbol frequencies
+		`DROP TABLE symbol_vocab`,
+		`CREATE VIRTUAL TABLE symbol_vocab USING fts5vocab(symbol_fts, 'col')`,
+	},
+	{ // v2 -> v3: each file remembers which extraction logic produced its rows
+		`ALTER TABLE files ADD COLUMN extract_ver INTEGER NOT NULL DEFAULT 0`,
 	},
 }
 
