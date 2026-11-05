@@ -41,37 +41,44 @@ type Seen func(key, fingerprint string) bool
 // Build renders items within maxTokens (estimated for the whole block). Items already
 // reported by seen are skipped. It returns "" when nothing fits.
 func Build(items []Item, maxTokens int, seen Seen) string {
-	bySection := map[string][]string{}
+	text, _ := Compose(items, maxTokens, seen)
+	return text
+}
+
+// Compose is Build that also reports which items were rendered, so the caller can
+// remember them for deduplication.
+func Compose(items []Item, maxTokens int, seen Seen) (string, []Item) {
+	bySection := map[string][]Item{}
 	for _, it := range items {
 		if seen != nil && seen(it.Key, it.Fingerprint) {
 			continue
 		}
-		text := sanitize(it.Text)
-		if text == "" {
+		it.Text = sanitize(it.Text)
+		if it.Text == "" {
 			continue
 		}
-		bySection[it.Section] = append(bySection[it.Section], text)
+		bySection[it.Section] = append(bySection[it.Section], it)
 	}
 
 	var lines []string
+	var used []Item
 	base := openMarker + "\n" + preamble + "\n" + closeMarker
 	if EstimateTokens(base) > maxTokens {
-		return ""
+		return "", nil
 	}
-	accepted := 0
 	for _, section := range sectionOrder {
-		texts := bySection[section]
-		if len(texts) == 0 {
+		entries := bySection[section]
+		if len(entries) == 0 {
 			continue
 		}
 		heading := section
 		headingAdded := false
-		for _, text := range texts {
+		for _, it := range entries {
 			candidate := append([]string{}, lines...)
 			if !headingAdded {
 				candidate = append(candidate, heading)
 			}
-			candidate = append(candidate, "- "+text)
+			candidate = append(candidate, "- "+it.Text)
 			if EstimateTokens(render(candidate)) > maxTokens {
 				continue
 			}
@@ -79,14 +86,14 @@ func Build(items []Item, maxTokens int, seen Seen) string {
 				lines = append(lines, heading)
 				headingAdded = true
 			}
-			lines = append(lines, "- "+text)
-			accepted++
+			lines = append(lines, "- "+it.Text)
+			used = append(used, it)
 		}
 	}
-	if accepted == 0 {
-		return ""
+	if len(used) == 0 {
+		return "", nil
 	}
-	return render(lines)
+	return render(lines), used
 }
 
 func render(sectionLines []string) string {

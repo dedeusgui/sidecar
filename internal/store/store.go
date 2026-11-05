@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver with FTS5; keeps the binary CGo-free
@@ -80,6 +81,7 @@ type SymbolHit struct {
 	EndLine   int
 	Doc       string
 	Value     string
+	FileHash  string
 	Rank      float64 // bm25 value: lower is better
 }
 
@@ -103,6 +105,9 @@ const pragmas = "_pragma=busy_timeout(3000)&_pragma=journal_mode(WAL)&_pragma=sy
 
 // Open opens or creates the index at path and migrates it to SchemaVersion.
 func Open(path string) (*Store, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, err
+	}
 	db, err := sql.Open("sqlite", "file:"+path+"?"+pragmas)
 	if err != nil {
 		return nil, err
@@ -189,9 +194,9 @@ func (s *Store) ReplaceFile(file FileRecord, syms []SymbolRecord, refs []RefReco
 
 	symIDs := make([]int64, len(syms))
 	for i, sym := range syms {
-		r, err := tx.Exec(`INSERT INTO symbols(file_id, kind, name, signature, doc, value, line, end_line)
-			VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
-			fileID, sym.Kind, sym.Name, sym.Signature, sym.Doc, sym.Value, sym.Line, sym.EndLine)
+		r, err := tx.Exec(`INSERT INTO symbols(file_id, kind, name, key, signature, doc, value, line, end_line)
+			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			fileID, sym.Kind, sym.Name, KeyOf(sym.Name), sym.Signature, sym.Doc, sym.Value, sym.Line, sym.EndLine)
 		if err != nil {
 			return err
 		}
@@ -275,7 +280,7 @@ func (s *Store) FileRecords() (map[string]FileRecord, error) {
 // expression built by the caller. Results are ordered by bm25 (best first).
 func (s *Store) SearchSymbols(match string, limit int) ([]SymbolHit, error) {
 	rows, err := s.db.Query(`SELECT s.id, s.file_id, f.path, s.kind, s.name, s.signature,
-			s.line, s.end_line, s.doc, s.value, bm25(symbol_fts, 10.0, 4.0, 2.0, 3.0)
+			s.line, s.end_line, s.doc, s.value, f.hash, bm25(symbol_fts, 10.0, 4.0, 2.0, 3.0)
 		FROM symbol_fts
 		JOIN symbols s ON s.id = symbol_fts.rowid
 		JOIN files f ON f.id = s.file_id
@@ -290,7 +295,7 @@ func (s *Store) SearchSymbols(match string, limit int) ([]SymbolHit, error) {
 	for rows.Next() {
 		var h SymbolHit
 		if err := rows.Scan(&h.ID, &h.FileID, &h.Path, &h.Kind, &h.Name, &h.Signature,
-			&h.Line, &h.EndLine, &h.Doc, &h.Value, &h.Rank); err != nil {
+			&h.Line, &h.EndLine, &h.Doc, &h.Value, &h.FileHash, &h.Rank); err != nil {
 			return nil, err
 		}
 		out = append(out, h)
@@ -541,6 +546,7 @@ var migrations = [][]string{
 			parent_id INTEGER REFERENCES symbols(id) ON DELETE CASCADE,
 			kind TEXT NOT NULL,
 			name TEXT NOT NULL,
+			key TEXT NOT NULL DEFAULT '',
 			signature TEXT NOT NULL DEFAULT '',
 			doc TEXT NOT NULL DEFAULT '',
 			value TEXT NOT NULL DEFAULT '',
@@ -548,6 +554,7 @@ var migrations = [][]string{
 			end_line INTEGER NOT NULL
 		)`,
 		`CREATE INDEX symbols_name ON symbols(name)`,
+		`CREATE INDEX symbols_key ON symbols(key)`,
 		`CREATE INDEX symbols_file ON symbols(file_id)`,
 		`CREATE INDEX symbols_parent ON symbols(parent_id)`,
 		`CREATE VIRTUAL TABLE symbol_fts USING fts5(
@@ -590,4 +597,10 @@ var migrations = [][]string{
 		)`,
 		`CREATE INDEX commit_files_path ON commit_files(path)`,
 	},
+}
+
+// KeyOf normalizes an identifier for exact matching: lowercase, underscores removed.
+// MAX_ACTIVE_TICKETS and MaxActiveTickets share the key maxactivetickets.
+func KeyOf(name string) string {
+	return strings.ToLower(strings.ReplaceAll(name, "_", ""))
 }

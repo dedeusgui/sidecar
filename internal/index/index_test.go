@@ -289,3 +289,52 @@ func TestHistoryIsIngestedIncrementallyAndCountsCoChanges(t *testing.T) {
 func filepathFor(i int) string {
 	return filepath.ToSlash(filepath.Join("pkg", "f"+string(rune('a'+i%26))+string(rune('a'+i/26))+".go"))
 }
+
+func TestParentLinkPointsAtTheContainingSymbol(t *testing.T) {
+	root := mkRepo(t)
+	put(t, root, "queue.go", "package q\n\n// Queue holds waiting vehicles.\ntype Queue struct{}\n\n// Push adds a vehicle.\nfunc (q *Queue) Push() {}\n\nconst MaxSlots = 3\n")
+	git(t, root, "add", ".")
+	git(t, root, "commit", "-q", "-m", "init")
+
+	ix := openIndex(t, root)
+	mustSync(t, ix, Options{})
+	hits, err := ix.Store().SearchSymbols("push", 10)
+	if err != nil || len(hits) == 0 {
+		t.Fatalf("Push not found: %v %v", hits, err)
+	}
+	var method store.SymbolHit
+	for _, h := range hits {
+		if h.Name == "Push" {
+			method = h
+		}
+	}
+	parent, ok, err := ix.Store().ParentOf(method.ID)
+	if err != nil || !ok || parent.Name != "Queue" {
+		t.Fatalf("parent of Push = %+v (ok=%v, err=%v), want Queue", parent, ok, err)
+	}
+	if parent.ID == method.ID {
+		t.Fatal("a symbol is recorded as its own parent")
+	}
+}
+
+func TestIndexRebuildsWhenExtractionLogicChanges(t *testing.T) {
+	root := mkRepo(t)
+	put(t, root, "a.go", "package a\n\nfunc Alpha() {}\n")
+	put(t, root, "b.go", "package a\n\nfunc Beta() {}\n")
+	git(t, root, "add", ".")
+	git(t, root, "commit", "-q", "-m", "init")
+
+	ix := openIndex(t, root)
+	mustSync(t, ix, Options{})
+	// Simulate an index written by an older extraction: rows are stale even though files are unchanged.
+	if err := ix.Store().SetMeta("extract_version", "0"); err != nil {
+		t.Fatal(err)
+	}
+	rep := mustSync(t, ix, Options{})
+	if rep.Parsed != 2 {
+		t.Fatalf("stale index was not rebuilt: parsed %d files, want 2", rep.Parsed)
+	}
+	if rep := mustSync(t, ix, Options{}); rep.Parsed != 0 {
+		t.Fatalf("rebuilt index should be incremental again, parsed %d", rep.Parsed)
+	}
+}

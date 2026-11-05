@@ -45,6 +45,8 @@ func TestStemIsConservativeForPortugueseAndEnglish(t *testing.T) {
 		"statuses":   "status",
 		"boletos":    "boleto",
 		"liberacoes": "liberacao",
+		"pesagens":   "pesagem",
+		"itens":      "item",
 		"release":    "release",
 		"status":     "status",
 		"chass":      "chass",
@@ -54,6 +56,15 @@ func TestStemIsConservativeForPortugueseAndEnglish(t *testing.T) {
 		if got := Stem(in); got != want {
 			t.Errorf("Stem(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestAdverbSuffixMapsToAdjectiveStem(t *testing.T) {
+	if got := Stem("manualmente"); got != "manual" {
+		t.Errorf("Stem(manualmente) = %q, want manual", got)
+	}
+	if !contains(Translations("libera"), "release") {
+		t.Errorf("verb libera should translate to release, got %v", Translations("libera"))
 	}
 }
 

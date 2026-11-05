@@ -26,6 +26,10 @@ import (
 	"github.com/dedeusgui/sidecar/internal/store"
 )
 
+// extractVersion identifies the extraction and row layout. Changing it rebuilds every index
+// on the next sync, so rows written by older logic are never served.
+const extractVersion = "2"
+
 const (
 	maxSymbolsPerFile = 5000
 	maxRefsPerFile    = 20000
@@ -41,13 +45,15 @@ type Options struct {
 
 // Report summarizes one Sync.
 type Report struct {
-	Files     int // files indexed after the sync
-	Parsed    int // files read and parsed by this sync
-	Removed   int // files removed from the index
-	Complete  bool
-	Recovered bool // the database was rebuilt because it was unreadable
-	Head      string
-	Duration  time.Duration
+	Files    int // files indexed after the sync
+	Parsed   int // files read and parsed by this sync
+	Removed  int // files removed from the index
+	Complete bool
+	// HistoryStale is true when HEAD has commits that Git history has not been ingested for.
+	HistoryStale bool
+	Recovered    bool // the database was rebuilt because it was unreadable
+	Head         string
+	Duration     time.Duration
 }
 
 // Index is the index of one worktree.
@@ -91,6 +97,19 @@ func (ix *Index) Sync(ctx context.Context, opts Options) (Report, error) {
 	}
 	rep.Head = plan.head
 
+	stored, err := ix.st.GetMeta("extract_version")
+	if err != nil {
+		return rep, err
+	}
+	rebuild := stored != extractVersion
+	if rebuild {
+		all, err := ix.allFiles(ctx)
+		if err != nil {
+			return rep, err
+		}
+		plan.changed = cleanPaths(append(plan.changed, all...))
+	}
+
 	for _, p := range plan.removed {
 		if err := ix.st.DeleteFile(p); err != nil {
 			return rep, err
@@ -101,6 +120,9 @@ func (ix *Index) Sync(ctx context.Context, opts Options) (Report, error) {
 	records, err := ix.st.FileRecords()
 	if err != nil {
 		return rep, err
+	}
+	if rebuild {
+		records = map[string]store.FileRecord{} // nothing is trusted: every file is parsed again
 	}
 	parsed, complete, err := ix.parseAll(ctx, plan.changed, records, opts.Workers)
 	if err != nil {
@@ -138,8 +160,21 @@ func (ix *Index) Sync(ctx context.Context, opts Options) (Report, error) {
 				return rep, err
 			}
 		}
+		if err := ix.st.SetMeta("last_sync", time.Now().UTC().Format(time.RFC3339)); err != nil {
+			return rep, err
+		}
+		if err := ix.st.SetMeta("extract_version", extractVersion); err != nil {
+			return rep, err
+		}
 	}
 
+	if ix.isGit && plan.head != "" {
+		hist, err := ix.st.GetMeta("indexed_history_head")
+		if err != nil {
+			return rep, err
+		}
+		rep.HistoryStale = hist != plan.head
+	}
 	files, err := ix.st.FileRecords()
 	if err != nil {
 		return rep, err
@@ -148,6 +183,14 @@ func (ix *Index) Sync(ctx context.Context, opts Options) (Report, error) {
 	rep.Complete = complete && ctx.Err() == nil
 	rep.Duration = time.Since(start)
 	return rep, nil
+}
+
+// allFiles lists every file the index may contain, using the same rules as a normal sync.
+func (ix *Index) allFiles(ctx context.Context) ([]string, error) {
+	if ix.isGit {
+		return gitx.ListFiles(ctx, ix.root)
+	}
+	return repo.Walk(ix.root)
 }
 
 type plan struct {
@@ -414,16 +457,19 @@ func (ix *Index) parse(ex *extract.Extractor, rel string, prev store.FileRecord,
 	}
 
 	lines := 1 + strings.Count(string(data), "\n")
-	out.syms = []store.SymbolRecord{fileSymbol(rel, lines, data)}
 	if lang == "" {
+		out.syms = []store.SymbolRecord{fileSymbol(rel, lines, data)}
 		return out
 	}
 	res, err := ex.File(lang, data)
 	if err != nil {
 		out.file.Skipped = "parse_error"
+		out.syms = []store.SymbolRecord{fileSymbol(rel, lines, data)}
 		return out
 	}
-	out.syms = append(out.syms, convertSymbols(res)...)
+	// The file row goes last so that the extractor's parent and reference indices, which
+	// count from the first extracted symbol, stay valid without any offset.
+	out.syms = append(convertSymbols(res), fileSymbol(rel, lines, data))
 	out.refs = convertRefs(res)
 	for _, m := range res.Imports {
 		out.imports = append(out.imports, store.ImportRecord{Module: m})

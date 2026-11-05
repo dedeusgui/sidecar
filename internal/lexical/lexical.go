@@ -88,10 +88,14 @@ func Stem(w string) string {
 		return w
 	}
 	switch {
+	case strings.HasSuffix(w, "mente") && len(w) > 8:
+		return w[:len(w)-5] // manualmente → manual
 	case strings.HasSuffix(w, "sses"):
 		return w[:len(w)-2]
 	case strings.HasSuffix(w, "oes") && len(w) > 4:
 		return w[:len(w)-3] + "ao"
+	case strings.HasSuffix(w, "ens") && len(w) > 4:
+		return w[:len(w)-3] + "em" // pesagens → pesagem, itens → item
 	case strings.HasSuffix(w, "uses"):
 		return w[:len(w)-2]
 	case strings.HasSuffix(w, "ies") && len(w) > 4:
@@ -130,7 +134,8 @@ var stopwords = toSet(
 	"em", "no", "na", "nos", "nas", "e", "ou", "que", "para", "pra", "por", "com", "sem",
 	"se", "ao", "aos", "como", "mais", "menos", "isso", "este", "esta", "esse", "essa",
 	"eu", "voce", "nao", "sim", "ser", "ter", "foi", "ja", "qual", "quando", "onde",
-	"sobre", "entre", "muito", "pode", "preciso", "quero", "deve", "ate",
+	"sobre", "entre", "muito", "pode", "preciso", "quero", "deve", "ate", "somente",
+	"apenas", "tambem", "ainda", "aqui", "ali", "la",
 	// English
 	"the", "an", "and", "or", "of", "to", "in", "on", "for", "with", "is", "are", "be",
 	"it", "this", "that", "by", "at", "from", "we", "i", "you", "can", "should", "would",

@@ -199,3 +199,9 @@ func toSet(words ...string) map[string]bool {
 	}
 	return m
 }
+
+// Kind returns the file kind for a path (code, test, doc, config, binary).
+func Kind(p string) string {
+	_, kind := Classify(p)
+	return kind
+}

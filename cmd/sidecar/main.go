@@ -1,0 +1,257 @@
+// Command sidecar adds repository context to Claude Code and Codex prompts. Normal use is
+// automatic after `sidecar install`; the other commands are for maintenance and debugging.
+package main
+
+import (
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/dedeusgui/sidecar/internal/adapter"
+	"github.com/dedeusgui/sidecar/internal/app"
+	"github.com/dedeusgui/sidecar/internal/install"
+	"github.com/dedeusgui/sidecar/internal/paths"
+	"github.com/dedeusgui/sidecar/internal/repo"
+)
+
+// version is set at build time with -ldflags "-X main.version=...".
+var version = "dev"
+
+func main() {
+	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+func run(args []string, in io.Reader, out, errOut io.Writer) int {
+	if len(args) == 0 {
+		usage(errOut)
+		return 2
+	}
+	cmd, rest := args[0], args[1:]
+	switch cmd {
+	case "hook":
+		return cmdHook(rest, in, out, errOut)
+	case "index":
+		return cmdIndex(rest, errOut)
+	case "install":
+		return cmdInstall(rest, in, out, errOut)
+	case "uninstall":
+		return cmdUninstall(rest, out, errOut)
+	case "status":
+		return cmdStatus(rest, out, errOut)
+	case "doctor":
+		return cmdDoctor(out, errOut)
+	case "explain":
+		return cmdExplain(rest, in, out, errOut)
+	case "version", "--version":
+		fmt.Fprintln(out, "sidecar", version)
+		return 0
+	case "help", "-h", "--help":
+		usage(out)
+		return 0
+	}
+	fmt.Fprintf(errOut, "comando desconhecido: %q\n\n", cmd)
+	usage(errOut)
+	return 2
+}
+
+func usage(w io.Writer) {
+	fmt.Fprint(w, `sidecar — contexto de repositório para Claude Code e Codex
+
+Uso:
+  sidecar install [--yes] [--agent claude|codex]...   configura os hooks (com autorização)
+  sidecar uninstall [--purge]                         remove apenas o que o Sidecar instalou
+  sidecar status [--root DIR]                         resumo do índice do repositório
+  sidecar doctor                                      diagnóstico de instalação e ambiente
+  sidecar explain [--root DIR] [--json]               mostra o rastro de um prompt (lê stdin)
+  sidecar version
+
+Uso normal é automático: depois de instalar, cada prompt enviado ao agente é analisado.
+`)
+}
+
+type agentList []string
+
+func (a *agentList) String() string { return strings.Join(*a, ",") }
+func (a *agentList) Set(v string) error {
+	if _, err := adapter.ParseAgent(v); err != nil {
+		return err
+	}
+	*a = append(*a, v)
+	return nil
+}
+
+func cmdHook(args []string, in io.Reader, out, errOut io.Writer) int {
+	fs := flag.NewFlagSet("hook", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	agentName := fs.String("agent", "", "claude or codex")
+	if err := fs.Parse(args); err != nil {
+		return 0 // a malformed hook invocation must never block the agent
+	}
+	agent, err := adapter.ParseAgent(*agentName)
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return 0
+	}
+	return app.Hook(app.HookOptions{Agent: agent, Stdin: in, Stdout: out})
+}
+
+func cmdIndex(args []string, errOut io.Writer) int {
+	fs := flag.NewFlagSet("index", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	root := fs.String("root", "", "worktree root to index")
+	history := fs.Bool("history", false, "also ingest Git history")
+	if err := fs.Parse(args); err != nil || *root == "" {
+		fmt.Fprintln(errOut, "uso interno: sidecar index --root DIR [--history]")
+		return 2
+	}
+	if err := app.RunIndexer(*root, *history); err != nil {
+		fmt.Fprintln(errOut, "sidecar index:", err)
+		return 1
+	}
+	return 0
+}
+
+func cmdInstall(args []string, in io.Reader, out, errOut io.Writer) int {
+	fs := flag.NewFlagSet("install", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	yes := fs.Bool("yes", false, "confirm the changes without asking")
+	var agents agentList
+	fs.Var(&agents, "agent", "limit to an agent (repeatable)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	env, err := install.DefaultEnv()
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return 1
+	}
+	opts := install.Options{Env: env, Agents: agents, Yes: *yes, Out: out, In: in}
+	if !isTerminal(in) && !*yes {
+		opts.In = nil
+	}
+	done, err := install.Install(opts)
+	for _, d := range done {
+		fmt.Fprintln(out, "✓", d)
+	}
+	if err != nil {
+		fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	fmt.Fprintln(out, "\nPronto. Abra um repositório e envie um prompt normalmente.")
+	fmt.Fprintln(out, "Verifique com: sidecar doctor")
+	return 0
+}
+
+func cmdUninstall(args []string, out, errOut io.Writer) int {
+	fs := flag.NewFlagSet("uninstall", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	purge := fs.Bool("purge", false, "also delete the index cache and logs")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	env, err := install.DefaultEnv()
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return 1
+	}
+	done, err := install.Uninstall(install.UninstallOptions{Env: env, Out: out})
+	for _, d := range done {
+		fmt.Fprintln(out, "✓", d)
+	}
+	if err != nil {
+		fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	if *purge {
+		if err := os.RemoveAll(paths.Home()); err == nil {
+			fmt.Fprintln(out, "✓ cache removido:", paths.Home())
+		}
+		if err := os.RemoveAll(paths.ConfigHome()); err == nil {
+			fmt.Fprintln(out, "✓ configuração removida:", paths.ConfigHome())
+		}
+	}
+	fmt.Fprintln(out, "Sidecar desinstalado. Suas demais configurações foram preservadas.")
+	return 0
+}
+
+func cmdStatus(args []string, out, errOut io.Writer) int {
+	fs := flag.NewFlagSet("status", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	root := fs.String("root", ".", "folder inside the repository")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	abs, _ := filepath.Abs(*root)
+	rootDir, _ := repo.FindRoot(abs)
+	info, err := app.Status(rootDir)
+	if err != nil {
+		fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	for _, k := range []string{"root", "database", "files", "symbols", "commits", "dirty_files", "indexed_head", "last_sync", "index"} {
+		if v, ok := info[k]; ok {
+			fmt.Fprintf(out, "%-14s %v\n", k+":", v)
+		}
+	}
+	return 0
+}
+
+func cmdDoctor(out, errOut io.Writer) int {
+	env, err := install.DefaultEnv()
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return 1
+	}
+	cwd, _ := os.Getwd()
+	failed := false
+	for _, c := range app.Doctor(env, cwd) {
+		icon := map[string]string{"ok": "✓", "warn": "!", "fail": "✗", "info": "·"}[c.Status]
+		fmt.Fprintf(out, "%s %-22s %s\n", icon, c.Name, c.Detail)
+		if c.Status == "fail" {
+			failed = true
+		}
+	}
+	if failed {
+		return 1
+	}
+	return 0
+}
+
+func cmdExplain(args []string, in io.Reader, out, errOut io.Writer) int {
+	fs := flag.NewFlagSet("explain", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	root := fs.String("root", ".", "folder inside the repository")
+	asJSON := fs.Bool("json", false, "print the trace as JSON")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	prompt, err := io.ReadAll(io.LimitReader(in, adapter.MaxInputBytes))
+	if err != nil {
+		fmt.Fprintln(errOut, "erro lendo stdin:", err)
+		return 1
+	}
+	abs, _ := filepath.Abs(*root)
+	rootDir, _ := repo.FindRoot(abs)
+	rep, err := app.Explain(rootDir, strings.TrimSpace(string(prompt)))
+	if err != nil {
+		fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	if err := app.WriteExplain(out, rep, *asJSON); err != nil {
+		fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	return 0
+}
+
+func isTerminal(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
