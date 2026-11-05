@@ -1,0 +1,5 @@
+CREATE TABLE tickets (
+  id INTEGER PRIMARY KEY,
+  status TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS queue_entries (id INTEGER);

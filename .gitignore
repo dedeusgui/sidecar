@@ -1,0 +1,9 @@
+/sidecar
+/sidecar.exe
+/dist/
+/bin/
+*.test
+*.out
+*.db
+*.db-wal
+*.db-shm
