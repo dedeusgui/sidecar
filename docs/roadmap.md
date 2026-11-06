@@ -37,20 +37,34 @@
 
 **Gates:** relatório compara antes/depois com entradas e versões; nenhum benchmark paga tokens no PR; docs sincronizadas.
 
+## M1.5 — Context Engine v2 incremental [P1]
+
+**Objetivo:** nova estratégia orientada à intenção sem substituir de imediato BM25 + tradução; benchmark e rollout por feature flag. Especificação: [context-engine-v2.md](context-engine-v2.md).
+
+| Trabalho | Entrega / aceite |
+|---|---|
+| Instrumentar pipeline v1 | Trace de candidates/ablation, decisões de supressão, ids de evidência, orçamento e timings **sem mudar ranking** |
+| IntentRouter determinístico | `locate/impact/debug/extend/test/explain/general`, explicável, fallback ao v1; medir por intenção com labels públicos |
+| ContextPacker sob budget | Cobertura incremental/novidade/redundância e gate de confiança; medir evidência correta por token, falsos positivos e latência |
+| SessionSignals local e opt-in | IDs de evidência/arquivos já consultados, TTL/invalidação, sem gravação de conversa; adaptar sem forçar modelos |
+| Ablação e rollback | Comparação OFF vs v1 vs v2 e por componente; sem ganho replicado, não promover default |
+
+**Gate:** resultado offline reproduzível em corpora públicos pinados, sem regressões graves e com métricas de overhead; `AGENTS.md` e docs mantidos no PR.
+
 ## M2 — Benchmark de resultado real e econômico [P1]
 
 **Objetivo:** medir se a injeção reduz *tempo para evidência*, rounds e buscas sem diminuir qualidade.
 
 | Trabalho | Entrega / aceite |
 |---|---|
-| Corpus diverso e pinado | repositórios/SHAs/licenças, gold independente, tarefas PT/EN e negativas; `blind-test` fechado |
-| Instrumentação mínima | braços Sidecar ON/OFF, mesmo modelo/harness/permissions, TTFE, tool calls, rounds, tokens, solução e overhead |
+| Corpus público pinado como base | Agent Retrieval Bench (427 casos/25 repos, inclui no-gold) primeiro; ContextBench (1.136 tarefas/66 repos) depois; reusar labels sem reanotar; licença, SHA, manifests e blind-test isolado |
+| Instrumentação mínima | braços OFF / ON-v1 / ON-v2, mesmo modelo/harness/permissões; TTFE apresentado vs utilizado, tool calls, rounds, sucesso, tokens, custo, overhead e eventos não observados |
 | Piloto manual | **24 execuções**, 4 tarefas × 3 modelos (Haiku/Luna/Flash) × 2 braços; diagnosticar protocolo, não alegar ganho |
 | Amostra adicional | repetições randomizadas, intervalos de confiança por tarefa, casos com efeito adverso reportados |
-| Comparação de métodos | lexical vs tradução vs grafo vs Git e contexto automático vs agentes com ferramentas nativas |
+| Comparação de métodos | lexical vs tradução vs grafo vs Git vs intenção vs packer vs LSP; preservar capacidades de ferramentas do agente nos dois braços |
 | Qualidade downstream | bugs/fixes pequenos com testes oracle; separar “achou código” de “resolveu corretamente” |
 
-**Gates:** custos/quotas e timeout registrados, sem contaminação de holdout; resultados incluem negativos e falhas; aceitamos conclusão **inconclusiva**. Protocolo completo: `docs/evaluation-plan.md`.
+**Gates:** custos/quotas e timeout registrados, sem contaminação de holdout; resultados incluem negativos, falhas e informação não observada. Repetibilidade **determinística apenas no nível offline**; agentes exigem repetição e incerteza. Aceitamos conclusão **inconclusiva**. Protocolo: `docs/evaluation-plan.md` e `docs/agent-feedback.md`.
 
 ## M3 — Universalidade por fallback e integrações [P1/P2]
 
@@ -60,8 +74,9 @@
 |---|---|
 | Matriz por linguagem/escala | publicar suporte efetivo: parser, lexical fallback, caminhos, repo sem Git, tamanho e limitações |
 | Cobertura desconhecida | testar Rust, PHP, arquivos gerados, monorepos, symlinks, paths Unicode e projetos não convencionais; nunca inventar símbolos |
-| Visibilidade opcional | API local de atividade e status line Claude Code **opt-in**, coexistente e reversível |
-| Avaliar plugins/mods | só após validação oficial/versionada e E2E; não bloquear CLI sem UI |
+| LSP interoperável e opcional | detectar linguagem/servidor confiável; aproveitar plugin nativo do Claude; cliente LSP próprio somente após benefício medido; setup com consentimento, fallback e rollback; ver `docs/lsp-strategy.md` |
+| Visibilidade opcional | API local de atividade e status line/mod Claude Code **opt-in**, coexistente e reversível |
+| Avaliar plugins/mods | Claude Code já documenta mods em JS/TS e LSP plugins oficiais; usar extensão opt-in com E2E sem modificar o fluxo core |
 | Distribuição conveniente | script ou gerenciador de pacotes somente depois do contrato de update/uninstall; npm apenas se houver benefício concreto |
 
 **Gates:** nenhum requer config de projeto; fallback e falhas não bloqueiam agente; UI não vaza prompt ou código.
@@ -79,7 +94,9 @@
 2. Reproduzir instalação/upgrade/E2E; publicar primeiro release de desenvolvimento.
 3. Instrumentar benchmark sem LLM e dogfood no próprio repo.
 4. Preparar corpus e gold independente; executar piloto Haiku/Luna/Flash com teto.
-5. Medir antes de incorporar ranking complexo ou UI.
-6. Integrar status line como recurso secundário e opcional.
+5. Rodar ARB/ContextBench offline em subset fixo; habilitar roteamento por intenção e packing por feature flag com ablações.
+6. Instrumentar hooks de ferramenta em modo observação, com feedback opcional pós-tarefa (sem autoajuste por autorrelato).
+7. Avaliar LSP existente e suporte Claude; só depois implementar cliente/instalador LSP opt-in.
+8. Rodar pilotos agentic Haiku/Luna/Flash com teto e repetir pares; adicionar UI/mod opcional depois de comprovado o valor.
 
 **Definição de pronto para qualquer PR:** escopo pequeno, testes apropriados realmente executados, impacto documentado, risco de privacidade/cross-platform tratado e `docs/` atualizadas (ou justificativa objetiva).
