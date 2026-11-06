@@ -106,11 +106,13 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	if cwd == "" {
 		cwd = "."
 	}
-	if unsafeRoot(cwd) {
+	root, _ := repo.FindRoot(cwd)
+	// Check both the requested folder and the discovered worktree root. A project
+	// located at the user's home must not cause an entire home directory to be indexed.
+	if unsafeRoot(cwd) || unsafeRoot(root) {
 		rec["status"] = "skipped_unsafe_root"
 		return "", nil
 	}
-	root, _ := repo.FindRoot(cwd)
 	rec["repo"] = repoLabel(root)
 
 	t := time.Now()
@@ -177,7 +179,9 @@ func unsafeRoot(cwd string) bool {
 	if err != nil {
 		return true
 	}
-	if abs == string(filepath.Separator) {
+	// filepath.Dir(root) == root detects POSIX '/', Windows drive roots (C:\\)
+	// and UNC share roots without relying on a platform-specific separator.
+	if filepath.Dir(abs) == abs {
 		return true
 	}
 	if home, err := os.UserHomeDir(); err == nil && abs == filepath.Clean(home) {
