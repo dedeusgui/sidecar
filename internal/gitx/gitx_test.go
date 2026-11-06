@@ -188,7 +188,7 @@ func samePath(a, b string) bool {
 
 func TestChangedBetweenPreservesRenamesAndChangedPaths(t *testing.T) {
 	root := mkRepo(t)
-	write(t, filepath.Join(root, "src", "a queue.go"), "package src\n")
+	write(t, filepath.Join(root, "src", "a queue.go"), "package src\n\nfunc QueueSpecific() {}\n")
 	write(t, filepath.Join(root, "src", "removed.go"), "package src\n")
 	write(t, filepath.Join(root, "src", "edited.go"), "package src\n")
 	run(t, root, "add", ".")
