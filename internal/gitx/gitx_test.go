@@ -185,3 +185,49 @@ func samePath(a, b string) bool {
 	rb, _ := filepath.EvalSymlinks(b)
 	return ra == rb
 }
+
+func TestChangedBetweenPreservesRenamesAndChangedPaths(t *testing.T) {
+	root := mkRepo(t)
+	write(t, filepath.Join(root, "src", "a queue.go"), "package src\n")
+	write(t, filepath.Join(root, "src", "removed.go"), "package src\n")
+	write(t, filepath.Join(root, "src", "edited.go"), "package src\n")
+	run(t, root, "add", ".")
+	run(t, root, "commit", "-q", "-m", "before")
+	before, err := Head(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run(t, root, "mv", "src/a queue.go", "src/renamed queue.go")
+	if err := os.Remove(filepath.Join(root, "src", "removed.go")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(root, "src", "edited.go"), "package src\n\nfunc Edited() {}\n")
+	write(t, filepath.Join(root, "src", "added.go"), "package src\n")
+	run(t, root, "add", "-A")
+	run(t, root, "commit", "-q", "-m", "after")
+	after, err := Head(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changes, err := ChangedBetween(context.Background(), root, before, after)
+	if err != nil {
+		t.Fatalf("ChangedBetween failed on a valid Git diff: %v", err)
+	}
+	byPath := map[string]FileChange{}
+	for _, change := range changes {
+		byPath[change.Path] = change
+	}
+	if len(changes) != 4 {
+		t.Fatalf("expected four changed files, got %+v", changes)
+	}
+	if c := byPath["src/renamed queue.go"]; c.Status != "R" || c.OldPath != "src/a queue.go" {
+		t.Errorf("rename lost: %+v", c)
+	}
+	for p, want := range map[string]string{"src/removed.go": "D", "src/edited.go": "M", "src/added.go": "A"} {
+		if c := byPath[p]; c.Status != want {
+			t.Errorf("%s: expected %s, got %+v", p, want, c)
+		}
+	}
+}
