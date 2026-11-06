@@ -72,3 +72,11 @@ Servidores podem executar ferramentas de build, ler dependências e acessar rede
 - [LSP oficial](https://microsoft.github.io/language-server-protocol/)
 - [Claude Code: code intelligence plugins](https://code.claude.com/docs/en/plugins/code-intelligence)
 - [Claude Code: mod/plugin e hooks](https://code.claude.com/docs/en/hooks)
+
+## V2 integrada: seleção de fonte e reuso OSS
+
+- LSP é **provider opcional de evidência**, não motivo para transformar Sidecar em CodeGraph completo. A V2 precisa combinar saídas de parser/FTS/AST, LSP, código, testes, docs e contratos sob o mesmo schema de proveniência (ver [product-v2.md](product-v2.md)).
+- Antes de criar cliente JSON-RPC próprio, inspecionar [SolidLSP de Serena](https://github.com/oraios/serena/tree/main/src/solidlsp) (**MIT** por componente) e [CodeGraph](https://github.com/codegraph-ai/CodeGraph) (**Apache-2.0**), registrando o SHA consultado. **Serena aplicativo é GPL-3.0-or-later**, portanto não copiar indiscriminadamente.
+- A **descoberta** é automática e leve; a **instalação** do servidor não é. O prompt só funciona se Sidecar já estiver instalado; nunca injetar ordem que mande o agente executar instalador de terceiros na máquina.
+- Documentação de dependências via [Context7](https://github.com/upstash/context7) é **opt-in**, pode usar rede e backend não aberto; deve validar versão identificada em manifest, origem e política de privacidade. Não é substituto das evidências do código.
+- Gates LSP: repositório desconhecido, servidor ausente/falhando/frio, Java/Go, monorepo, confiança, tool hook, Linux/Windows/macOS, timeout, cancelamento, uninstall e comparação do benefício líquido com o modo sem LSP. Ver [rodada D](roadmap.md).
