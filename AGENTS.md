@@ -69,7 +69,7 @@ Ler `docs/evaluation-plan.md` antes de declarar ganho. Reportar **retrieval offl
 
 ## Política de compatibilidade e extensões
 
-Hooks são contratos versionados de terceiros: não presumir que Codex, Claude e Gemini tenham schemas ou UI idênticos. Exigir testes de contrato e E2E reais por cliente. Recursos de UI (status line, plugin/mod), skills ou integrações extras devem ser **opt-in**, reversíveis, sem substituir statuslines ou configurações existentes. Não prometer execução de interface não verificada.
+Hooks são contratos versionados de terceiros: não presumir que Codex, Claude Code e Antigravity CLI tenham schemas ou UI idênticos. Exigir testes de contrato e E2E reais por cliente. Recursos de UI (status line, plugin/mod), skills ou integrações extras devem ser **opt-in**, reversíveis, sem substituir statuslines ou configurações existentes. Não prometer execução de interface não verificada.
 
 ## Navegação
 
