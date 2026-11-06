@@ -10,6 +10,15 @@ O Sidecar lê um evento `UserPromptSubmit` do stdin, identifica o repositório e
 - **Codex:** `~/.codex/hooks.json` e `UserPromptSubmit`; hooks não gerenciados precisam de **aprovação/trust** via `/hooks`. Testar evento, schema, saída, aprovação, novo hash após update, recusa e desinstalação. Fonte: [Codex hooks](https://learn.chatgpt.com/docs/hooks).
 - **Gemini CLI:** *não integrado ao produto neste momento*. O modelo Gemini Flash pode participar de um benchmark com infraestrutura própria, mas o protocolo deve registrar se o cliente consegue consumir contexto Sidecar. Não simular equivalência com hook nativo.
 
+## Evolução prevista: observação do loop e LSP
+
+- `UserPromptSubmit` continua sendo a **única integração operacional atual**. A arquitetura v2 observa `PostToolUse`/equivalentes e `Stop`/encerramento, apenas com metadados redigidos e permissão explícita; **não implementado**. Contrato e riscos em [agent-feedback.md](agent-feedback.md).
+- Claude Code **já suporta** plugins oficiais de inteligência de código (LSP) com `gopls`, `jdtls`, `pyright`, `typescript-language-server`, `rust-analyzer` etc., com binário separado. Também tem recomendação nativa de plugin quando identifica servidor disponível. Sidecar não precisa inventar um MCP de LSP nem reinstalar o mesmo servidor automaticamente. Fonte: [Code intelligence plugins](https://code.claude.com/docs/en/plugins/code-intelligence).
+- A consulta LSP **dentro do Sidecar** para o ranking inicial é uma funcionalidade diferente de o agente possuir sua própria ferramenta LSP. Requer cliente próprio/integração documentada, confiança e timeout. Estratégia em [lsp-strategy.md](lsp-strategy.md).
+- A documentação oficial de [mods do Claude Code](https://code.claude.com/docs/en/plugins/mods/create) permite extensões JS/TS e alterações de UI. Um mod de atividade pode ser opcional, versionado e sem substituir hooks do Sidecar; requer versão/consentimento/superfície suportada. Não prometer funcionamento em cloud nem auto-instalação pelo hook.
+- Codex documenta `PreToolUse`, `PostToolUse`, `Stop` e limites para ferramentas hospedadas; Gemini CLI usa `BeforeTool`, `AfterTool` e `AfterAgent`. Adapters e eventos precisam de smoke/E2E individuais. Referências: [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Gemini CLI hooks](https://geminicli.com/docs/hooks/).
+- Uma instalação **nova** do Sidecar não pode ser oferecida por hook de um Sidecar ausente. O primeiro prompt só pode detectar linguagens, sugerir LSP ou adaptar contexto **depois** que o Sidecar já está instalado; qualquer download/instalação requer ação autorizada fora do caminho crítico.
+
 ## E2E mínimo antes de prometer compatibilidade
 
 1. Preparar usuário/configuração temporária sem hooks preexistentes; depois repetir **com** hooks do usuário.
