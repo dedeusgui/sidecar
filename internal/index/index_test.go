@@ -360,3 +360,60 @@ func TestBoundedSyncParsesAtMostNFilesAndResumes(t *testing.T) {
 		t.Fatalf("work was not resumed exactly: %d + %d, want 30", rep.Parsed, rep2.Parsed)
 	}
 }
+
+func TestCommittedHeadChangePlansOnlyChangedPaths(t *testing.T) {
+	root := mkRepo(t)
+	put(t, root, "a.go", "package p\n\nfunc Original() {}\n")
+	put(t, root, "b.go", "package p\n\nfunc Untouched() {}\n")
+	git(t, root, "add", ".")
+	git(t, root, "commit", "-q", "-m", "initial")
+	ix := openIndex(t, root)
+	mustSync(t, ix, Options{})
+
+	put(t, root, "a.go", "package p\n\nfunc Updated() {}\n")
+	git(t, root, "add", "a.go")
+	git(t, root, "commit", "-q", "-m", "update a")
+	plan, err := ix.plan(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.changed) != 1 || plan.changed[0] != "a.go" {
+		t.Fatalf("only a.go should be in the incremental plan, got %+v", plan)
+	}
+	mustSync(t, ix, Options{})
+	if hits, _ := ix.Store().SearchSymbols("updated", 10); countNamed(hits, "Updated") != 1 {
+		t.Fatalf("updated symbol missing after commit: %+v", hits)
+	}
+}
+
+func TestFullGitRescanRemovesFilesMissingFromCleanWorktree(t *testing.T) {
+	root := mkRepo(t)
+	put(t, root, "keep.go", "package p\n\nfunc Keep() {}\n")
+	put(t, root, "old.go", "package p\n\nfunc Obsolete() {}\n")
+	git(t, root, "add", ".")
+	git(t, root, "commit", "-q", "-m", "initial")
+	ix := openIndex(t, root)
+	mustSync(t, ix, Options{})
+
+	git(t, root, "rm", "old.go")
+	git(t, root, "commit", "-q", "-m", "remove old file")
+	// Simulate an index pointing to a commit lost during history replacement.
+	// The working tree is clean, so git status alone cannot discover old.go.
+	if err := ix.Store().SetMeta("indexed_head", "invalid-pruned-commit"); err != nil {
+		t.Fatal(err)
+	}
+	rep := mustSync(t, ix, Options{})
+	if rep.Removed == 0 {
+		t.Fatalf("full reconciliation did not prune missing file: %+v", rep)
+	}
+	records, err := ix.Store().FileRecords()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := records["old.go"]; ok {
+		t.Fatal("stale old.go file record survived full reconciliation")
+	}
+	if hits, _ := ix.Store().SearchSymbols("obsolete", 10); countNamed(hits, "Obsolete") != 0 {
+		t.Fatalf("deleted symbol remains searchable: %+v", hits)
+	}
+}
