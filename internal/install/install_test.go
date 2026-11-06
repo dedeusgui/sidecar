@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -230,8 +231,16 @@ func TestInstalledBinaryIsExecutableCopy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("binary not installed: %v", err)
 	}
-	if info.Mode().Perm()&0o100 == 0 {
+	// Windows does not expose executable bits through os.FileMode. The .exe
+	// extension identifies native executables there; on Unix check permissions.
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o100 == 0 {
 		t.Fatalf("installed binary is not executable: %v", info.Mode())
+	}
+	if !info.Mode().IsRegular() {
+		t.Fatalf("installed binary is not a regular file: %v", info.Mode())
+	}
+	if got, want := string(mustRead(t, filepath.Join(env.InstallDir, BinaryName))), string(mustRead(t, env.Source)); got != want {
+		t.Fatalf("installed binary contents differ from source")
 	}
 }
 
