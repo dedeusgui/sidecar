@@ -11,7 +11,11 @@ O Sidecar **não** é um agente, um orquestrador, uma memória de conversa nem u
 
 ## Instalação
 
-1. Baixe o binário da sua plataforma na página de releases e confira o `checksums.txt` (SHA-256).
+**Estado atual:** ainda não há release pública publicada. A descrição a seguir é o fluxo pretendido
+**depois** da primeira release. Para desenvolvimento, veja [docs/release.md](docs/release.md) antes de
+executar `sidecar install` (o comando altera configurações dos agentes do usuário).
+
+1. Após a publicação de uma release, baixe o binário da plataforma e confira o `checksums.txt` (SHA-256).
 2. Execute:
 
    ```sh
@@ -94,8 +98,9 @@ não commitada só reforça símbolos cujo nome contém a palavra do prompt, e a
 | **Claude Code** | Verificado de ponta a ponta nesta versão: instalação com `--yes`, hook real invocado pelo `claude -p`, o modelo respondeu usando o contexto injetado. Formato: `hookSpecificOutput.additionalContext`. |
 | **Codex** | Adaptador e `hooks.json` conforme o schema de hooks do Codex (`UserPromptSubmit`, `additionalContext`, campos `type`/`command`/`timeout`). **Não executado**: o Codex não está disponível neste ambiente. Precisa de teste local. O Codex só roda hooks que você aprovou na revisão de hooks dele; `sidecar doctor` avisa quando a aprovação falta. |
 
-Plataformas: o código compila sem CGo para linux, macOS e Windows (amd64 e arm64). Os testes foram executados
-em Linux. O CI está configurado para Linux, macOS e Windows, mas essas duas últimas ainda não rodaram.
+Plataformas: o código compila sem CGo para Linux, macOS e Windows (amd64 e arm64). O CI da branch
+`main` passou em testes Go em Linux, macOS e Windows e em cross-builds nas seis combinações em 2026-11-06.
+Isso **não** comprova instalação/hook E2E em todos os sistemas; Codex CLI real permanece pendente.
 
 ## Limitações
 
@@ -110,6 +115,23 @@ em Linux. O CI está configurado para Linux, macOS e Windows, mas essas duas úl
   quando o orçamento acaba). Não há daemon.
 - **Histórico.** Commits de formatação em massa são ignorados para co-alteração apenas pelo tamanho; não há detecção
   de mudanças só de espaço em branco.
+
+## Engenharia, benchmarks e roadmap
+
+- [AGENTS.md](AGENTS.md): contrato dos agentes que desenvolvem o Sidecar (não exige regras no repositório do usuário).
+- [CLAUDE.md](CLAUDE.md): entrada de instruções Claude Code, reutilizando AGENTS.md.
+- [docs/development.md](docs/development.md): mapa do código, testes, depuração e dogfooding.
+- [docs/evaluation-plan.md](docs/evaluation-plan.md): A/B com modelos baratos, corpus diverso, rounds,
+  tempo para evidência, custo e protocolo contra viés de benchmark.
+- [docs/landscape.md](docs/landscape.md): Aider, Serena, Continue e fundamentação científica.
+- [docs/integrations.md](docs/integrations.md): contratos de hooks e visibilidade UI opcional.
+- [docs/release.md](docs/release.md): build, instalação, update e gates de release.
+- [docs/roadmap.md](docs/roadmap.md): milestones, prioridades e critérios de aceite.
+- [docs/benchmark.md](docs/benchmark.md): **resultados existentes** de recuperação offline.
+
+**Atenção:** os benchmarks atuais não demonstram redução de rounds, tempo ou tokens de um
+agente. Essas são hipóteses a testar em experimentos pareados, sem confundir qualidade de
+retrieval com resultado de engenharia.
 
 ## Desenvolvimento
 
