@@ -19,6 +19,12 @@ O Sidecar lê um evento `UserPromptSubmit` do stdin, identifica o repositório e
 - Codex documenta `PreToolUse`, `PostToolUse`, `Stop` e limites para ferramentas hospedadas; Gemini CLI usa `BeforeTool`, `AfterTool` e `AfterAgent`. Adapters e eventos precisam de smoke/E2E individuais. Referências: [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Gemini CLI hooks](https://geminicli.com/docs/hooks/).
 - Uma instalação **nova** do Sidecar não pode ser oferecida por hook de um Sidecar ausente. O primeiro prompt só pode detectar linguagens, sugerir LSP ou adaptar contexto **depois** que o Sidecar já está instalado; qualquer download/instalação requer ação autorizada fora do caminho crítico.
 
+## Integração como produto completo V2
+
+O fluxo pretendido é `install once → UserPromptSubmit/context → SessionObserver → (intervenção seletiva quando suportada) → feedback diagnóstico opcional`, com continuidade entre sessões e nenhum setup por repo. Ver [v2-product-spec.md](v2-product-spec.md), [roadmap.md](roadmap.md) e [agent-feedback.md](agent-feedback.md). A implementação **ainda não foi feita**; os eventos existentes são capacidades de cada cliente, não provas de que Sidecar já as usa.
+
+Para definir adaptadores, os agentes desenvolvedores devem estudar a [matriz de projetos](open-source-references.md) (hooks CodeGraph, Claude-Mem, LSP Serena/SolidLSP) e schemas oficiais em versões fixadas. Reuso de código exige licença compatível e revisão; preferir uma única instalação leve e compatível às integrações obrigatórias por agente.
+
 ## E2E mínimo antes de prometer compatibilidade
 
 1. Preparar usuário/configuração temporária sem hooks preexistentes; depois repetir **com** hooks do usuário.
