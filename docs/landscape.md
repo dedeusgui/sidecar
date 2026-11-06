@@ -55,6 +55,12 @@ Nenhuma referência acima prova que o agente dará menos rounds por receber cont
 
 **Decisão de desenho:** v1 é baseline de comparação; v2 propõe `IntentRouter` determinístico + seleção por utilidade marginal de evidências por token + estado mínimo de sessão. LSP e feedback parametrizado entram em experimentos isolados com **fallback, opt-in e ablação**. Ver [Context Engine v2](context-engine-v2.md), [LSP](lsp-strategy.md), [feedback](agent-feedback.md).
 
+## Consolidação de referências para agentes desenvolvedores
+
+A lista **atualizada e operacional** de repositórios, commits, licenças, componentes a estudar e limites de reuso está em [open-source-references.md](open-source-references.md). Aquele catálogo substitui listas soltas deste estudo na hora de programar: cada módulo deve examinar 1–3 fontes **pertinentes** em SHA fixado e documentar uma decisão `reuse / integrate / independent / discard`, com testes e licenciamento. A especificação de destino do produto é [v2-product-spec.md](v2-product-spec.md).
+
+Não inferir que CodeGraph, Context7, Serena, RTK ou Claude-Mem resolvem por si só as hipóteses de produtividade. A principal contribuição a testar do V2 é **menos trabalho de descoberta e reconciliação por tarefa resolvida**, com observação, contexto sob demanda e LSP opcional.
+
 ## Decisão atual
 
 Investir primeiro em **evidência comparativa** (retrieval sem LLM + A/B com Haiku/Luna/Flash), E2E real de hooks e dogfooding. Só depois decidir ampliar linguagens, adicionar camada semântica ou UI. Para comunicação externa, evitar “mais rápido” até medir TTFE, rounds, sucesso e custo total.
