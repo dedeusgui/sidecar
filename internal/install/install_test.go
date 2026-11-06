@@ -312,7 +312,17 @@ func TestUninstallPreservesDifferentSidecarExecutableHook(t *testing.T) {
 	if _, err := Uninstall(UninstallOptions{Env: env, Out: &bytes.Buffer{}}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(mustRead(t, env.ClaudeSettings)), other) {
+	// Compare decoded JSON commands; raw Windows paths are escaped in JSON.
+	hooks, _ := readJSON(t, env.ClaudeSettings)["hooks"].(map[string]any)
+	found := false
+	for _, group := range asList(hooks["UserPromptSubmit"]) {
+		for _, handler := range asList(group.(map[string]any)["hooks"]) {
+			if handler.(map[string]any)["command"] == other {
+				found = true
+			}
+		}
+	}
+	if !found {
 		t.Fatal("uninstall removed an unrelated user's sidecar hook")
 	}
 }
