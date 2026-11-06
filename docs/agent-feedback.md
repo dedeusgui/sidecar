@@ -97,3 +97,13 @@ Observação ≠ causalidade. Comparação causal de utilidade exige A/B com est
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks)
 - [Codex hooks](https://learn.chatgpt.com/docs/hooks)
 - [Gemini CLI hooks](https://geminicli.com/docs/hooks/)
+
+## Consolidação para a V2 completa
+
+- Este arquivo especifica **um subsistema** do produto integrado ([product-v2.md](product-v2.md)); não é uma feature autônoma que exija outro daemon.
+- `SessionObserver` deve ser **passivo** até validar, com rastreamento de `new_evidence`, `previous_evidence`, `repeated_search`, `unobserved`, `time_to_correct_used_evidence` e custo de observação.
+- `LoopDiagnostics` exige anti-falsos-positivos: reler um arquivo após edição, depurar falha nova e reexecutar um teste não são necessariamente loops ruins.
+- A futura `InjectionPolicy` pode sugerir evidência **nova** em evento de ferramenta somente quando o cliente comprovadamente permitir aquele retorno de hook, sem duplicar o conteúdo e sem bloquear. Caso contrário, usar próximo prompt do usuário.
+- O feedback parametrizado por modelo permanece **opt-in e pós-tarefa**; o modelo não é juiz da própria eficiência e não gera rótulo definitivo para ranking.
+- Referências do módulo: [Claude-Mem](https://github.com/thedotmack/claude-mem/tree/main/src/hooks), [Beads](https://github.com/gastownhall/beads), [headroom](https://github.com/headroomlabs-ai/headroom) e [catálogo de licenças](reference-implementations.md).
+- Gates e cronograma: [roadmap.md](roadmap.md), rodadas C e E; nenhuma dessas funcionalidades é considerada implementada por esta documentação.
