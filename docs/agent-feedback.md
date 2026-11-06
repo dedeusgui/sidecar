@@ -20,9 +20,9 @@ Preferir **traces de eventos determinísticos** dos hooks disponíveis, capturad
 |---|---|---|
 | Claude Code | `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionEnd` | filtros/event payload variam; não tratar Stop como garantia de tarefa válida |
 | Codex | `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionEnd` | hooks requerem trust, algumas ferramentas hosted não geram hooks locais; cloud diferenciado |
-| Gemini CLI | `BeforeAgent`, `BeforeTool`, `AfterTool`, `AfterAgent`, `SessionEnd` | outro schema; exige adaptador próprio, não converter eventos por nome |
+| Antigravity CLI | `SessionStart`, `PreInvocation`, `PostInvocation`, `PreToolUse`, `PostToolUse`, `Stop` | outro schema; `PreInvocation` suporta `injectSteps`, mas injeção e observação precisam de E2E próprio; não converter eventos por nome |
 
-Referências: [Claude hooks](https://code.claude.com/docs/en/hooks), [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Gemini hooks](https://geminicli.com/docs/hooks/).
+Referências: [Claude hooks](https://code.claude.com/docs/en/hooks), [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Antigravity CLI hooks](https://antigravity.google/docs/hooks).
 
 ## Esquema de evento proposto (não vigente)
 
@@ -96,7 +96,7 @@ Observação ≠ causalidade. Comparação causal de utilidade exige A/B com est
 
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks)
 - [Codex hooks](https://learn.chatgpt.com/docs/hooks)
-- [Gemini CLI hooks](https://geminicli.com/docs/hooks/)
+- [Antigravity CLI hooks](https://antigravity.google/docs/hooks/)
 
 ## Consolidação para a V2 completa
 
