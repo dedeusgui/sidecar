@@ -116,6 +116,16 @@ Isso **não** comprova instalação/hook E2E em todos os sistemas; Codex CLI rea
 - **Histórico.** Commits de formatação em massa são ignorados para co-alteração apenas pelo tamanho; não há detecção
   de mudanças só de espaço em branco.
 
+## Direção de produto: Sidecar V2
+
+O projeto segue funcional na versão atual. A **V2 completa ainda está em desenvolvimento**: uma camada local que antecipa contexto relevante, acompanha navegação dos agentes, reconcilia evidências de código/testes/docs, mantém decisões técnicas verificáveis e reduz busca/rounds/tokens com mínimo de intervenção. **Não é outro CodeGraph nem exige MCP/skills do usuário.**
+
+- [Visão e contratos do produto V2](docs/product-v2.md)
+- [Roadmap integral e matriz de todos os testes pendentes](docs/roadmap.md)
+- [Implementações open source de referência, caminhos de código e licenças](docs/reference-implementations.md)
+
+As funções novas são **planejadas, não entregues**. Toda alegação de ganho precisará de benchmark offline e A/B agentic, incluindo efeitos negativos.
+
 ## Engenharia, benchmarks e roadmap
 
 - [AGENTS.md](AGENTS.md): contrato dos agentes que desenvolvem o Sidecar (não exige regras no repositório do usuário).
