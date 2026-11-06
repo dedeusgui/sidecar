@@ -1,7 +1,7 @@
 # Sidecar V2 — especificação do produto completo
 
 **Estado:** arquitetura-alvo e contrato de implementação; **nenhum dos módulos novos está implementado por este documento**. Data: 2026-11-06.
-**Usuário prioritário:** desenvolvedor com Claude Code, Codex e Gemini CLI, frequentemente usando modelos econômicos, em diferentes repositórios, com pouco orçamento de tokens e tempo.
+**Usuário prioritário:** desenvolvedor com Claude Code, Codex e Antigravity CLI, frequentemente usando modelos econômicos, em diferentes repositórios, com pouco orçamento de tokens e tempo.
 
 ## North star
 
