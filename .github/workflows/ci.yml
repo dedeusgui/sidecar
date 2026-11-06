@@ -2,8 +2,15 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
+  workflow_dispatch:
+
+# Feature branches run through their PR, not once for the push and again for the PR.
+# A new push cancels obsolete jobs for the same PR.
+concurrency:
+  group: sidecar-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
