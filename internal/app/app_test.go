@@ -180,3 +180,29 @@ func TestUnsafeRootIsNotIndexed(t *testing.T) {
 		t.Fatalf("filesystem root should never be indexed: out=%q log=%s", out, log)
 	}
 }
+
+func TestHookRejectsRepositoryRootAtUserHome(t *testing.T) {
+	setupHome(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if actual, err := os.UserHomeDir(); err != nil || filepath.Clean(actual) != filepath.Clean(home) {
+		t.Skipf("cannot override user home on this platform: %q, %v", actual, err)
+	}
+	// A nested cwd does not make it safe to index a Git worktree rooted at HOME.
+	if err := os.MkdirAll(filepath.Join(home, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(home, "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var spawned []string
+	out, log := runHook(t, adapter.Claude, payload(t, nested, "MAX_ACTIVE_TICKETS", "home-root"), &spawned)
+	if out != "" || !strings.Contains(log, "skipped_unsafe_root") {
+		t.Fatalf("home-rooted repository should not be indexed: out=%q log=%s", out, log)
+	}
+	if len(spawned) != 0 {
+		t.Fatalf("unsafe repository started a background worker: %v", spawned)
+	}
+}
