@@ -26,7 +26,7 @@ Stop/completion (opt-in) ─> feedback auxiliar / eval fora do runtime
 
 Preservar os limites atuais de CPU, budget de sincronização e fail-open; passagem de dados não confiáveis nunca cria autoridade instrucional.
 
-## 3. IntentRouter (MVP sem LLM)
+## 3. IntentRouter (núcleo V2 sem LLM)
 
 Classes (multirrótulo opcional, com fallback `general`):
 - `locate`: encontrar definição/regra/rota; lexical/exato/path.
@@ -101,5 +101,11 @@ Cada etapa requer benchmark offline independente e verificação de latência/se
 - Um LSP pode executar componentes do projeto/abrir rede; isolamento e consentimento são necessários.
 - Classificador pode superajustar benchmark; manter teste cego intocado até versão congelada.
 - Se o v2 não vencer BM25 + tradução e Sidecar v1 no teste cego, preferir reduzir complexidade.
+
+## Consolidação com o produto V2 completo
+
+Este ADR descreve o *caminho interno de recuperação*, não todo o produto. O contrato final integra também `ContractResolver`, `DecisionMemory`, `EnvironmentDiscovery`, LSP opcional, observação e intervenção seletiva, diagnóstico e release testado. A fonte canônica de escopo e ordem é `docs/v2-product-spec.md` + `docs/roadmap.md`. Tratar V2.0–V2.5 abaixo como **incrementos de engenharia**, nunca como um MVP ou como autorização para encerrar antes da integração completa.
+
+Em cada incremento, agentes devem consultar referências específicas do `docs/open-source-references.md` (CodeGraph, Aider, Serena/SolidLSP, Repomix, ARB etc.), confirmar licença por componente e comparar com código v1 existente antes de implementar. Priorizar **uso efetivo de evidências em tarefas reais** e custo total. Do ponto de vista de extensão, `LSP` pode ser fonte de evidência e `PostToolUse` observação/intervenção apenas quando o contrato verificado do cliente permitir.
 
 **Leitura obrigatória complementar:** `docs/evaluation-plan.md`, `docs/lsp-strategy.md`, `docs/agent-feedback.md`, `docs/benchmark.md`.
