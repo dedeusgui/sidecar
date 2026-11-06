@@ -319,13 +319,6 @@ func editHooks(file, command string, add bool) error {
 	return writeObject(file, obj)
 }
 
-func agentOf(command string) string {
-	if strings.HasSuffix(command, " hook --agent codex") {
-		return "codex"
-	}
-	return "claude"
-}
-
 func listOf(v any) []any {
 	l, _ := v.([]any)
 	return l
