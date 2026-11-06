@@ -147,6 +147,11 @@ func Install(opts Options) ([]string, error) {
 	dst := filepath.Join(opts.Env.InstallDir, BinaryName)
 	if !samePath(opts.Env.Source, dst) {
 		created := !fileExists(dst)
+		// Do not clobber an executable we cannot prove belongs to this install.
+		// A missing/corrupt manifest must never turn an existing binary into ours.
+		if !created && (m.Binary != dst || !m.BinaryCreated) {
+			return nil, fmt.Errorf("refusing to overwrite unmanaged binary %s; move it or uninstall it first", dst)
+		}
 		if err := copyExecutable(opts.Env.Source, dst); err != nil {
 			return nil, fmt.Errorf("installing binary: %w", err)
 		}
@@ -254,7 +259,6 @@ func editHooks(file, command string, add bool) error {
 	if err != nil {
 		return err
 	}
-	agent := agentOf(command)
 	hooks, _ := obj["hooks"].(map[string]any)
 	if hooks == nil {
 		hooks = map[string]any{}
@@ -271,7 +275,9 @@ func editHooks(file, command string, add bool) error {
 		ours := false
 		for _, h := range listOf(group["hooks"]) {
 			cmd, _ := h.(map[string]any)["command"].(string)
-			if IsOurs(cmd, agent) {
+			// Only change the exact command managed by this install. Another
+			// sidecar executable on PATH may be an unrelated user hook.
+			if cmd == command {
 				ours = true
 				if insertAt < 0 {
 					insertAt = len(kept)
@@ -311,13 +317,6 @@ func editHooks(file, command string, add bool) error {
 		return nil
 	}
 	return writeObject(file, obj)
-}
-
-func agentOf(command string) string {
-	if strings.HasSuffix(command, " hook --agent codex") {
-		return "codex"
-	}
-	return "claude"
 }
 
 func listOf(v any) []any {

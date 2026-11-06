@@ -135,16 +135,34 @@ func Status(ctx context.Context, root string) ([]StatusEntry, error) {
 }
 
 // ChangedBetween lists paths that differ between two commits (rename-aware).
+// Git's NUL-delimited format preserves spaces, tabs and newlines in filenames.
 func ChangedBetween(ctx context.Context, root, from, to string) ([]FileChange, error) {
-	out, err := gitRun(ctx, root, "diff", "--name-status", "-M", "--no-renames=false", from, to)
+	out, err := gitRun(ctx, root, "diff", "--name-status", "-z", "--no-ext-diff", "-M", from, to, "--")
 	if err != nil {
 		return nil, err
 	}
+	fields := bytes.Split(out, []byte{0})
 	var changes []FileChange
-	for _, line := range strings.Split(string(out), "\n") {
-		if fc, ok := parseNameStatus(line); ok {
-			changes = append(changes, fc)
+	for i := 0; i < len(fields); {
+		status := string(fields[i])
+		i++
+		if status == "" {
+			continue
 		}
+		code := status[:1]
+		if code == "R" || code == "C" {
+			if i+1 >= len(fields) {
+				return nil, fmt.Errorf("truncated git diff rename/copy record")
+			}
+			changes = append(changes, FileChange{Status: code, OldPath: string(fields[i]), Path: string(fields[i+1])})
+			i += 2
+			continue
+		}
+		if i >= len(fields) {
+			return nil, fmt.Errorf("truncated git diff record")
+		}
+		changes = append(changes, FileChange{Status: code, Path: string(fields[i])})
+		i++
 	}
 	return changes, nil
 }

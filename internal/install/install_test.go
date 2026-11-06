@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -230,8 +231,16 @@ func TestInstalledBinaryIsExecutableCopy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("binary not installed: %v", err)
 	}
-	if info.Mode().Perm()&0o100 == 0 {
+	// Windows does not expose executable bits through os.FileMode. The .exe
+	// extension identifies native executables there; on Unix check permissions.
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o100 == 0 {
 		t.Fatalf("installed binary is not executable: %v", info.Mode())
+	}
+	if !info.Mode().IsRegular() {
+		t.Fatalf("installed binary is not a regular file: %v", info.Mode())
+	}
+	if got, want := string(mustRead(t, filepath.Join(env.InstallDir, BinaryName))), string(mustRead(t, env.Source)); got != want {
+		t.Fatalf("installed binary contents differ from source")
 	}
 }
 
@@ -252,4 +261,68 @@ func mustRead(t *testing.T, path string) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+func TestInstallRefusesToOverwriteUnmanagedBinary(t *testing.T) {
+	env := testEnv(t)
+	dst := filepath.Join(env.InstallDir, BinaryName)
+	if err := os.MkdirAll(env.InstallDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	original := []byte("user-owned executable, do not replace")
+	if err := os.WriteFile(dst, original, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	opts, _ := yes(t, env)
+	if _, err := Install(opts); err == nil || !strings.Contains(err.Error(), "unmanaged binary") {
+		t.Fatalf("expected a safe refusal, got %v", err)
+	}
+	if got := mustRead(t, dst); !bytes.Equal(got, original) {
+		t.Fatal("install overwrote an existing unmanaged executable")
+	}
+	if _, err := os.Stat(env.ClaudeSettings); !os.IsNotExist(err) {
+		t.Fatal("install changed hooks despite refusing the binary replacement")
+	}
+}
+
+func TestUninstallPreservesDifferentSidecarExecutableHook(t *testing.T) {
+	env := testEnv(t)
+	other := HookCommand(filepath.Join(env.InstallDir, "elsewhere", BinaryName), "claude")
+	if err := os.MkdirAll(filepath.Dir(env.ClaudeSettings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(map[string]any{
+		"hooks": map[string]any{
+			"UserPromptSubmit": []any{map[string]any{
+				"hooks": []any{map[string]any{"type": "command", "command": other}},
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(env.ClaudeSettings, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	opts, _ := yes(t, env)
+	opts.Agents = []string{"claude"}
+	if _, err := Install(opts); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Uninstall(UninstallOptions{Env: env, Out: &bytes.Buffer{}}); err != nil {
+		t.Fatal(err)
+	}
+	// Compare decoded JSON commands; raw Windows paths are escaped in JSON.
+	hooks, _ := readJSON(t, env.ClaudeSettings)["hooks"].(map[string]any)
+	found := false
+	for _, group := range asList(hooks["UserPromptSubmit"]) {
+		for _, handler := range asList(group.(map[string]any)["hooks"]) {
+			if handler.(map[string]any)["command"] == other {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("uninstall removed an unrelated user's sidecar hook")
+	}
 }
