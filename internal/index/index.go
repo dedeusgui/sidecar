@@ -242,6 +242,22 @@ func (ix *Index) gitPlan(ctx context.Context) (plan, error) {
 			return p, err
 		}
 		p.changed = append(p.changed, files...)
+		// A missing/rebased indexed HEAD requires a full reconciliation, not only
+		// re-reading current files. Otherwise paths deleted in the new history
+		// remain searchable forever because git status is clean.
+		present := make(map[string]bool, len(files))
+		for _, name := range files {
+			present[name] = true
+		}
+		records, err := ix.st.FileRecords()
+		if err != nil {
+			return p, err
+		}
+		for name := range records {
+			if !present[name] {
+				p.removed = append(p.removed, name)
+			}
+		}
 	}
 
 	status, err := gitx.Status(ctx, ix.root)
