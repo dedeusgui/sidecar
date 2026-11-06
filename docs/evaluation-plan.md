@@ -82,6 +82,44 @@ Candidatos não constituem dataset pronto. Usar um estrato com arquivos duplicad
 - Pin de dataset deve incluir URI, commit SHA, checksum da anotação, licença, linguagem, estrato, autor/revisor, data e versão do Sidecar.
 - Distinguir offline benchmark, benchmark end-to-end e dogfooding em relatórios. Nenhuma generalização sobre “todos os repositórios” sem amostragem adequada.
 
+## Estratégia de corpus: reutilizar benchmarks públicos, não refazer sua pesquisa
+
+**Escolha principal:** usar datasets e métricas públicos para avaliar a recuperação local, mantendo um conjunto **pequeno e próprio** apenas para o harness de hooks e produtividade com modelos baratos.
+
+| Fonte | Escopo verificado | Uso proposto |
+|---|---|---|
+| [Agent Retrieval Bench](https://agent-retrieval-bench.github.io/) e [release/código](https://github.com/eyuansu62/agent-retrieval-bench) | 427 casos, 25 repositórios, 5 subconjuntos (inclui `no-gold`) | **Primeiro benchmark offline**: recuperar arquivos de trabalho e testar seletividade sem LLM; reutilizar rótulos existentes |
+| [ContextBench](https://contextbench.github.io/) e [dataset](https://contextbench.github.io/) | 1.136 tarefas, 66 repositórios, 8 linguagens, contextos gold anotados | Segundo benchmark: seletividade, recall/precision em nível de contexto e evolução para trajetórias de agente; recortar por custo |
+| Fixtures locais (`bench/cases.json`) | 71 casos em pequenas fixtures de desenvolvimento; tune/eval/holdout históricos já inspecionados | Testes rápidos de regressão, **não** claim externo |
+| Mini suíte agentic Sidecar | 4 tarefas × 3 modelos × ON/OFF = 24 runs no piloto | Validar hooks, TTFE, rounds e instrumentação, não produzir “placar publicável” |
+
+**Reaproveitar labels não é repetir os experimentos da comunidade:** precisamos executar **o algoritmo Sidecar** contra os mesmos casos/commits fixados e medir seus outputs; não precisar produzir manualmente outro gold se a anotação pública satisfaz nossa tarefa. Não copiar resultado de um concorrente como se fosse resultado nosso. Não comparar scores calculados em configurações de corpus/métrica distintas.
+
+Averiguar licença do dataset e repositórios upstream; [Agent Retrieval Bench documenta separadamente licença do avaliador e do código incorporado](https://huggingface.co/datasets/eyuansu71/agent_retrieval_bench/blob/main/DATA_LICENSE.md). Pin de release, SHA e checksum; baixar fora de `bench/` e fora do CI padrão, sem commits de corpus de terceiros.
+
+### Determinismo e reprodutibilidade — duas garantias diferentes
+
+- **Camada offline:** candidatos, classificação de intenção, evidências/packing e métricas de acerto devem ser estáveis para mesmos inputs, versão, configuração, commit e índice congelado. Ordenar empates, fixar semente quando houver amostragem, registrar versões. Latência, cache e hardware não são exatamente determinísticos; reportar distribuição.
+- **Camada agentic:** o modelo pode variar mesmo com parâmetros idênticos; não prometer placar determinístico em cada execução. Registrar versões exatas, permissões, temperatura/seed se expostos, número de turnos e ordem AB/BA; repetir pares e relatar variância.
+- **Isolamento dos braços:** além de `OFF` e `ON-v2`, medir `ON-v1` e, em ablação, `ON-v2 sem LSP`, `ON-v2 com LSP`, `ON-v2 sem sinais de sessão`. Não alterar múltiplas dimensões sem ablação.
+- **Ferramenta de LSP:** ferramenta LSP disponível para o agente e LSP consultado internamente pelo Sidecar **são dimensões distintas**; manter iguais as capacidades disponíveis ao agente em ambos os braços ou explicitar experimento fatorial.
+- **Sem telemetria assimétrica:** observador de eventos executa em ambos os braços, jamais entrega dicas extras ao controle OFF.
+
+### Scorecard e metas *propostas*, não resultados
+
+O relatório publicado deve destacar um **vetor** de métricas, não um único score opaco. `Pass@1 / success` é guardrail, `TTFE` e navegação são medidas de eficiência. Separar `first_correct_context_presented` (quando gold foi injetado/mostrado) de `first_correct_context_used_or_identified` (uso verificável em ação, trecho/patch ou avaliação gold), para não declarar vitória apenas porque Sidecar antecipou um snippet que o modelo ignorou.
+
+**Critérios aspiracionais para futura amostra robusta, a validar e pré-registrar:** reduzir a mediana do tempo até evidência correta utilizada em **≥15%** e tool calls de busca/leitura até evidência em **≥20%** versus OFF; manter resolução de tarefa sem degradação significativa, não ampliar taxa de contexto enganoso, preservar p95 de hook warm **≤150 ms** onde é mensurável; reportar tokens/latência de setup. Esses limiares são *metas de produto*, não prova estatística nem gate do piloto de 24 execuções. Sucesso é binário por tarefa com oracle; não declarar “não inferior” usando somente quatro tarefas.
+
+Relatório deve mostrar `N`, denominador, CI/intervalos, p50/p95, taxa de resolução, custo total, falhas e casos em que Sidecar **piorou**. Sem repetições suficientes: `inconclusivo`.
+
+### Instrumentação de feedback (não contamina tarefa)
+
+- Ver `docs/agent-feedback.md`: `PostToolUse` e equivalentes observam operações sem texto do prompt; associar ferramentas a evidências por ID e validar com gold.
+- Autorrelato parametrizado pelo modelo pode ser pedido **após** conclusão e fora da rodada principal, como sinal fraco. Não obrigar o modelo a dizer “Sidecar ajudou” durante a tarefa, nem atualizar ranking em tempo real com sua opinião.
+- Critério forte: gold anotado/aceitação independente; arquivo acessado ≠ relevância demonstrada.
+- Registro padronizado de cobertura de eventos (`observed`, `unobserved`), sem contabilizar como zero o que não foi monitorado.
+
 ## Estrutura proposta para o harness futuro (não implementada)
 
 `bench/agentic/`: `manifest.jsonl` (tarefa + versão + gold), `run-manifest.json` (modelo/CLI/effort, orçamento, braço, seed/ordem), `traces/` privados locais, `report.json` e `report.md` derivados. Início com um runner de replay simples; **não** introduzir framework pesado nem abstrair três CLIs antes de observar seus eventos reais. Salvar metadados agregados por padrão; conteúdo bruto somente com opt-in em diretório privado e retenção definida.
