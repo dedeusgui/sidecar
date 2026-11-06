@@ -58,3 +58,11 @@ Nenhuma referência acima prova que o agente dará menos rounds por receber cont
 ## Decisão atual
 
 Investir primeiro em **evidência comparativa** (retrieval sem LLM + A/B com Haiku/Luna/Flash), E2E real de hooks e dogfooding. Só depois decidir ampliar linguagens, adicionar camada semântica ou UI. Para comunicação externa, evitar “mais rápido” até medir TTFE, rounds, sucesso e custo total.
+
+## Posicionamento consolidado da V2 (2026-11-06)
+
+CodeGraph já possui **contexto orientado à intenção**, ferramentas de contexto/impacto e, em outra implementação, **hook `UserPromptSubmit`**. Portanto grafo, front-loading e MCP isoladamente **não** distinguem Sidecar. O foco testável passa a ser **custo e qualidade por tarefa correta**, reduzindo busca, redescoberta e conflitos código/documentação sem skill extensa ou novo protocolo obrigatório.
+
+O [catálogo OSS](reference-implementations.md) documenta as implementações concretas e licenças por componente; [product-v2.md](product-v2.md) contém o desenho de produto completo; [roadmap.md](roadmap.md) lista entregas e validações. Priorizar integração/reuso responsável antes de reimplementar, sem importar módulos GPL/BUSL inadvertidamente.
+
+Leituras principais: [CodeGraph Apache-2.0](https://github.com/codegraph-ai/CodeGraph), [CodeGraph MIT](https://github.com/colbymchenry/codegraph), [Context7 MIT (backend privado)](https://github.com/upstash/context7), [Serena com licença mista](https://github.com/oraios/serena), [RTK com edição OSS e componentes BUSL](https://github.com/rtk-ai/rtk), [Agent Retrieval Bench](https://github.com/eyuansu62/agent-retrieval-bench).
