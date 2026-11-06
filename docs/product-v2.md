@@ -111,7 +111,7 @@ Tudo roda localmente no mesmo executável Go quando possível, reusando SQLite/F
 
 ### P8. AgentAdapters, UX e distribuição
 
-- Claude Code, Codex e Gemini CLI com contratos, testes e cobertura real documentados **por evento e por plataforma**, sem presumir equivalência. Preservar hooks/settings alheios, manifest e rollback.
+- Claude Code, Codex e Antigravity CLI com contratos, testes e cobertura real documentados **por evento e por plataforma**, sem presumir equivalência. Preservar hooks/settings alheios, manifest e rollback.
 - Instalação local intuitiva e `doctor` robusto; status local e visualização opcional sem consumir prompt. UX não deve exigir plugin para funcionamento base.
 - Runtime local sem LLM e rede; instalação completa precisa de release, checksums, licença e update seguro.
 
