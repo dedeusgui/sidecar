@@ -262,3 +262,57 @@ func mustRead(t *testing.T, path string) []byte {
 	}
 	return b
 }
+
+func TestInstallRefusesToOverwriteUnmanagedBinary(t *testing.T) {
+	env := testEnv(t)
+	dst := filepath.Join(env.InstallDir, BinaryName)
+	if err := os.MkdirAll(env.InstallDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	original := []byte("user-owned executable, do not replace")
+	if err := os.WriteFile(dst, original, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	opts, _ := yes(t, env)
+	if _, err := Install(opts); err == nil || !strings.Contains(err.Error(), "unmanaged binary") {
+		t.Fatalf("expected a safe refusal, got %v", err)
+	}
+	if got := mustRead(t, dst); !bytes.Equal(got, original) {
+		t.Fatal("install overwrote an existing unmanaged executable")
+	}
+	if _, err := os.Stat(env.ClaudeSettings); !os.IsNotExist(err) {
+		t.Fatal("install changed hooks despite refusing the binary replacement")
+	}
+}
+
+func TestUninstallPreservesDifferentSidecarExecutableHook(t *testing.T) {
+	env := testEnv(t)
+	other := HookCommand(filepath.Join(env.InstallDir, "elsewhere", BinaryName), "claude")
+	if err := os.MkdirAll(filepath.Dir(env.ClaudeSettings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(map[string]any{
+		"hooks": map[string]any{
+			"UserPromptSubmit": []any{map[string]any{
+				"hooks": []any{map[string]any{"type": "command", "command": other}},
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(env.ClaudeSettings, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	opts, _ := yes(t, env)
+	opts.Agents = []string{"claude"}
+	if _, err := Install(opts); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Uninstall(UninstallOptions{Env: env, Out: &bytes.Buffer{}}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(mustRead(t, env.ClaudeSettings)), other) {
+		t.Fatal("uninstall removed an unrelated user's sidecar hook")
+	}
+}
