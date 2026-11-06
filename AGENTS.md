@@ -62,6 +62,9 @@ Hooks são contratos versionados de terceiros: não presumir que Codex, Claude e
 
 ## Navegação
 
+- `docs/context-engine-v2.md`: ADR de intenção, estratégia de candidatos e packing sob budget; **proposto**.
+- `docs/lsp-strategy.md`: LSP opcional, integração com plugins oficiais e consentimento de instalação.
+- `docs/agent-feedback.md`: observação de ferramentas e autorrelato como sinal auxiliar, nunca gold.
 - `docs/development.md`: setup, mapa, dogfooding, diagnóstico.
 - `docs/evaluation-plan.md`: hipóteses, dataset, métricas, A/B, custo.
 - `docs/landscape.md`: mercado, literatura e diferenciação a testar.
