@@ -8,7 +8,7 @@ O Sidecar hoje utiliza FTS5/BM25, normalização PT/EN, símbolos exatos, vizinh
 
 Hipótese do v2: o contexto deve ser determinado pela **intenção da tarefa**, pela **novidade/informatividade das evidências** e pelo **estado da sessão**, em vez de uma única configuração estática de ranking. Benefício a validar: menos navegação redundante, menor tempo até a primeira evidência correta (TTFE) e taxa de solução preservada.
 
-**Não objetivos:** substituir Claude/Codex/Gemini; impor convenções/AGENTS.md ao repositório do usuário; armazenar conversas completas; exigir embeddings ou modelos pagos; executar código de projeto; criar daemon pesado; afirmar ganho antes de medir.
+**Não objetivos:** substituir Claude Code/Codex/Antigravity CLI; impor convenções/AGENTS.md ao repositório do usuário; armazenar conversas completas; exigir embeddings ou modelos pagos; executar código de projeto; criar daemon pesado; afirmar ganho antes de medir.
 
 ## 2. Pipeline proposto (módulos conceituais, não novos serviços)
 
