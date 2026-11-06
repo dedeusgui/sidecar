@@ -124,6 +124,24 @@ Relatório deve mostrar `N`, denominador, CI/intervalos, p50/p95, taxa de resolu
 
 `bench/agentic/`: `manifest.jsonl` (tarefa + versão + gold), `run-manifest.json` (modelo/CLI/effort, orçamento, braço, seed/ordem), `traces/` privados locais, `report.json` e `report.md` derivados. Início com um runner de replay simples; **não** introduzir framework pesado nem abstrair três CLIs antes de observar seus eventos reais. Salvar metadados agregados por padrão; conteúdo bruto somente com opt-in em diretório privado e retenção definida.
 
+## V2 completo: métricas da reconciliação, navegação e concorrência
+
+O plano de avaliação é transversal às trilhas A–H em `docs/roadmap.md`; o benchmark offline não substitui os testes E2E de instalação, hooks, LSP, documentação divergente e decisões técnicas. Reutilizar os datasets públicos para retrieval, mas criar **fixtures locais próprias** apenas para aspectos que ARB/ContextBench não cobrem (conflitos docs/testes, memória de decisões, continuidade e fricção do agente).
+
+Matriz adicional por tarefa, com gabarito e `PT`/`EN`:
+- Pergunta vaga de negócio com símbolo indireto: arquivo/contrato correto **realmente utilizado**.
+- Docs apresentam valor contraditório a implementação/teste: conflito corretamente detectado sem decidir comportamento desejado.
+- Docs históricas ou módulos distintos: falso conflito = defeito.
+- Busca repetida e ciclos de leitura: quantificar repetição, sinais não observados, intervenções que ajudaram/atrapalharam e follow-up tool calls.
+- Compactação e sessões simultâneas: invalidar estado; medir redescoberta e vazamento.
+- Agente com LSP próprio / Sidecar LSP / fallback: controlar ferramentas equivalentes por braço, subprocessos e overhead.
+- Qualidade do patch e contratos: testes oracle independentes, regressões, intervenção humana, qualidade de entrega.
+- Confiabilidade de produto: install/doctor/update/uninstall, hooks em clientes e SOs suportados, fail-open, checksum e notices.
+
+**Guardrails:** gastar menos tokens em contexto sem reduzir custo total **não** conta como ganho; modelos baratos são experimentais e o custo deve caber em quotas/assinaturas reais. Nenhum replay LLM é literalmente determinístico; retrieval/packing e labels públicos podem ser. Adicionar `CodeGraph` como concorrente com mesma superfície de integração e `Sidecar + CodeGraph` como complementar opcional; separar resultados se modelos, LSP ou ferramentas disponíveis diferirem.
+
+Fontes de referência/benchmark devem ser pesquisadas por módulo e pinadas, conforme [catálogo](open-source-references.md). Comparar projetos upstream sem reivindicar resultados deles.
+
 ## Critérios de aceitação do primeiro benchmark agentic
 
 - Pelo menos 4 tarefas verificadas em 2+ repositórios, replicáveis em OFF/ON no mesmo commit.

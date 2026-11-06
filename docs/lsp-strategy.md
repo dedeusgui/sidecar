@@ -29,7 +29,7 @@ Estados: `not_applicable`, `missing`, `available`, `requires_consent`, `initiali
 
 ## Estratégias, da mais barata para a mais complexa
 
-A. **Coexistir com o LSP do agente (MVP)** — não tentar capturar socket/processo privado; recomendar plugin oficial quando aplicável; Sidecar continua com recuperação local. Instrumentar se o agente utilizou LSP em ON/OFF quando o hook expuser esse evento. Não inventar API de compartilhamento.
+A. **Coexistir com o LSP do agente (primeira integração)** — não tentar capturar socket/processo privado; recomendar plugin oficial quando aplicável; Sidecar continua com recuperação local. Instrumentar se o agente utilizou LSP em ON/OFF quando o hook expuser esse evento. Não inventar API de compartilhamento.
 B. **LSP cliente próprio, somente local e opt-in (fase posterior)** — se houver servidor confiável instalado, iniciar processo filho controlado em cache/workspace isolado, stdio JSON-RPC, timeouts e cancelamentos; os metadados são normalizados para as mesmas evidências de `retrieve`. Não concorrer com servidor do editor se ele não oferece sessão independente.
 C. **Instalação guiada do servidor, separada do hook** — `sidecar lsp doctor` / `sidecar lsp setup --language java` são exemplos de comandos **futuros, inexistentes hoje**. Listar pré-requisitos, origem, licença, versão exata, tamanho e checksum/assinatura quando disponível, impacto de PATH, espaço/disco, execução de código e redes; preview e consentimento expresso.
 D. **Instalação assistida** — somente para distribuições/gerenciadores confiáveis com versões fixadas, verificação de integridade, rollback, uninstall e manifest próprio; ainda opt-in. Nunca executar `curl | sh` arbitrário, comandos do README do repositório ou script de terceiros ao entrar em uma pasta.
@@ -66,6 +66,12 @@ Servidores podem executar ferramentas de build, ler dependências e acessar rede
 - E2E real Linux/Windows em pelo menos Java e Go, com fallback Rust/PHP sem parser e instalação ausente; smoke de PATH com espaços Unicode.
 - Medir warm-up, memória, walltime, número de servers, percentagem de consultas realmente melhoradas, TTFE de agente e overhead (ON/OFF) antes de ativar LSP por padrão.
 - Testar desconexões, múltiplos workspaces, cancelamento e desinstalação. Ao faltar confiança ou capacidade, não consultar LSP nem quebrar o hook.
+
+## Consolidação com o V2 completo
+
+O produto V2 inclui a **experiência de descoberta e integração LSP**, mas não exige instalar servidor em todo repositório. A jornada termina com suporte seguro a servidores confiáveis, fallback, diagnóstico, opt-in explícito para download/execução e rollback. A implementação ocorre em PRs independentes conforme `docs/roadmap.md` (trilha E), mantendo o mesmo contrato `Evidence` do `docs/v2-product-spec.md`.
+
+Para estudar interfaces e tratamento de erros de LSP, consultar a matriz pinada de `docs/open-source-references.md`: Serena/SolidLSP (**somente a pasta MIT onde aplicável**), protocolo LSP e integração oficial Claude. Comparar primeiro custo de reutilizar bibliotecas com custo de criar cliente próprio. Não duplicar subprocessos se o servidor existente não permite múltiplos clientes.
 
 ## Referências
 

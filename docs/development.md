@@ -43,6 +43,17 @@ Exemplos de perguntas de dogfooding (não são gabaritos):
 - “Como um hook com erro evita interromper o agente?”
 - “Onde o instalador preserva outros UserPromptSubmit hooks?”
 
+## Executando entregas do produto V2
+
+1. Ler `docs/v2-product-spec.md` e a trilha de `docs/roadmap.md` antes de modificar código. V2 é um produto completo; PRs são incrementos para viabilizar integração e rollback, não um MVP.
+2. Abrir `docs/open-source-references.md` **para o módulo da tarefa**, inspecionar os repositórios pertinentes (URLs/SHAs e licenças), e registrar alternativas `integrate/reuse/independent/discard` com custos/testes. Não executar scripts upstream em ambiente do usuário.
+3. Escolher baseline v1, fixtures públicas pinadas e caso de uso privado PT/EN; definir primeiro o teste para o gargalo específico: round trips, buscas circulares, discrepâncias docs/código, contexto desperdiçado ou contrato ignorado.
+4. Implementar com feature flag/rollback e testes de componente, integração real e segurança; verificar hooks dos clientes antes de prometer intervenção ou instalação de LSP.
+5. Rodar comparações offline sem modelos pagos quando possível. Apenas testar agente com ON/OFF em sessão isolada e orçamento explícito. Registrar resultado adverso.
+6. Atualizar ADR, README, README/roadmap e evidências no mesmo PR. Nunca declarar tarefa concluída só porque a feature compila.
+
+**Checklist completo de testes pendentes:** `docs/roadmap.md#testes-pendentes-check-list-consolidado`; anexar evidências dos ambientes realmente usados, e apontar `not-run` em vez de `pass` para outros.
+
 ## Contrato de alteração
 
 - Definir antes a hipótese mensurável. Preferir mudanças pequenas e reversíveis.

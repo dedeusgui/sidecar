@@ -30,6 +30,19 @@ Princípios inegociáveis:
 
 Separar adaptadores de agentes, recuperação, persistência e aplicação. Manter interfaces pequenas e operações determinísticas; alterações no ranking requerem benchmark A/B e ablação. Não fazer refatoração lateral não solicitada.
 
+## Entrega V2 completa e pesquisa obrigatória de upstream
+
+O destino é um **produto V2 completo, testado e reversível**, não um MVP reduzido. Implementação em PRs incrementais NÃO autoriza remover funcionalidades do contrato final. Antes de qualquer tarefa V2, consultar **somente** os documentos ligados à tarefa:
+
+1. `docs/v2-product-spec.md` — fronteiras de produto e definição de completo.
+2. `docs/roadmap.md` — trilha, dependências, testes e aceite.
+3. `docs/open-source-references.md` — **obrigatório** consultar 1–3 implementações existentes aplicáveis, com URL+SHA+licença por componente; comparar solução, interface, testes, complexidade e integração. **NÃO** listar genericamente projetos sem examinar o que é pertinente.
+4. ADR específica: `context-engine-v2.md`, `contract-evidence.md`, `agent-feedback.md`, `lsp-strategy.md` ou `evaluation-plan.md`.
+
+Preferir **interop/reuso lícito** sobre reimplementação; nunca incluir código estrangeiro sem licença compatível, avisos e revisão do mantenedor (licença do Sidecar ainda não definida). Serena tem partes GPL-3.0-or-later e SolidLSP MIT; Context7 público não contém todo backend. Não confundir “clean room” com renomear código copiado. Não executar código de upstream sem isolamento e autorização. Não transformar referências de desenvolvimento em prompt de runtime.
+
+O novo escopo de experimentação inclui IntentRouter, ContextPacker, SessionObserver, Evidence/ContractResolver, memória de decisões técnicas, descoberta de ambiente, LSP opt-in, intervenção por hooks quando suportada, feedback auxiliar e benchmark de **sucesso/custo**. Estado `planejado` nunca é `implementado`; manter v1 como baseline e rollback. A métrica North Star é **custo/tempo por tarefa corretamente concluída**, não “mais texto” nem benchmark lexical isolado.
+
 ## Loop de engenharia (cada tarefa)
 
 1. **Observar:** ler código e testes pertinentes; reproduzir erro ou comportamento atual; registrar hipótese, escopo e critério verificável de conclusão.
@@ -62,6 +75,9 @@ Hooks são contratos versionados de terceiros: não presumir que Codex, Claude e
 
 ## Navegação
 
+- `docs/v2-product-spec.md`: escopo integrado e contrato final do V2, não MVP.
+- `docs/open-source-references.md`: referências open source por módulo, pin de SHA, licenças e decisão de reuso.
+- `docs/contract-evidence.md`: divergência código/teste/docs e decisões com invalidação.
 - `docs/context-engine-v2.md`: ADR de intenção, estratégia de candidatos e packing sob budget; **proposto**.
 - `docs/lsp-strategy.md`: LSP opcional, integração com plugins oficiais e consentimento de instalação.
 - `docs/agent-feedback.md`: observação de ferramentas e autorrelato como sinal auxiliar, nunca gold.

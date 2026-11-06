@@ -92,6 +92,14 @@ Observação ≠ causalidade. Comparação causal de utilidade exige A/B com est
 4. Avaliar precisão dos sinais, memória ocupada e overhead; descartar a autoavaliação se não acrescentar informação útil.
 5. Só usar feedback para futuras melhorias após revisão humana ou critério objetivo. Não compartilhar dados sem consentimento.
 
+## Integração no produto V2 completo
+
+Esta é a estratégia de observação/feedback da trilha B/F em [roadmap.md](roadmap.md). O observador é um módulo final do produto, embora implementado incrementalmente. Toda intervenção por hook precisa ser suportada pelo **schema real** do cliente/versionamento; eventos que não suportam adicionar contexto devem apenas observar. A autoavaliação parametrizada permanece pós-tarefa e opcional, jamais obrigação que custe tokens em todas as mensagens do usuário.
+
+Para evitar reinventar telemetria/memória, consultar [open-source-references.md](open-source-references.md) e examinar Claude-Mem/Beads e contratos de hooks oficiais em SHA pinado, preservando privacidade. A trilha D integra esse estado a `ContractResolver` e memórias de decisões **verificadas e invalidadas**; não persistir toda conversa.
+
+Métricas adicionais da trilha completa: `navigation_revisit_rate`, `tokens_injected`, `context_used_vs_presented`, `verified_contract_conflicts`, `human_interventions`, `tool_hook_observability_coverage`, `patch_success`. Todos devem explicitar denominador, cobertura e quando o sinal é apenas inferido.
+
 ## Fontes
 
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks)

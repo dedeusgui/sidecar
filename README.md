@@ -116,11 +116,20 @@ Isso **não** comprova instalação/hook E2E em todos os sistemas; Codex CLI rea
 - **Histórico.** Commits de formatação em massa são ignorados para co-alteração apenas pelo tamanho; não há detecção
   de mudanças só de espaço em branco.
 
+## Visão do produto V2 (em desenvolvimento)
+
+O Sidecar V2 é projetado como **produto completo**, entregue em PRs verificáveis: recuperação por intenção, evidências concisas, reconciliação de contratos código/teste/docs, observação de navegação e continuidade de sessão, LSP opcional, intervenção seletiva por hook e benchmarks de custo/qualidade. **Essas capacidades são propostas, não funcionalidades disponíveis na versão atual.** O objetivo é menos buscas/round trips e menor tempo/custo por tarefa corretamente concluída, sem exigir configuração do repositório ou skills longas.
+
+Referência de execução: [especificação V2](docs/v2-product-spec.md), [roadmap integral](docs/roadmap.md) e [matriz open source](docs/open-source-references.md).
+
 ## Engenharia, benchmarks e roadmap
 
 - [AGENTS.md](AGENTS.md): contrato dos agentes que desenvolvem o Sidecar (não exige regras no repositório do usuário).
 - [CLAUDE.md](CLAUDE.md): entrada de instruções Claude Code, reutilizando AGENTS.md.
 - [docs/development.md](docs/development.md): mapa do código, testes, depuração e dogfooding.
+- [docs/v2-product-spec.md](docs/v2-product-spec.md): contrato do produto V2 completo, experiência e critérios de aceite.
+- [docs/open-source-references.md](docs/open-source-references.md): projetos upstream, licenças, SHAs e estudos por módulo.
+- [docs/contract-evidence.md](docs/contract-evidence.md): relações e conflitos entre código, testes, docs e decisões.
 - [docs/context-engine-v2.md](docs/context-engine-v2.md): arquitetura proposta de recuperação por intenção e contexto por token.
 - [docs/lsp-strategy.md](docs/lsp-strategy.md): suporte LSP, coexistência com plugins e instalação segura.
 - [docs/agent-feedback.md](docs/agent-feedback.md): observabilidade do loop e feedback parametrizado sem autoaprendizado.
