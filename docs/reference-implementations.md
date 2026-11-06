@@ -44,7 +44,7 @@
 | `ContractResolver` | CodeGraph estrutura → Serena LSP → Superpowers contratos | Cruzar testes, código e docs com proveniência; **não** deduzir verdade só de frequência |
 | `DependencyDocsProvider` | Context7 | Descoberta de biblioteca/versão e interface de documentação **externa opcional**, não tornar rede obrigatória |
 | `Cost/ToolOutput Diagnostics` | RTK-OSS → Headroom → ARB | Simulação de budget, retenção de erros, medição de economia **de tarefa inteira** |
-| `Install/Adapters/UX` | colbymchenry/codegraph → Claude/Codex/Gemini oficiais | Preservação de hooks, ownership, opt-in UI e recuperação de falhas |
+| `Install/Adapters/UX` | colbymchenry/codegraph → Claude/Codex/Antigravity CLI oficiais | Preservação de hooks, ownership, opt-in UI e recuperação de falhas |
 
 ## Gate legal e de qualidade para código vindo de terceiros
 
