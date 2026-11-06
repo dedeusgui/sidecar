@@ -44,7 +44,7 @@ Não substituir sucesso por Hit@5. Não alegar ganho **do modelo** se só houve 
 ### Planejamento de custos — contratos baratos, experimentos curtos
 
 Painel de execução inicialmente **manual e opt-in**:
-- Anthropic: **Haiku**; OpenAI/Codex: **Luna** (nome/alias usado pelo operador; fixar ID real e esforço); Google/Gemini: **Flash**. Esses nomes não garantem o mesmo limite, preço, versão nem grau de esforço. Registrar versão exata, CLI, modo de autenticação, reasoning/effort e ferramentas efetivamente usadas. Não pressupor permissão de automação ou disponibilidade de API a partir de assinatura.
+- Anthropic: **Haiku**; OpenAI/Codex: **Luna** (nome/alias usado pelo operador; fixar ID real e esforço); Google/Antigravity CLI: **Gemini Flash**. Esses nomes não garantem o mesmo limite, preço, versão nem grau de esforço. Registrar versão exata, CLI, modo de autenticação, reasoning/effort e ferramentas efetivamente usadas. Não pressupor permissão de automação ou disponibilidade de API a partir de assinatura.
 - Modelos mais caros (ex.: **Tera**) podem ajudar a **desenvolver o harness**, nunca contam como resultados do conjunto barato e não participam de benchmark cego.
 - **Fase 0, sem chamadas pagas:** validar corpus, gold, linhas, scripts de replay e medição offline; rodar mocks/fixture.
 - **Piloto mínimo:** 4 tarefas × 3 modelos × 2 braços = **24 execuções**, uma tentativa por célula; apenas detectar falhas do protocolo, sem tirar conclusões de produtividade.
