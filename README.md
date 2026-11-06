@@ -121,6 +121,9 @@ Isso **não** comprova instalação/hook E2E em todos os sistemas; Codex CLI rea
 - [AGENTS.md](AGENTS.md): contrato dos agentes que desenvolvem o Sidecar (não exige regras no repositório do usuário).
 - [CLAUDE.md](CLAUDE.md): entrada de instruções Claude Code, reutilizando AGENTS.md.
 - [docs/development.md](docs/development.md): mapa do código, testes, depuração e dogfooding.
+- [docs/context-engine-v2.md](docs/context-engine-v2.md): arquitetura proposta de recuperação por intenção e contexto por token.
+- [docs/lsp-strategy.md](docs/lsp-strategy.md): suporte LSP, coexistência com plugins e instalação segura.
+- [docs/agent-feedback.md](docs/agent-feedback.md): observabilidade do loop e feedback parametrizado sem autoaprendizado.
 - [docs/evaluation-plan.md](docs/evaluation-plan.md): A/B com modelos baratos, corpus diverso, rounds,
   tempo para evidência, custo e protocolo contra viés de benchmark.
 - [docs/landscape.md](docs/landscape.md): Aider, Serena, Continue e fundamentação científica.
