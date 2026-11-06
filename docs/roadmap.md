@@ -7,7 +7,7 @@
 
 Construir e entregar **a V2 integrada**, e não um MVP com capacidades essenciais ausentes. A implementação continua **iterativa**, em PRs pequenos, reversíveis, com testes e documentação; a conclusão só é declarada quando todos os módulos e integrações comprometidos na arquitetura passaram pelos gates. Não confundir “produto completo” com ativar de uma vez todas as features sem evidência.
 
-**Proposta de valor para uso pessoal:** diminuir tempo, tokens, buscas repetidas e necessidade de intervenção humana **por tarefa corretamente concluída** usando Claude Code, Codex e, onde suportado, Gemini CLI e modelos econômicos. Zero configuração por repositório; instalação única; fallback universal; runtime local e sem LLM/rede obrigatórios.
+**Proposta de valor para uso pessoal:** diminuir tempo, tokens, buscas repetidas e necessidade de intervenção humana **por tarefa corretamente concluída** usando Claude Code, Codex e, onde suportado, Antigravity CLI e modelos econômicos. Zero configuração por repositório; instalação única; fallback universal; runtime local e sem LLM/rede obrigatórios.
 
 **Diferencial a testar contra CodeGraph:** não ser “outro grafo” mais pobre, mas uma **camada econômica de entrega e manutenção de evidências** antes e durante a navegação do agente. A injeção inicial **não é exclusiva do Sidecar**: CodeGraph também a utiliza. O posicionamento exige benchmark competitivo.
 
@@ -15,7 +15,7 @@ Construir e entregar **a V2 integrada**, e não um MVP com capacidades essenciai
 
 **Implementado antes deste planejamento:** binário Go e CLI; indexação incremental e worktrees; SQLite/FTS5; BM25 e normalização PT↔EN; tree-sitter em parte das linguagens; identificadores, estrutura, Git/RRF; contexto por budget; hook de prompt Claude e adaptador Codex; `doctor`, `status`, `explain`, install/uninstall; testes e CI multiplataforma; avaliador offline com fixtures. Documentação e AGENTS já existem.
 
-**Não implementado / não comprovado:** IntentRouter por tarefa, pacote de evidências por utilidade marginal, fingerprint arquitetural, reconciliação de contratos código/docs/testes, observação de tool calls, detecção de redescoberta, memória de decisões entre sessões, cliente/instalador LSP gerenciado, provider Context7, Gemini adapter, feedback parametrizado, suíte A/B agentic confiável e prova de ganho real. A existência de interfaces de hook no cliente não prova E2E do Sidecar.
+**Não implementado / não comprovado:** IntentRouter por tarefa, pacote de evidências por utilidade marginal, fingerprint arquitetural, reconciliação de contratos código/docs/testes, observação de tool calls, detecção de redescoberta, memória de decisões entre sessões, cliente/instalador LSP gerenciado, provider Context7, Antigravity CLI adapter, feedback parametrizado, suíte A/B agentic confiável e prova de ganho real. A existência de interfaces de hook no cliente não prova E2E do Sidecar.
 
 **Pendências operacionais P0:** licença do Sidecar; GitHub default branch ainda `ccr-b6db8870-kl90n6` em vez de `main`; primeira release inexistente; PATH/upgrade/ownership; E2E Codex real; testes Windows de tempo (falha histórica intermitente em asserção `0s`, embora último CI tenha passado); testes de rollout/rollback e instalação por SO.
 
@@ -33,7 +33,7 @@ Construir e entregar **a V2 integrada**, e não um MVP com capacidades essenciai
 | W5 — SessionObserver + LoopDiagnostics | P0 | Traces por adapter, busca repetida, continuidade e intervenção seletiva segura | W1, W4, adapter hooks |
 | W6 — DecisionMemory | P1 | Memória opcional de decisões técnicas verificáveis, TTL, invalidação e purge | W3, W5 |
 | W7 — LSP + Documentation Providers | P1 | Detecção, integração local opt-in, setup confiável e rollback; docs por versão como complemento | W0, W2, W3 |
-| W8 — Adaptadores, UX e integrações | P1 | Claude/Codex/Gemini onde suportado, status local e UI opcional, zero config de repo | W0, W5 |
+| W8 — Adaptadores, UX e integrações | P1 | Claude/Codex/Antigravity CLI onde suportado, status local e UI opcional, zero config de repo | W0, W5 |
 | W9 — Avaliação agentic e qualidade de entrega | P0 contínuo | OFF vs v1 vs v2 e concorrentes; oráculos independentes, métricas de custo/qualidade | W1 e cada módulo |
 | W10 — Hardening e entrega V2 integrada | P0 final | E2E, perf, segurança, compatibilidade, docs e release verificadas | W0–W9 |
 
@@ -64,7 +64,7 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 
 ### Rodada C — acompanhar o agente com baixo custo
 
-- **C1 — SessionObserver passivo:** normalizar eventos suportados de Claude, Codex e Gemini por adapter; IDs opacos, retenção curta, redaction, distinção `unobserved` vs zero; modo OFF possui instrumentação igual no benchmark.
+- **C1 — SessionObserver passivo:** normalizar eventos suportados de Claude, Codex e Antigravity CLI por adapter; IDs opacos, retenção curta, redaction, distinção `unobserved` vs zero; modo OFF possui instrumentação igual no benchmark.
 - **C2 — LoopDiagnostics:** detectar repetição de buscas/leituras sem novidade e mudanças de stage observáveis; testar falso alarme em loops legítimos; não interferir no agente nesta etapa.
 - **C3 — Continuidade/SessionSignals:** memória efêmera por sessão, hash de evidências, mudança de branch e compactação; retomar sem republicar contexto inteiro.
 - **C4 — Intervenção seletiva:** apenas quando cliente suportar entrega de evidência em evento real e houver **nova evidência verificada**; alternativa é aguardar próximo UserPromptSubmit. Nunca cancelar arbitrariamente tool calls.
@@ -78,7 +78,7 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 - **D2 — LSP retrieval:** cliente próprio JSON-RPC somente com servidor confiável e autorizado, timeouts/recursos/locks, definitions/references/symbols e proveniência; testar Java/Go e cross-platform.
 - **D3 — LSP install:** comando/UX assistidos, com origem, versão, checksum, licença, preview e rollback; **nunca instalar durante prompt/hook**.
 - **D4 — Dependency docs:** detectar versões do repo e adapter externo opcional (Context7, documentação oficial); consentimento e cache; rede **nunca** requerida no core.
-- **D5 — Gemini + status UX:** validar hooks reais para Gemini CLI; status local baixo custo, UI/mod Claude opcional; reverter configs com segurança.
+- **D5 — Antigravity CLI + status UX:** validar hooks reais para Antigravity CLI; status local baixo custo, UI/mod Claude opcional; reverter configs com segurança.
 
 **Gate D:** instalação/desinstalação e confiança verificáveis; sem LSP/docs online ainda há produto funcional; adapter por OS/superfície com cobertura efetivamente testada.
 
@@ -97,7 +97,7 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 | Área | Testes de aceite mínimos | Status |
 |---|---|---|
 | CLI/distribuição | build + checksums; install→reinstall→upgrade→uninstall→rollback; PATH e ownership; 3 SO | **Pendente E2E abrangente** |
-| Hooks | schema por versão, aprovação Codex, Claude real, Gemini real, no evidence/failure/safe stdout, coexistência | **Parcial** |
+| Hooks | schema por versão, aprovação Codex, Claude real, Antigravity CLI real, no evidence/failure/safe stdout, coexistência | **Parcial** |
 | Ranking/intenção | baselines v1, ablações, PT/EN, tie-break estável, negativas, mudanças de repo | **V2 pendente** |
 | Contratos | código/docs/testes de acordo, conflito explícito, falso conflito, fonte desatualizada, alteração de commit | **Pendente** |
 | SessionObserver | repetição real/legítima, concorrência, TTL, privacy, compactação, unobserved, session IDs | **Pendente** |
