@@ -41,6 +41,20 @@ Nenhuma referência acima prova que o agente dará menos rounds por receber cont
 - **Qualidade do repositório:** Sidecar não é linter, refatorador ou política de arquitetura. Pode **facilitar** mudanças consistentes ao apontar código e testes relevantes; medir downstream em tarefas com validação. Recomendar padrões do próprio repo apenas como informação, não como regra inventada.
 - **Complementaridade:** permitir coexistência com LSP/MCP/grep e outras ferramentas. Não monopolizar contexto nem impor decisões ao agente.
 
+## Atualização de pesquisa — 2026-11-06: estratégia v2
+
+**Benchmarks comunitários a reutilizar, não reinventar:**
+- [Agent Retrieval Bench](https://agent-retrieval-bench.github.io/) apresenta 427 exemplos de recuperação de contexto de trabalho, 25 repositórios, casos positivos e negativos. O repositório do [avaliador](https://github.com/eyuansu62/agent-retrieval-bench) publica meios de descarregar subsets e conjuntos pinados. Aplicar `sidecar-eval` a suas entradas com metadados/split conhecidos, **sem presumir** que seus relatórios são os scores do Sidecar.
+- [ContextBench](https://contextbench.github.io/) cobre 1.136 tarefas, 66 repositórios e oito linguagens, com anotações de contexto; útil para validar qualidade, ruído e eficiência de recuperação sem executar todos os agentes de ponta a ponta.
+- **Método:** manter tests públicos intactos e estratificar por intenção; relatório offline reprodutível por commit não é o mesmo que A/B agentic determinístico. Metas e orçamento no [plano de avaliação](evaluation-plan.md).
+
+**Integração com ferramentas existentes em vez de reimplementação cega:**
+- [LSP oficial](https://microsoft.github.io/language-server-protocol/) define navegação simbólica por JSON-RPC. [Claude Code já oferece plugins LSP](https://code.claude.com/docs/en/plugins/code-intelligence) e os recomenda quando encontra servidor no PATH; um cliente LSP do Sidecar é decisão **separada** e depende de benefício em recuperação pré-inferência.
+- [Hooks Claude](https://code.claude.com/docs/en/hooks), [Codex](https://learn.chatgpt.com/docs/hooks) e [Gemini](https://geminicli.com/docs/hooks/) permitem observar parte das ações. A cobertura difere por cliente e superfície; telemetria nunca substitui gold independente.
+- [Mods Claude](https://code.claude.com/docs/en/plugins/mods/create) oferecem visualização/contagem de ações em UI, mas dependem de versão e consentimento; a integração de observação permanece separada do runtime principal.
+
+**Decisão de desenho:** v1 é baseline de comparação; v2 propõe `IntentRouter` determinístico + seleção por utilidade marginal de evidências por token + estado mínimo de sessão. LSP e feedback parametrizado entram em experimentos isolados com **fallback, opt-in e ablação**. Ver [Context Engine v2](context-engine-v2.md), [LSP](lsp-strategy.md), [feedback](agent-feedback.md).
+
 ## Decisão atual
 
 Investir primeiro em **evidência comparativa** (retrieval sem LLM + A/B com Haiku/Luna/Flash), E2E real de hooks e dogfooding. Só depois decidir ampliar linguagens, adicionar camada semântica ou UI. Para comunicação externa, evitar “mais rápido” até medir TTFE, rounds, sucesso e custo total.
