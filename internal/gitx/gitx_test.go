@@ -189,7 +189,7 @@ func samePath(a, b string) bool {
 func TestChangedBetweenPreservesRenamesAndChangedPaths(t *testing.T) {
 	root := mkRepo(t)
 	write(t, filepath.Join(root, "src", "a queue.go"), "package src\n\nfunc QueueSpecific() {}\n")
-	write(t, filepath.Join(root, "src", "removed.go"), "package src\n")
+	write(t, filepath.Join(root, "src", "removed.go"), "package src\n\nfunc RemovedOnly() {}\n")
 	write(t, filepath.Join(root, "src", "edited.go"), "package src\n")
 	run(t, root, "add", ".")
 	run(t, root, "commit", "-q", "-m", "before")
@@ -203,7 +203,7 @@ func TestChangedBetweenPreservesRenamesAndChangedPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, filepath.Join(root, "src", "edited.go"), "package src\n\nfunc Edited() {}\n")
-	write(t, filepath.Join(root, "src", "added.go"), "package src\n")
+	write(t, filepath.Join(root, "src", "added.go"), "package src\n\nfunc AddedOnly() {}\n")
 	run(t, root, "add", "-A")
 	run(t, root, "commit", "-q", "-m", "after")
 	after, err := Head(context.Background(), root)
