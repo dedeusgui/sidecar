@@ -448,6 +448,8 @@ func (ix *Index) parse(ex *extract.Extractor, rel string, prev store.FileRecord,
 	switch {
 	case !info.Mode().IsRegular():
 		out.file.Skipped = "not_regular"
+	case !repo.Contained(ix.root, abs):
+		out.file.Skipped = "outside_root"
 	case kind == "binary":
 		out.file.Skipped = "binary"
 	case repo.IsSensitive(rel):

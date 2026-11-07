@@ -100,13 +100,19 @@ func ContractEvidence(st *store.Store, root string, subjects []store.SymbolHit) 
 		return nil, err
 	}
 	for _, p := range docs {
-		heading := ""
+		heading, fenced := "", false
 		for n, line := range readLines(root, p) {
 			if t := strings.TrimSpace(line); strings.HasPrefix(t, "#") {
 				heading = strings.TrimSpace(strings.TrimLeft(t, "#"))
 			}
+			if strings.HasPrefix(strings.TrimSpace(line), "```") {
+				fenced = !fenced
+			}
 			for i, s := range subjects {
-				status, claim := mention(line, s, docMarkers)
+				status, claim := arityMention(line, s, fenced)
+				if status == "" {
+					status, claim = mention(line, s, docMarkers)
+				}
 				if status == "" {
 					continue
 				}
@@ -280,6 +286,119 @@ func routeMention(text string, s store.SymbolHit) (ContractStatus, string) {
 	return "", ""
 }
 
+// callRe finds a call written as name(args) on one line; args cannot nest parentheses.
+var callRe = regexp.MustCompile(`([A-Za-z_]\w*)\s*\(([^()]*)\)`)
+
+// receiverRe matches a receiver parameter, which callers do not pass.
+var receiverRe = regexp.MustCompile(`^(?:&\s*(?:mut\s+)?|mut\s+)?(?:self|this|cls|\$this)\b`)
+
+// arityMention compares a call written in a code span or fenced block with the parameter list of
+// a function or method. Only one call of the name on the line, with plain arguments, is compared.
+func arityMention(line string, s store.SymbolHit, fenced bool) (ContractStatus, string) {
+	if (s.Kind != "function" && s.Kind != "method") || !hasWord(line, s.Name) || (!fenced && !inCodeSpan(line, s.Name)) {
+		return "", ""
+	}
+	want, ok := paramCount(s.Signature, s.Name)
+	if !ok {
+		return "", ""
+	}
+	var calls []string
+	for _, m := range callRe.FindAllStringSubmatch(line, -1) {
+		if m[1] == s.Name {
+			calls = append(calls, m[2])
+		}
+	}
+	if len(calls) != 1 {
+		return "", "" // no call, or several: not attributable to one signature
+	}
+	args := strings.TrimSpace(calls[0])
+	got, ok := argCount(args)
+	if !ok {
+		return "", ""
+	}
+	claim := s.Name + "(" + args + ")"
+	if got == want {
+		return Documented, claim
+	}
+	return ConflictCandidate, claim
+}
+
+// argCount counts the arguments written in a doc call. Quotes, =, * and ... make the count
+// ambiguous (literals with commas, keywords, unpacking), so ok is false.
+func argCount(args string) (int, bool) {
+	if args == "" {
+		return 0, true
+	}
+	if strings.ContainsAny(args, "\"'`=*") || strings.Contains(args, "...") {
+		return 0, false
+	}
+	parts := strings.Split(args, ",")
+	for _, p := range parts {
+		if strings.TrimSpace(p) == "" {
+			return 0, false
+		}
+	}
+	return len(parts), true
+}
+
+// paramCount counts the parameters of a declaration's first line after name. A receiver is not
+// counted. Variadic, optional and defaulted parameters make the count unknown (ok false), and so
+// does a parameter list that the first line does not close.
+func paramCount(sig, name string) (int, bool) {
+	loc := regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\s*\(`).FindStringIndex(sig)
+	if loc == nil {
+		return 0, false
+	}
+	params, ok := splitParams(sig[loc[1]:])
+	if !ok {
+		return 0, false
+	}
+	if len(params) > 0 && receiverRe.MatchString(params[0]) {
+		params = params[1:]
+	}
+	if len(params) == 1 && params[0] == "void" { // C: (void) declares no parameters
+		params = nil
+	}
+	for _, p := range params {
+		if strings.ContainsAny(p, "=?") || strings.Contains(p, "...") || strings.HasPrefix(p, "*") {
+			return 0, false
+		}
+	}
+	return len(params), true
+}
+
+// splitParams splits the text after an opening parenthesis at its top-level commas. A trailing
+// comma is allowed; an empty parameter elsewhere is not.
+func splitParams(rest string) ([]string, bool) {
+	depth, start := 0, 0
+	var out []string
+	for i := 0; i < len(rest); i++ {
+		switch rest[i] {
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			if depth == 0 {
+				if last := strings.TrimSpace(rest[start:i]); last != "" {
+					out = append(out, last)
+				}
+				return out, true
+			}
+			depth--
+		case ',':
+			if depth > 0 {
+				continue
+			}
+			p := strings.TrimSpace(rest[start:i])
+			if p == "" {
+				return nil, false
+			}
+			out = append(out, p)
+			start = i + 1
+		}
+	}
+	return nil, false
+}
+
 // valueClaim returns the single literal that text states for name. It needs an explicit
 // marker, exactly one literal, no other code-like identifier and no comparison: otherwise
 // the number may belong to a different definition, and ok is false.
@@ -446,7 +565,7 @@ func docPaths(st *store.Store, root string) ([]string, error) {
 // readLines returns the lines of an indexed file, or nil when it is missing, binary, too large
 // or outside the root. Paths come from the index; the check keeps a bad one inside the root.
 func readLines(root, rel string) []string {
-	if root == "" || !filepath.IsLocal(rel) {
+	if root == "" || !filepath.IsLocal(rel) || !repo.Contained(root, filepath.Join(root, rel)) {
 		return nil
 	}
 	data, reason := repo.ReadSource(filepath.Join(root, rel), maxDocBytes)

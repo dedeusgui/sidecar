@@ -40,6 +40,11 @@ type Options struct {
 	// Seen reports evidence already delivered in this session; nil means none was.
 	Seen   ctxbuild.Seen
 	Ablate Ablation
+	// LSPTrusted and LSPServer are the opt-in language-server hooks. The lsp package imports
+	// retrieve, so the caller supplies them. Notes need SIDECAR_LSP=1 and LSPTrusted(Root); LSPServer
+	// returns the server name that can confirm rel, or "" for none.
+	LSPTrusted func(root string) bool
+	LSPServer  func(ctx context.Context, root, rel string) string
 }
 
 // Ablation switches off parts of the pipeline. It exists to measure each component's
@@ -271,7 +276,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	var excluded map[string]string
 	if v2 {
 		t = time.Now()
-		evidence, excluded, err = v2Pipeline(st, evidence, opts, budget, &res.Trace)
+		evidence, excluded, err = v2Pipeline(ctx, st, prompt, evidence, opts, budget, &res.Trace)
 		if err != nil {
 			return res, err
 		}
@@ -290,7 +295,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 
 // v2Pipeline adds contract evidence to the ranked pool, then (unless ablated) packs the set
 // sent under the budget. It returns the evidence to send and, per excluded item, the reason.
-func v2Pipeline(st *store.Store, pool []Evidence, opts Options, budget int, tr *Trace) ([]Evidence, map[string]string, error) {
+func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evidence, opts Options, budget int, tr *Trace) ([]Evidence, map[string]string, error) {
 	var concerns []Evidence
 	if !opts.Ablate.NoContract {
 		findings, err := ContractEvidence(st, opts.Root, subjectsOf(pool))
@@ -299,6 +304,18 @@ func v2Pipeline(st *store.Store, pool []Evidence, opts Options, budget int, tr *
 		}
 		tr.Contracts = findings
 		concerns = annotate(pool, findings)
+	}
+	if opts.Root != "" {
+		if tr.Fingerprint == nil {
+			fp := store.DiscoverCached(ctx, opts.Root, st)
+			tr.Fingerprint = &fp
+		}
+		top := 0.0
+		for _, ev := range pool {
+			top = max(top, ev.Score)
+		}
+		concerns = append(concerns, docEvidence(ctx, tr.Fingerprint, prompt, top)...)
+		lspNotes(ctx, opts, pool)
 	}
 	if opts.Ablate.NoPacker {
 		out := pool

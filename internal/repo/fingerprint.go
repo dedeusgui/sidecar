@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"maps"
 	"os"
@@ -115,8 +116,8 @@ func Discover(ctx context.Context, root string) Fingerprint {
 		base := path.Base(p)
 		lang, kind := LanguageOf(p)
 		var head []byte
-		if (kind == "code" || kind == "test") && !IsSensitive(p) {
-			head = headOf(filepath.Join(root, filepath.FromSlash(p)))
+		if abs := filepath.Join(root, filepath.FromSlash(p)); (kind == "code" || kind == "test") && !IsSensitive(p) && Contained(root, abs) {
+			head = headOf(abs)
 		}
 		if IsGenerated(p, head) {
 			fp.Generated++
@@ -172,7 +173,11 @@ func Discover(ctx context.Context, root string) Fingerprint {
 	_, _ = io.WriteString(h, "v1\n"+fp.Head+"\n")
 	roots := map[string]bool{}
 	for _, m := range manifests {
-		data, reason := ReadSource(filepath.Join(root, filepath.FromSlash(m.path)), maxManifestBytes)
+		abs := filepath.Join(root, filepath.FromSlash(m.path))
+		data, reason := ReadSource(abs, maxManifestBytes)
+		if reason == "" && !Contained(root, abs) {
+			data, reason = nil, "outside_root"
+		}
 		sum := sha256.Sum256(data)
 		_, _ = io.WriteString(h, m.path+"\x00"+reason+"\x00"+hex.EncodeToString(sum[:])+"\n")
 		man := Manifest{Path: m.path, Ecosystem: m.eco}
@@ -200,6 +205,31 @@ func Discover(ctx context.Context, root string) Fingerprint {
 	fp.Tests.Frameworks = frameworksOf(fp.Manifests, goTests > 0)
 	fp.Entrypoints = sortedKeys(entrypoints, maxEntrypoints)
 	return fp
+}
+
+// QuickHash names the state fp was read from without walking the tree: HEAD plus the size and
+// mtime of each manifest fp recorded. ok is false outside Git, where a new manifest would not
+// change HEAD and so would go unnoticed.
+// shortcut: uncommitted new manifests and source files are seen only after the next commit or manifest edit, upgrade by hashing git status when stale fingerprints are reported.
+func QuickHash(ctx context.Context, root string, fp Fingerprint) (string, bool) {
+	if !fp.Git {
+		return "", false
+	}
+	head, err := gitx.Head(ctx, root)
+	if err != nil {
+		return "", false
+	}
+	h := sha256.New()
+	_, _ = io.WriteString(h, "v1\n"+head+"\n")
+	for _, m := range fp.Manifests {
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(m.Path)))
+		if err != nil {
+			_, _ = io.WriteString(h, m.Path+"\x00missing\n")
+			continue
+		}
+		_, _ = fmt.Fprintf(h, "%s\x00%d\x00%d\n", m.Path, info.Size(), info.ModTime().UnixNano())
+	}
+	return hex.EncodeToString(h.Sum(nil)), true
 }
 
 // excludedPath reports whether any directory in p is one the walk never enters.

@@ -207,3 +207,60 @@ func TestConflictReachesConcernsOnlyWithContractLayer(t *testing.T) {
 		t.Errorf("v1 produced %d concerns; the v1 pipeline must not change", n)
 	}
 }
+
+// signatureRepo documents a Go function whose call in the doc is given by call.
+func signatureRepo(call string) map[string]string {
+	return map[string]string{
+		"svc/orders.go": "package svc\n\n// ProcessOrder handles one order.\nfunc ProcessOrder(ctx context.Context, id string, retry int) error {\n\treturn nil\n}\n",
+		"docs/api.md":   "# API\n\n## Processamento\n\nUse `" + call + "` para processar.\n",
+	}
+}
+
+func TestDocumentedCallWithMatchingArityIsDocumented(t *testing.T) {
+	ix, root := contractRepo(t, signatureRepo("ProcessOrder(ctx, id, retry)"))
+	fs := findingsFor(t, ix, root, definition(t, ix, "function", "ProcessOrder"))
+	if len(conflictsOf(fs)) != 0 {
+		t.Fatalf("matching arity reported a conflict: %+v", fs)
+	}
+	if !hasFinding(fs, Documented, "doc", "docs/api.md", 5) {
+		t.Errorf("matching call is not DOCUMENTED: %+v", fs)
+	}
+}
+
+func TestDocumentedCallWithDifferentArityIsConflictWithBothSides(t *testing.T) {
+	ix, root := contractRepo(t, signatureRepo("ProcessOrder(ctx, id)"))
+	fs := findingsFor(t, ix, root, definition(t, ix, "function", "ProcessOrder"))
+	cs := conflictsOf(fs)
+	if len(cs) != 1 || cs[0].Path != "docs/api.md" || cs[0].Line != 5 || cs[0].Claim != "ProcessOrder(ctx, id)" {
+		t.Fatalf("want one arity conflict at docs/api.md:5 claiming ProcessOrder(ctx, id), got %+v", fs)
+	}
+	note := conflictNote(cs[0])
+	for _, want := range []string{"function ProcessOrder (svc/orders.go:4)", "doc: docs/api.md:5", "diz ProcessOrder(ctx, id)"} {
+		if !strings.Contains(note, want) {
+			t.Errorf("note %q lacks %q", note, want)
+		}
+	}
+}
+
+func TestVariadicSignatureIsNotCompared(t *testing.T) {
+	ix, root := contractRepo(t, map[string]string{
+		"svc/log.go":  "package svc\n\nfunc Log(ctx context.Context, args ...string) {}\n",
+		"docs/api.md": "# API\n\n## Log\n\nUse `Log(ctx)` ou `Log(ctx, a, b)`.\n",
+	})
+	fs := findingsFor(t, ix, root, definition(t, ix, "function", "Log"))
+	if len(conflictsOf(fs)) != 0 {
+		t.Fatalf("variadic signature was compared: %+v", fs)
+	}
+}
+
+// C writes an empty parameter list as (void); a documented call with no arguments matches it.
+// C files are not indexed, so the helper is exercised with the symbol the C grammar would give.
+func TestCVoidParameterListMatchesNoArgumentCall(t *testing.T) {
+	sym := store.SymbolHit{Kind: "function", Name: "start", Signature: "int start(void) {", Path: "app/main.c", Line: 1}
+	if st, claim := arityMention("Chame `start()` para iniciar.", sym, false); st != Documented || claim != "start()" {
+		t.Fatalf("call with no arguments vs (void) = %s %q, want DOCUMENTED start()", st, claim)
+	}
+	if st, _ := arityMention("Chame `start(1)` para iniciar.", sym, false); st != ConflictCandidate {
+		t.Fatalf("call with one argument vs (void) = %s, want CONFLICT_CANDIDATE", st)
+	}
+}

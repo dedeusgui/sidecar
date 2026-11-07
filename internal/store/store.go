@@ -359,7 +359,7 @@ func (s *Store) SearchSymbols(match string, limit int) ([]SymbolHit, error) {
 		JOIN symbols s ON s.id = symbol_fts.rowid
 		JOIN files f ON f.id = s.file_id
 		WHERE symbol_fts MATCH ?
-		ORDER BY bm25(symbol_fts, 10.0, 4.0, 2.0, 3.0)
+		ORDER BY bm25(symbol_fts, 10.0, 4.0, 2.0, 3.0), f.path, s.line, s.name, s.kind, s.id
 		LIMIT ?`, match, limit)
 	if err != nil {
 		return nil, err
