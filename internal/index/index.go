@@ -207,8 +207,9 @@ func (ix *Index) plan(ctx context.Context) (plan, error) {
 
 func (ix *Index) gitPlan(ctx context.Context) (plan, error) {
 	var p plan
-	head, err := gitx.Head(ctx, ix.root)
-	if err != nil && !errors.Is(err, gitx.ErrNoHead) {
+	// One git call gives HEAD and the working-tree status; a warm sync is dominated by these subprocesses.
+	head, status, err := gitx.Status(ctx, ix.root)
+	if err != nil {
 		return p, err
 	}
 	p.head = head
@@ -260,10 +261,6 @@ func (ix *Index) gitPlan(ctx context.Context) (plan, error) {
 		}
 	}
 
-	status, err := gitx.Status(ctx, ix.root)
-	if err != nil {
-		return p, err
-	}
 	for _, e := range status {
 		if e.OldPath != "" {
 			p.removed = append(p.removed, e.OldPath)

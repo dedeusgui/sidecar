@@ -106,20 +106,25 @@ func ListFiles(ctx context.Context, root string) ([]string, error) {
 	return files, nil
 }
 
-// Status lists working-tree changes (modified, added, deleted, renamed, untracked).
-func Status(ctx context.Context, root string) ([]StatusEntry, error) {
-	out, err := gitRun(ctx, root, "status", "--porcelain=v2", "-z", "--untracked-files=all", "--ignore-submodules=all")
+// Status lists working-tree changes (modified, added, deleted, renamed, untracked) and the
+// commit HEAD points to, which is "" when HEAD is unborn. One git call answers both.
+func Status(ctx context.Context, root string) (head string, entries []StatusEntry, err error) {
+	out, err := gitRun(ctx, root, "status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all", "--ignore-submodules=all")
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	records := bytes.Split(out, []byte{0})
-	var entries []StatusEntry
 	for i := 0; i < len(records); i++ {
 		rec := string(records[i])
 		if rec == "" {
 			continue
 		}
 		switch {
+		case strings.HasPrefix(rec, "# branch.oid "):
+			head = strings.TrimPrefix(rec, "# branch.oid ")
+			if head == "(initial)" {
+				head = ""
+			}
 		case strings.HasPrefix(rec, "? "):
 			entries = append(entries, StatusEntry{Path: rec[2:], XY: "??", Untracked: true})
 		case strings.HasPrefix(rec, "1 "):
@@ -145,7 +150,7 @@ func Status(ctx context.Context, root string) ([]StatusEntry, error) {
 			}
 		}
 	}
-	return entries, nil
+	return head, entries, nil
 }
 
 // ChangedBetween lists paths that differ between two commits (rename-aware).

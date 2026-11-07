@@ -71,7 +71,7 @@ func TestStatusReportsModifiedUntrackedAndRenamed(t *testing.T) {
 	run(t, root, "mv", "a.go", "b.go")
 	write(t, filepath.Join(root, "c.go"), "package c\n")
 
-	entries, err := Status(context.Background(), root)
+	_, entries, err := Status(context.Background(), root)
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
@@ -84,6 +84,24 @@ func TestStatusReportsModifiedUntrackedAndRenamed(t *testing.T) {
 	}
 	if e, ok := byPath["c.go"]; !ok || !e.Untracked {
 		t.Errorf("expected untracked c.go, got %+v", entries)
+	}
+}
+
+// Status reports the same HEAD as Head, and an empty one before the first commit.
+func TestStatusReturnsHeadOrEmptyWhenUnborn(t *testing.T) {
+	root := mkRepo(t)
+	write(t, filepath.Join(root, "a.go"), "package a\n")
+	run(t, root, "add", ".")
+	if head, _, err := Status(context.Background(), root); err != nil || head != "" {
+		t.Fatalf("unborn Status head = %q, %v; want empty", head, err)
+	}
+	run(t, root, "commit", "-q", "-m", "init")
+	want, err := Head(context.Background(), root)
+	if err != nil {
+		t.Fatalf("Head: %v", err)
+	}
+	if head, _, err := Status(context.Background(), root); err != nil || head != want {
+		t.Fatalf("Status head = %q, %v; want %q", head, err, want)
 	}
 }
 
