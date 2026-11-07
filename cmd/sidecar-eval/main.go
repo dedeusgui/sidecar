@@ -57,7 +57,7 @@ type callResult struct {
 	latencyMS float64
 }
 
-type runner func(st *store.Store, prompt string) (callResult, error)
+type runner func(ix *index.Index, prompt string) (callResult, error)
 
 type method struct {
 	name string
@@ -117,14 +117,18 @@ func main() {
 		{"bm25 + traducao/normalizacao", retrieveRun(retrieve.Ablation{LexicalOnly: true})},
 		{"lexical + grafo", retrieveRun(retrieve.Ablation{NoGit: true})},
 		{"lexical + grafo + git", retrieveRun(retrieve.Ablation{})},
-		{"v2.1 (intent router)", retrieveRunWith(retrieve.Options{EngineVersion: "v2"})},
+		{"v2.1 (intent router)", retrieveRunWith(retrieve.Options{IntentRouting: true})},
+		{"v2 (intent + contract + packer)", retrieveRunWith(retrieve.Options{EngineVersion: "v2"})},
+		{"v2 sem intent", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoIntent: true}})},
+		{"v2 sem contract", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoContract: true}})},
+		{"v2 sem packer", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoPacker: true}})},
 	}
 
 	var outcomes []caseOutcome
 	for _, m := range methods {
 		for _, c := range cf.Cases {
 			ix := indexes[c.Repo]
-			res, err := m.run(ix.Store(), c.Prompt)
+			res, err := m.run(ix, c.Prompt)
 			must(err)
 			outcomes = append(outcomes, score(m.name, c, res))
 		}
@@ -156,15 +160,23 @@ func retrieveRun(ab retrieve.Ablation) runner {
 
 // retrieveRunWith runs the retrieval pipeline with the given options.
 func retrieveRunWith(opts retrieve.Options) runner {
-	return func(st *store.Store, prompt string) (callResult, error) {
+	return func(ix *index.Index, prompt string) (callResult, error) {
 		t := time.Now()
-		res, err := retrieve.Search(context.Background(), st, prompt, opts)
+		o := opts
+		o.Root = ix.Root()
+		res, err := retrieve.Search(context.Background(), ix.Store(), prompt, o)
 		if err != nil {
 			return callResult{}, err
 		}
+		// A conflict note is a second item about the same definition; the hit list counts each once.
 		var hits []store.SymbolHit
+		seen := map[string]bool{}
 		for _, e := range res.Evidence {
-			hits = append(hits, e.Hit)
+			key := fmt.Sprintf("%s|%s|%s|%d", e.Hit.Path, e.Hit.Kind, e.Hit.Name, e.Hit.Line)
+			if !seen[key] {
+				seen[key] = true
+				hits = append(hits, e.Hit)
+			}
 		}
 		return callResult{hits: hits, tokens: ctxbuild.EstimateTokens(brief.Render(res, nil)),
 			latencyMS: float64(time.Since(t).Microseconds()) / 1000}, nil
@@ -173,7 +185,7 @@ func retrieveRunWith(opts retrieve.Options) runner {
 
 // textualRun is the baseline a person would get from grep: raw prompt words (4+ letters,
 // no translation, no stemming, no stopwords) matched as substrings of symbol names and paths.
-func textualRun(st *store.Store, prompt string) (callResult, error) {
+func textualRun(ix *index.Index, prompt string) (callResult, error) {
 	t := time.Now()
 	words := strings.FieldsFunc(strings.ToLower(prompt), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
 	var terms []string
@@ -182,7 +194,7 @@ func textualRun(st *store.Store, prompt string) (callResult, error) {
 			terms = append(terms, w)
 		}
 	}
-	all, err := st.AllSymbols()
+	all, err := ix.Store().AllSymbols()
 	if err != nil {
 		return callResult{}, err
 	}

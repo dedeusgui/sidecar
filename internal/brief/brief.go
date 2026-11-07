@@ -8,8 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
-	"strings"
 
 	"github.com/dedeusgui/sidecar/internal/ctxbuild"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
@@ -54,6 +52,20 @@ func RenderSession(res retrieve.Result, statePath string) (string, []string) {
 	}
 	saveState(statePath, st)
 	return text, keys
+}
+
+// SeenFor returns the session memory as it stands before the next prompt, so the packer can
+// avoid evidence that RenderSession would suppress. An empty path has no memory.
+func SeenFor(statePath string) ctxbuild.Seen {
+	if statePath == "" {
+		return nil
+	}
+	st := loadState(statePath)
+	next := st.Turn + 1
+	return func(key, fingerprint string) bool {
+		e, ok := st.Emitted[key]
+		return ok && e.Fingerprint == fingerprint && next-e.Turn < TTLTurns
+	}
 }
 
 type entry struct {
@@ -110,9 +122,7 @@ func items(res retrieve.Result) []ctxbuild.Item {
 	dirtyNoted := map[string]bool{}
 	for _, ev := range res.Evidence {
 		h := ev.Hit
-		key := h.Kind + "|" + h.Path + "|" + h.Name
-		fp := h.FileHash + ":" + strconv.Itoa(h.Line) + "-" + strconv.Itoa(h.EndLine)
-		out = append(out, ctxbuild.Item{Section: ev.Section, Key: key, Fingerprint: fp, Text: describe(ev)})
+		out = append(out, ctxbuild.Item{Section: ev.Section, Key: ev.Key(), Fingerprint: ev.Fingerprint(), Text: retrieve.Describe(ev)})
 		if ev.Dirty && !dirtyNoted[h.Path] {
 			dirtyNoted[h.Path] = true
 			out = append(out, ctxbuild.Item{
@@ -122,42 +132,4 @@ func items(res retrieve.Result) []ctxbuild.Item {
 		}
 	}
 	return out
-}
-
-func describe(ev retrieve.Evidence) string {
-	h := ev.Hit
-	var b strings.Builder
-	if h.Kind == "file" {
-		fmt.Fprintf(&b, "file %s", h.Path)
-	} else {
-		fmt.Fprintf(&b, "%s %s (%s:%d-%d)", h.Kind, h.Name, h.Path, h.Line, h.EndLine)
-	}
-	if ev.Verdict != "" {
-		fmt.Fprintf(&b, " [%s]", ev.Verdict)
-	}
-	if h.Value != "" {
-		fmt.Fprintf(&b, " = %s", h.Value)
-	}
-	if h.Kind != "file" && h.Signature != "" {
-		fmt.Fprintf(&b, " — %s", truncate(h.Signature, 160))
-	}
-	if h.Doc != "" {
-		fmt.Fprintf(&b, " · %s", truncate(h.Doc, 140))
-	}
-	if len(ev.Relations) > 0 {
-		rels := ev.Relations
-		if len(rels) > 3 {
-			rels = rels[:3]
-		}
-		fmt.Fprintf(&b, " | %s", strings.Join(rels, "; "))
-	}
-	return b.String()
-}
-
-func truncate(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
-		return s
-	}
-	return string(r[:n]) + "…"
 }

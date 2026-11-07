@@ -158,8 +158,14 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 		}
 	}
 
+	statePath := ""
+	if in.SessionID != "" {
+		statePath = opts.StatePath(string(opts.Agent), in.SessionID)
+	}
+	ropts := hookRetrieveOptions(root, statePath)
+	rec["engine"] = engineOf(ropts)
 	t = time.Now()
-	res, err := retrieve.Search(ctx, ix.Store(), in.Prompt, retrieve.Options{})
+	res, err := retrieve.Search(ctx, ix.Store(), in.Prompt, ropts)
 	if err != nil {
 		return "", damaged(paths.IndexDB(root), err)
 	}
@@ -169,10 +175,6 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	rec["exact"] = res.Trace.Exact
 
 	t = time.Now()
-	statePath := ""
-	if in.SessionID != "" {
-		statePath = opts.StatePath(string(opts.Agent), in.SessionID)
-	}
 	block, used := brief.RenderSession(res, statePath)
 	if in.SessionID != "" {
 		recordEvidence(root, opts.Agent, in.SessionID, used)
@@ -187,6 +189,18 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 		rec["status"] = "no_evidence"
 	}
 	return block, nil
+}
+
+// hookRetrieveOptions reads the engine and profile switches from the environment. Unset or
+// unknown values keep the v1 pipeline, so the default hook behaviour is unchanged. Session
+// memory is read only for v2, because only the v2 packer uses it.
+func hookRetrieveOptions(root, statePath string) retrieve.Options {
+	o := retrieve.Options{Root: root, Profile: os.Getenv("SIDECAR_PROFILE")}
+	if os.Getenv("SIDECAR_ENGINE") == "v2" {
+		o.EngineVersion = "v2"
+		o.Seen = brief.SeenFor(statePath)
+	}
+	return o
 }
 
 // damagedIndexError marks a failure caused by a damaged index file; Hook quarantines that file.

@@ -31,7 +31,15 @@ type Options struct {
 	EngineVersion string
 	// IntentRouting enables intent routing regardless of EngineVersion.
 	IntentRouting bool
-	Ablate        Ablation
+	// Root is the repository root. The v2 contract check reads Markdown and test bodies from
+	// it; empty means the index alone is used.
+	Root string
+	// Profile sets the context budget: "minimal" (300), "balanced" (800) or "deep" (1500).
+	// Unknown names are ignored and the budget follows the evidence size.
+	Profile string
+	// Seen reports evidence already delivered in this session; nil means none was.
+	Seen   ctxbuild.Seen
+	Ablate Ablation
 }
 
 // Ablation switches off parts of the pipeline. It exists to measure each component's
@@ -42,6 +50,9 @@ type Ablation struct {
 	NoStructure   bool // do not expand structural neighbours
 	NoGit         bool // do not use uncommitted state or co-change
 	LexicalOnly   bool // return the raw lexical ranking, without gating or fusion
+	NoIntent      bool // v2 without intent routing
+	NoContract    bool // v2 without contract links and conflict notes
+	NoPacker      bool // v2 without utility packing: the ranked top MaxItems are sent
 }
 
 // Evidence is one item of retrieved context.
@@ -57,6 +68,8 @@ type Evidence struct {
 	Source        string   // exact | lexical | contract | structural | git
 	Confidence    float64  // heuristic in [0, 1]; not fitted to labelled data
 	TokenEstimate int      // estimate of the item's rendered metadata line
+	// Note replaces the rendered line; set only for contract conflicts, which have no symbol of their own.
+	Note string
 }
 
 // CandidateTrace explains one candidate for diagnostics.
@@ -94,6 +107,8 @@ type Trace struct {
 	Routed        bool              `json:"intent_routed"` // the intent changed the structural expansion
 	TokenEstimate int               `json:"token_estimate"`
 	Fingerprint   *repo.Fingerprint `json:"repo_fingerprint,omitempty"` // set by the caller that has the root
+	Contracts     []Finding         `json:"contracts,omitempty"`        // v2: every checked contract link
+	Packing       *PackTrace        `json:"packing,omitempty"`          // v2: why the final set was chosen
 }
 
 // Result is the outcome of Search.
@@ -152,8 +167,9 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 
 	// Intent is always reported; it changes the search only when v2 routing is on and confident.
 	res.Trace.Intent = ClassifyIntent(prompt)
+	v2 := opts.EngineVersion == "v2"
 	var families map[string]bool
-	if (opts.IntentRouting || opts.EngineVersion == "v2") && res.Trace.Intent.Confidence >= intentMinConfidence {
+	if (opts.IntentRouting || v2) && !opts.Ablate.NoIntent && res.Trace.Intent.Confidence >= intentMinConfidence {
 		families = familiesFor(res.Trace.Intent.Kinds)
 		res.Trace.Routed = families != nil
 	}
@@ -243,16 +259,69 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	kept := fuse(cands, lexOrder, opts)
 	res.Trace.Timings["fusion"] = time.Since(t)
 
+	var evidence []Evidence
 	for _, c := range kept {
-		ev := evidenceOf(c)
-		res.Evidence = append(res.Evidence, ev)
+		evidence = append(evidence, evidenceOf(c))
+	}
+	budget := budgetFor(evidence[:min(len(evidence), opts.MaxItems)])
+	if b, ok := ProfileBudget(opts.Profile); ok {
+		budget = b
+	}
+	res.Trace.Budget = budget
+	var excluded map[string]string
+	if v2 {
+		t = time.Now()
+		evidence, excluded, err = v2Pipeline(st, evidence, opts, budget, &res.Trace)
+		if err != nil {
+			return res, err
+		}
+		res.Trace.Timings["contract_pack"] = time.Since(t)
+	}
+	res.Evidence = evidence
+	for _, ev := range res.Evidence {
 		res.Trace.TokenEstimate += ev.TokenEstimate
 	}
 	res.Trace.Final = len(res.Evidence)
-	res.Trace.Budget = budgetFor(res.Evidence)
 	res.Trace.Candidates = traceOf(cands)
+	markExcluded(res.Trace.Candidates, excluded)
 	res.Trace.Timings["total"] = time.Since(start)
 	return res, nil
+}
+
+// v2Pipeline adds contract evidence to the ranked pool, then (unless ablated) packs the set
+// sent under the budget. It returns the evidence to send and, per excluded item, the reason.
+func v2Pipeline(st *store.Store, pool []Evidence, opts Options, budget int, tr *Trace) ([]Evidence, map[string]string, error) {
+	var concerns []Evidence
+	if !opts.Ablate.NoContract {
+		findings, err := ContractEvidence(st, opts.Root, subjectsOf(pool))
+		if err != nil {
+			return nil, nil, err
+		}
+		tr.Contracts = findings
+		concerns = annotate(pool, findings)
+	}
+	if opts.Ablate.NoPacker {
+		out := pool
+		if len(out) > opts.MaxItems {
+			out = out[:opts.MaxItems]
+		}
+		return append(out, concerns...), nil, nil
+	}
+	selected, excluded, pt := Pack(append(pool, concerns...), PackOptions{Budget: budget, Seen: opts.Seen})
+	tr.Packing = &pt
+	return selected, excluded, nil
+}
+
+// markExcluded records on the candidate trace why the packer dropped an item that the
+// ranking had kept.
+func markExcluded(cands []CandidateTrace, excluded map[string]string) {
+	for i := range cands {
+		if reason, ok := excluded[cands[i].ID]; ok && cands[i].Kept {
+			cands[i].Kept = false
+			cands[i].ReasonSelected = ""
+			cands[i].ReasonSuppressed = "packer: " + reason
+		}
+	}
 }
 
 func withDefaults(o Options) Options {

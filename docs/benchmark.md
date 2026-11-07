@@ -91,6 +91,35 @@ com algum item), latência P50/P95 da chamada de recuperação em processo, e to
    código, como `tentar cobrar novamente` → `MAX_RETRY_ATTEMPTS`. Cobertura de vocabulário é o limite
    principal hoje.
 
+## Rodada B3–B5: contrato e empacotamento (v2)
+
+Medido em 2026-11-06 com `go run ./cmd/sidecar-eval --cases bench/cases.json` (retrieval offline, sem agente). Hit@5, Recall@10, MRR e precisão em %, tokens = média do bloco renderizado.
+
+| Split | Método | Hit@5 | Recall@10 | MRR | Precisão | Falso positivo (negativos) | Tokens |
+|---|---|---|---|---|---|---|---|
+| tune | v1 (`lexical + grafo + git`) | 80,0 | 80,0 | 0,629 | 12,6 | 0,0 | 354 |
+| tune | v2 (intent + contract + packer) | 80,0 | 80,0 | 0,629 | 12,7 | 0,0 | 365 |
+| tune | v2 sem intent | 80,0 | 80,0 | 0,629 | 12,7 | 0,0 | 373 |
+| tune | v2 sem contract | 80,0 | 80,0 | 0,629 | 12,6 | 0,0 | 345 |
+| tune | v2 sem packer | 80,0 | 80,0 | 0,629 | 12,6 | 0,0 | 369 |
+| eval | v1 (`lexical + grafo + git`) | 75,0 | 75,0 | 0,567 | 23,1 | 0,0 | 214 |
+| eval | v2 (intent + contract + packer) | 75,0 | 75,0 | 0,567 | 23,3 | 0,0 | 215 |
+| eval | v2 sem intent | 75,0 | 75,0 | 0,567 | 23,3 | 0,0 | 218 |
+| eval | v2 sem contract | 75,0 | 75,0 | 0,567 | 23,1 | 0,0 | 210 |
+| eval | v2 sem packer | 75,0 | 75,0 | 0,567 | 23,1 | 0,0 | 219 |
+| holdout | v1 (`lexical + grafo + git`) | 64,7 | 64,7 | 0,490 | 20,2 | 0,0 | 215 |
+| holdout | v2 (intent + contract + packer) | 64,7 | 64,7 | 0,490 | 20,2 | 0,0 | 216 |
+| holdout | v2 sem intent | 64,7 | 64,7 | 0,490 | 20,2 | 0,0 | 223 |
+| holdout | v2 sem contract | 64,7 | 64,7 | 0,490 | 20,2 | 0,0 | 206 |
+| holdout | v2 sem packer | 64,7 | 64,7 | 0,490 | 20,2 | 0,0 | 216 |
+
+Leitura:
+
+1. **Sem regressão de recuperação, sem economia de tokens.** A v2 completa iguala a v1 em Hit@5, recall e MRR nos três splits. Os tokens sobem 0,5% a 3%: o custo das anotações de contrato. O packer não reduz tokens sem perder acertos: testei pool largo (até 3× o top-8), limiares de valor por token de 0,001 a 0,005 e um teto de itens. No tune, todas as variantes que reduziram tokens perderam Hit@5: 5 pontos com teto de 8 itens (320 tokens) e até 35 pontos com limiar 0,005 e pool largo (148 tokens). A configuração defendida só remove ou reordena dentro do top-8 da v1, e o limiar 0,001 foi escolhido no split tune.
+2. **O MRR da própria v1 oscila entre execuções** (0,604 e 0,629 no mesmo código do `HEAD`). A ordenação de símbolos depende da indexação paralela, como já registrado acima. Diferenças de MRR menores que ~0,03 não são evidência.
+3. **Nenhum conflito no bench.** Nos 71 prompts, os vínculos foram `IMPLEMENTED` 103, `TEST_EXPECTED` 59, `INFERRED` 16 e `DOCUMENTED` 6, com 0 `UNVERIFIED` e 0 `CONFLICT_CANDIDATE`. O zero de falsos positivos é verdadeiro, mas não mede a detecção de conflito: essa só é exercida pelos testes sintéticos de `internal/retrieve/contract_test.go`. Um conjunto com divergências reais precisa ser criado antes de afirmar precisão ou recall de conflito.
+4. **Não é medição agêntica.** Estes números não dizem se o agente chega à tarefa correta com menos tempo ou tokens. Isso exige o protocolo de `evaluation-plan.md` com agentes reais.
+
 ## Latência em repositório real
 
 Medição com o binário de release (`-trimpath`, grammars de subconjunto, 16,2 MB) no Spring PetClinic

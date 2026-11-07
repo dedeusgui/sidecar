@@ -18,6 +18,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/install"
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/repo"
+	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
 )
 
@@ -73,7 +74,7 @@ Uso:
   sidecar uninstall [--purge]                         remove apenas o que o Sidecar instalou
   sidecar status [--root DIR]                         resumo do índice do repositório
   sidecar doctor                                      diagnóstico de instalação e ambiente
-  sidecar explain [--root DIR] [--json]               mostra o rastro de um prompt (lê stdin)
+  sidecar explain [--root DIR] [--json] [--engine v1|v2]   mostra o rastro de um prompt (lê stdin)
   sidecar memory list|add|purge [--root DIR] [--json] decisões técnicas verificáveis (opt-in)
                                                       add: --target ARQUIVO|SIMBOLO --summary TEXTO [--ttl 720h]
                                                       purge: remove as invalidadas (--all: todas)
@@ -235,12 +236,25 @@ func cmdDoctor(out, errOut io.Writer) int {
 	return 0
 }
 
+// defaultEngine is v2 only when SIDECAR_ENGINE asks for it; the product default stays v1.
+func defaultEngine() string {
+	if os.Getenv("SIDECAR_ENGINE") == "v2" {
+		return "v2"
+	}
+	return "v1"
+}
+
 func cmdExplain(args []string, in io.Reader, out, errOut io.Writer) int {
 	fs := flag.NewFlagSet("explain", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	root := fs.String("root", ".", "folder inside the repository")
 	asJSON := fs.Bool("json", false, "print the trace as JSON")
+	engine := fs.String("engine", defaultEngine(), "retrieval pipeline: v1 or v2 (default from SIDECAR_ENGINE)")
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *engine != "v1" && *engine != "v2" {
+		_, _ = fmt.Fprintf(errOut, "--engine deve ser v1 ou v2, não %q\n", *engine)
 		return 2
 	}
 	prompt, err := io.ReadAll(io.LimitReader(in, adapter.MaxInputBytes))
@@ -250,7 +264,8 @@ func cmdExplain(args []string, in io.Reader, out, errOut io.Writer) int {
 	}
 	abs, _ := filepath.Abs(*root)
 	rootDir, _ := repo.FindRoot(abs)
-	rep, err := app.Explain(rootDir, strings.TrimSpace(string(prompt)))
+	opts := retrieve.Options{EngineVersion: *engine, Profile: os.Getenv("SIDECAR_PROFILE")}
+	rep, err := app.Explain(rootDir, strings.TrimSpace(string(prompt)), opts)
 	if err != nil {
 		_, _ = fmt.Fprintln(errOut, "erro:", err)
 		return 1

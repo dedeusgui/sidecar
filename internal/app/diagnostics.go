@@ -41,7 +41,18 @@ type ExplainReport struct {
 	TimingsMS     map[string]float64        `json:"timings_ms"`
 	Candidates    []retrieve.CandidateTrace `json:"candidates"`
 	Evidence      []EvidenceSummary         `json:"evidence"`
+	Engine        string                    `json:"engine"`
+	Contracts     []retrieve.Finding        `json:"contracts,omitempty"`
+	Packing       *retrieve.PackTrace       `json:"packing,omitempty"`
 	Context       string                    `json:"context"`
+}
+
+// engineOf names the pipeline that produced a result. Only the exact value "v2" selects v2.
+func engineOf(opts retrieve.Options) string {
+	if opts.EngineVersion == "v2" {
+		return "v2"
+	}
+	return "v1"
 }
 
 // SyncSummary is the part of a sync report that matters to a user.
@@ -70,7 +81,7 @@ type EvidenceSummary struct {
 }
 
 // Explain runs the full pipeline for one prompt against a worktree, without the hook's deadline.
-func Explain(root, prompt string) (ExplainReport, error) {
+func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) {
 	ix, _, err := index.Open(root, paths.IndexDB(root))
 	if err != nil {
 		return ExplainReport{}, err
@@ -83,7 +94,8 @@ func Explain(root, prompt string) (ExplainReport, error) {
 	if err != nil {
 		return ExplainReport{}, err
 	}
-	res, err := retrieve.Search(ctx, ix.Store(), prompt, retrieve.Options{})
+	opts.Root = root
+	res, err := retrieve.Search(ctx, ix.Store(), prompt, opts)
 	if err != nil {
 		return ExplainReport{}, err
 	}
@@ -92,6 +104,9 @@ func Explain(root, prompt string) (ExplainReport, error) {
 	res.Trace.Fingerprint = &fp
 	rep := ExplainReport{
 		Root:          root,
+		Engine:        engineOf(opts),
+		Contracts:     res.Trace.Contracts,
+		Packing:       res.Trace.Packing,
 		Sync:          SyncSummary{Files: sync.Files, Parsed: sync.Parsed, Complete: sync.Complete, Head: sync.Head, MS: ms(time.Since(t))},
 		Terms:         res.Trace.Terms,
 		Phrases:       res.Trace.Phrases,
@@ -144,6 +159,10 @@ func WriteExplain(w io.Writer, rep ExplainReport, asJSON bool) error {
 	}
 	_, _ = fmt.Fprintf(w, "Candidatos: léxicos=%d exatos=%d estruturais=%d · orçamento=%d tokens\n", rep.Lexical, rep.Exact, rep.Structural, rep.Budget)
 	_, _ = fmt.Fprintf(w, "Intenção: %s (confiança %.2f)\n", strings.Join(rep.Intent.Kinds, ", "), rep.Intent.Confidence)
+	_, _ = fmt.Fprintf(w, "Motor: %s\n", rep.Engine)
+	if pk := rep.Packing; pk != nil {
+		_, _ = fmt.Fprintf(w, "Pacote: %d itens · %d/%d tokens · abstenção=%v %s\n", pk.Selected, pk.Used, pk.Budget, pk.Abstained, pk.Reason)
+	}
 	if fp := rep.Fingerprint; fp != nil {
 		_, _ = fmt.Fprintf(w, "Repositório: git=%v monorepo=%v arquivos=%d manifests=%d linguagens=%d\n", fp.Git, fp.Monorepo, fp.Files, len(fp.Manifests), len(fp.Languages))
 	}

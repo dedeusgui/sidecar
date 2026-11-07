@@ -16,6 +16,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/install"
 	"github.com/dedeusgui/sidecar/internal/paths"
+	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
 )
 
@@ -271,7 +272,7 @@ func TestDogfoodQueries(t *testing.T) {
 	}
 	root := dogfoodRoot(t)
 	for _, c := range file.Cases {
-		rep, err := Explain(root, c.Prompt)
+		rep, err := Explain(root, c.Prompt, retrieve.Options{})
 		if err != nil {
 			t.Fatalf("%s: explain: %v", c.ID, err)
 		}
@@ -678,7 +679,7 @@ func TestDamagedIndexIsRebuiltAndHookKeepsAnswering(t *testing.T) {
 func TestExplainCarriesIntentAndFingerprint(t *testing.T) {
 	setupHome(t)
 	root := makeProject(t)
-	rep, err := Explain(root, "Onde fica o ManualReleaseHandler?")
+	rep, err := Explain(root, "Onde fica o ManualReleaseHandler?", retrieve.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -230,3 +230,50 @@ func (s *Store) AllSymbols() ([]SymbolHit, error) {
 	}
 	return collectHits(rows)
 }
+
+// DocPaths lists indexed documentation files (Markdown, README, CHANGELOG), sorted by path.
+func (s *Store) DocPaths(limit int) ([]string, error) {
+	rows, err := s.db.Query(`SELECT path FROM files WHERE kind = 'doc' ORDER BY path LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// TestPaths lists indexed test files, sorted by path.
+func (s *Store) TestPaths(limit int) ([]string, error) {
+	rows, err := s.db.Query(`SELECT path FROM files WHERE kind = 'test' ORDER BY path LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// DocstringOwners returns definitions whose extracted doc comment contains name verbatim.
+func (s *Store) DocstringOwners(name string, limit int) ([]SymbolHit, error) {
+	rows, err := s.db.Query(`SELECT `+symbolColumns("s")+`
+		FROM symbols s JOIN files f ON f.id = s.file_id
+		WHERE s.doc <> '' AND instr(s.doc, ?) > 0 ORDER BY s.id LIMIT ?`, name, limit)
+	if err != nil {
+		return nil, err
+	}
+	return collectHits(rows)
+}

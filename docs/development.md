@@ -38,7 +38,8 @@ Não commitar `bench/results/local.json` ou dados de diagnóstico gerados sem in
 3. Conferir manualmente se caminho/símbolo/linhas apontam para a implementação verdadeira. Classificar `hit`, `partial`, `miss`, `wrong`, `no_evidence_correct`.
 4. Repetir após a mudança; rodar as mesmas queries, mesmas fixtures e comparação com baseline. Se houve ganho de retrieval, registrar também o custo incremental de tokens e latência.
 5. Para validar auxílio ao **agente**, executar protocolo separado em `docs/evaluation-plan.md`; `explain` sozinho não mede rounds de modelo.
-6. Registrar falhas reproduzíveis como casos de regressão sem inserir os resultados da avaliação cega no conjunto de tuning.
+6. Para o pipeline v2 (contrato e empacotamento), use `sidecar explain --engine v2 --json`. O hook usa `SIDECAR_ENGINE=v2` (qualquer outro valor, ou ausência, mantém v1) e `SIDECAR_PROFILE=minimal|balanced|deep` para fixar o orçamento; sem perfil o orçamento segue o tamanho da evidência, como na v1. O trace v2 traz `contracts` (cada vínculo com status) e `packing` (orçamento, tokens usados e motivo da abstenção).
+7. Registrar falhas reproduzíveis como casos de regressão sem inserir os resultados da avaliação cega no conjunto de tuning.
 
 Consultas pinadas em `bench/dogfood_cases.json`, verificadas por `TestDogfoodQueries` (`go test ./internal/app/ -run TestDogfoodQueries`) contra um snapshot congelado (`dogfoodSnapshot`: arquivos de produção de `internal/app`, `internal/gitx` e `internal/install`), não contra o repositório vivo. Os positivos exigem o par arquivo+símbolo no top-5 do `explain`; os negativos não podem injetar contexto. Se um símbolo for renomeado ou um arquivo movido, atualize o arquivo e a lista no mesmo PR. Não são gabarito de tuning e não justificam mudar ranking sem A/B em `bench/cases.json`.
 
