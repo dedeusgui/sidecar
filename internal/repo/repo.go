@@ -49,6 +49,13 @@ var langByExt = map[string]string{
 
 var configExt = toSet(".yml", ".yaml", ".json", ".toml", ".xml", ".properties", ".gradle", ".ini", ".cfg", ".conf")
 
+// discoveryLangByExt names languages that discovery recognises but the indexer does not parse.
+// Classify deliberately ignores them: adding a grammar would change indexing and retrieval.
+var discoveryLangByExt = map[string]string{
+	".rs": "rust", ".php": "php", ".rb": "ruby", ".kt": "kotlin", ".swift": "swift",
+	".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".hpp": "cpp", ".sh": "shell",
+}
+
 // Classify returns the grammar name ("" when none), and the file kind:
 // code, test, doc, config or binary.
 func Classify(p string) (lang, kind string) {
@@ -74,6 +81,46 @@ func Classify(p string) (lang, kind string) {
 		return lang, "test"
 	}
 	return lang, "code"
+}
+
+// LanguageOf names a file's language for repository discovery and returns its kind. It covers
+// Classify's languages and discoveryLangByExt; lang is "" for files that are not source code.
+func LanguageOf(p string) (lang, kind string) {
+	lang, kind = Classify(p)
+	if lang != "" || kind != "" {
+		return lang, kind
+	}
+	base := path.Base(p)
+	name := discoveryLangByExt[strings.ToLower(path.Ext(base))]
+	switch {
+	case name == "":
+		return "", ""
+	case isTestPath(p, base, name):
+		return name, "test"
+	}
+	return name, "code"
+}
+
+var generatedNames = toSet("package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
+	"go.sum", "Cargo.lock", "composer.lock", "poetry.lock", "Pipfile.lock", "Gemfile.lock", "gradle.lockfile")
+
+var generatedSuffixes = []string{".pb.go", "_gen.go", "_pb2.py", ".min.js", ".min.css"}
+
+// IsGenerated reports files people should not edit: lockfiles, minified bundles, codegen output
+// and files whose leading bytes carry a generator marker. head is the file's first bytes, or nil.
+func IsGenerated(p string, head []byte) bool {
+	base := path.Base(p)
+	if generatedNames[base] {
+		return true
+	}
+	for _, s := range generatedSuffixes {
+		if strings.HasSuffix(base, s) {
+			return true
+		}
+	}
+	text := string(head)
+	return strings.Contains(text, "Code generated") && strings.Contains(text, "DO NOT EDIT") ||
+		strings.Contains(text, "@generated")
 }
 
 func isTestPath(p, base, lang string) bool {

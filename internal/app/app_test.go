@@ -213,8 +213,39 @@ func TestHookRejectsRepositoryRootAtUserHome(t *testing.T) {
 	}
 }
 
-// TestDogfoodQueries runs the pinned queries from bench/dogfood_cases.json against this
-// repository. If a symbol named there is renamed, update the file in the same change.
+// dogfoodSnapshot is the frozen corpus for TestDogfoodQueries: the production files of the
+// packages that own the pinned symbols. Tests and other packages are left out on purpose, so
+// adding them cannot move the answers. Changing this list is a deliberate corpus change.
+var dogfoodSnapshot = []string{
+	"internal/app/app.go",
+	"internal/app/diagnostics.go",
+	"internal/app/spawn_unix.go",
+	"internal/app/spawn_windows.go",
+	"internal/gitx/gitx.go",
+	"internal/install/install.go",
+}
+
+// dogfoodRoot copies dogfoodSnapshot from the repository into a temporary folder and returns it.
+func dogfoodRoot(t *testing.T) string {
+	t.Helper()
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dst := t.TempDir()
+	for _, rel := range dogfoodSnapshot {
+		body, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(dst, filepath.FromSlash(rel)), string(body))
+	}
+	return dst
+}
+
+// TestDogfoodQueries runs the pinned queries from bench/dogfood_cases.json against the frozen
+// snapshot of this repository (dogfoodSnapshot). If a pinned symbol is renamed or its file is
+// moved, update the case file and the snapshot list in the same change.
 func TestDogfoodQueries(t *testing.T) {
 	setupHome(t)
 	raw, err := os.ReadFile(filepath.Join("..", "..", "bench", "dogfood_cases.json"))
@@ -238,10 +269,7 @@ func TestDogfoodQueries(t *testing.T) {
 	if len(file.Cases) < 6 {
 		t.Fatalf("dogfood set has %d cases, want at least 6", len(file.Cases))
 	}
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := dogfoodRoot(t)
 	for _, c := range file.Cases {
 		rep, err := Explain(root, c.Prompt)
 		if err != nil {
@@ -643,5 +671,32 @@ func TestDamagedIndexIsRebuiltAndHookKeepsAnswering(t *testing.T) {
 				t.Fatalf("damaged index was not kept aside: %v", err)
 			}
 		})
+	}
+}
+
+// TestExplainCarriesIntentAndFingerprint checks the observability fields of `explain --json`.
+func TestExplainCarriesIntentAndFingerprint(t *testing.T) {
+	setupHome(t)
+	root := makeProject(t)
+	rep, err := Explain(root, "Onde fica o ManualReleaseHandler?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Fingerprint == nil || rep.Fingerprint.Hash == "" || rep.Fingerprint.Provenance == "" {
+		t.Fatalf("fingerprint missing: %+v", rep.Fingerprint)
+	}
+	if len(rep.Intent.Kinds) == 0 || rep.Intent.Kinds[0] != "locate" {
+		t.Fatalf("intent = %+v, want locate first", rep.Intent)
+	}
+	if rep.Routed {
+		t.Fatal("explain runs the v1 pipeline; intent must not route it")
+	}
+	if _, ok := rep.TimingsMS["fingerprint"]; !ok {
+		t.Fatalf("fingerprint timing missing: %v", rep.TimingsMS)
+	}
+	for _, e := range rep.Evidence {
+		if e.ID == "" || e.Source == "" {
+			t.Fatalf("evidence without ID or source: %+v", e)
+		}
 	}
 }

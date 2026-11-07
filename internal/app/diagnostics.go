@@ -25,19 +25,23 @@ import (
 
 // ExplainReport is the full trace of one prompt, for `sidecar explain`.
 type ExplainReport struct {
-	Root         string                    `json:"root"`
-	Sync         SyncSummary               `json:"sync"`
-	Terms        []string                  `json:"terms"`
-	Phrases      []string                  `json:"phrases"`
-	Translations map[string][]string       `json:"translations"`
-	Lexical      int                       `json:"lexical_candidates"`
-	Exact        int                       `json:"exact_candidates"`
-	Structural   int                       `json:"structural_candidates"`
-	Budget       int                       `json:"budget_tokens"`
-	TimingsMS    map[string]float64        `json:"timings_ms"`
-	Candidates   []retrieve.CandidateTrace `json:"candidates"`
-	Evidence     []EvidenceSummary         `json:"evidence"`
-	Context      string                    `json:"context"`
+	Root          string                    `json:"root"`
+	Sync          SyncSummary               `json:"sync"`
+	Terms         []string                  `json:"terms"`
+	Phrases       []string                  `json:"phrases"`
+	Translations  map[string][]string       `json:"translations"`
+	Lexical       int                       `json:"lexical_candidates"`
+	Exact         int                       `json:"exact_candidates"`
+	Structural    int                       `json:"structural_candidates"`
+	Budget        int                       `json:"budget_tokens"`
+	TokenEstimate int                       `json:"token_estimate"`
+	Intent        retrieve.Intent           `json:"intent"`
+	Routed        bool                      `json:"intent_routed"`
+	Fingerprint   *repo.Fingerprint         `json:"repo_fingerprint,omitempty"`
+	TimingsMS     map[string]float64        `json:"timings_ms"`
+	Candidates    []retrieve.CandidateTrace `json:"candidates"`
+	Evidence      []EvidenceSummary         `json:"evidence"`
+	Context       string                    `json:"context"`
 }
 
 // SyncSummary is the part of a sync report that matters to a user.
@@ -51,14 +55,18 @@ type SyncSummary struct {
 
 // EvidenceSummary is one retrieved item in readable form.
 type EvidenceSummary struct {
-	Name      string   `json:"name"`
-	Kind      string   `json:"kind"`
-	Path      string   `json:"path"`
-	Lines     string   `json:"lines"`
-	Verdict   string   `json:"verdict"`
-	Section   string   `json:"section"`
-	Score     float64  `json:"score"`
-	Relations []string `json:"relations,omitempty"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Kind          string   `json:"kind"`
+	Path          string   `json:"path"`
+	Lines         string   `json:"lines"`
+	Verdict       string   `json:"verdict"`
+	Section       string   `json:"section"`
+	Source        string   `json:"source"`
+	Confidence    float64  `json:"confidence"`
+	TokenEstimate int      `json:"token_estimate"`
+	Score         float64  `json:"score"`
+	Relations     []string `json:"relations,omitempty"`
 }
 
 // Explain runs the full pipeline for one prompt against a worktree, without the hook's deadline.
@@ -79,28 +87,38 @@ func Explain(root, prompt string) (ExplainReport, error) {
 	if err != nil {
 		return ExplainReport{}, err
 	}
+	fpStart := time.Now()
+	fp := repo.Discover(ctx, root)
+	res.Trace.Fingerprint = &fp
 	rep := ExplainReport{
-		Root:         root,
-		Sync:         SyncSummary{Files: sync.Files, Parsed: sync.Parsed, Complete: sync.Complete, Head: sync.Head, MS: ms(time.Since(t))},
-		Terms:        res.Trace.Terms,
-		Phrases:      res.Trace.Phrases,
-		Translations: res.Trace.Translations,
-		Lexical:      res.Trace.Lexical,
-		Exact:        res.Trace.Exact,
-		Structural:   res.Trace.Structural,
-		Budget:       res.Trace.Budget,
-		TimingsMS:    map[string]float64{},
-		Candidates:   res.Trace.Candidates,
-		Context:      brief.Render(res, nil),
+		Root:          root,
+		Sync:          SyncSummary{Files: sync.Files, Parsed: sync.Parsed, Complete: sync.Complete, Head: sync.Head, MS: ms(time.Since(t))},
+		Terms:         res.Trace.Terms,
+		Phrases:       res.Trace.Phrases,
+		Translations:  res.Trace.Translations,
+		Lexical:       res.Trace.Lexical,
+		Exact:         res.Trace.Exact,
+		Structural:    res.Trace.Structural,
+		Budget:        res.Trace.Budget,
+		TokenEstimate: res.Trace.TokenEstimate,
+		Intent:        res.Trace.Intent,
+		Routed:        res.Trace.Routed,
+		Fingerprint:   res.Trace.Fingerprint,
+		TimingsMS:     map[string]float64{},
+		Candidates:    res.Trace.Candidates,
+		Context:       brief.Render(res, nil),
 	}
 	for k, d := range res.Trace.Timings {
 		rep.TimingsMS[k] = ms(d)
 	}
+	rep.TimingsMS["fingerprint"] = ms(time.Since(fpStart))
 	for _, e := range res.Evidence {
 		rep.Evidence = append(rep.Evidence, EvidenceSummary{
-			Name: e.Hit.Name, Kind: e.Hit.Kind, Path: e.Hit.Path,
+			ID: e.ID, Name: e.Hit.Name, Kind: e.Hit.Kind, Path: e.Hit.Path,
 			Lines:   fmt.Sprintf("%d-%d", e.Hit.Line, e.Hit.EndLine),
-			Verdict: e.Verdict, Section: e.Section, Score: e.Score, Relations: e.Relations,
+			Verdict: e.Verdict, Section: e.Section, Source: e.Source,
+			Confidence: e.Confidence, TokenEstimate: e.TokenEstimate,
+			Score: e.Score, Relations: e.Relations,
 		})
 	}
 	return rep, nil
@@ -124,7 +142,12 @@ func WriteExplain(w io.Writer, rep ExplainReport, asJSON bool) error {
 	for _, k := range keys {
 		_, _ = fmt.Fprintf(w, "Tradução %s → %s\n", k, strings.Join(rep.Translations[k], ", "))
 	}
-	_, _ = fmt.Fprintf(w, "Candidatos: léxicos=%d exatos=%d estruturais=%d · orçamento=%d tokens\n\n", rep.Lexical, rep.Exact, rep.Structural, rep.Budget)
+	_, _ = fmt.Fprintf(w, "Candidatos: léxicos=%d exatos=%d estruturais=%d · orçamento=%d tokens\n", rep.Lexical, rep.Exact, rep.Structural, rep.Budget)
+	_, _ = fmt.Fprintf(w, "Intenção: %s (confiança %.2f)\n", strings.Join(rep.Intent.Kinds, ", "), rep.Intent.Confidence)
+	if fp := rep.Fingerprint; fp != nil {
+		_, _ = fmt.Fprintf(w, "Repositório: git=%v monorepo=%v arquivos=%d manifests=%d linguagens=%d\n", fp.Git, fp.Monorepo, fp.Files, len(fp.Manifests), len(fp.Languages))
+	}
+	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprintln(w, "Evidências:")
 	if len(rep.Evidence) == 0 {
 		_, _ = fmt.Fprintln(w, "  (nenhuma — o prompt não gera contexto)")

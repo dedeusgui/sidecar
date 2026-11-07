@@ -1,5 +1,5 @@
 {
-  "description": "Consultas pinadas sobre o próprio repositório Sidecar, usadas por TestDogfoodQueries (internal/app). Positivos exigem path+name no top-5 do explain; negativos não podem injetar contexto. Se um símbolo for renomeado, atualize este arquivo no mesmo PR. Não são gabarito de tuning: não ajustar o ranking para estes casos sem benchmark A/B em bench/cases.json.",
+  "description": "Consultas pinadas usadas por TestDogfoodQueries (internal/app). O teste indexa um snapshot congelado (dogfoodSnapshot em internal/app/app_test.go: arquivos de produção de internal/app, internal/gitx e internal/install), não o repositório vivo, para que novos testes não mudem as respostas. Positivos exigem path+name no top-5 do explain; negativos não podem injetar contexto. Se um símbolo for renomeado ou um arquivo movido, atualize este arquivo e a lista dogfoodSnapshot no mesmo PR. Não são gabarito de tuning: não ajustar o ranking para estes casos sem benchmark A/B em bench/cases.json.",
   "cases": [
     {
       "id": "D01",

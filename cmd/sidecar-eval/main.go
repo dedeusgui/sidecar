@@ -117,6 +117,7 @@ func main() {
 		{"bm25 + traducao/normalizacao", retrieveRun(retrieve.Ablation{LexicalOnly: true})},
 		{"lexical + grafo", retrieveRun(retrieve.Ablation{NoGit: true})},
 		{"lexical + grafo + git", retrieveRun(retrieve.Ablation{})},
+		{"v2.1 (intent router)", retrieveRunWith(retrieve.Options{EngineVersion: "v2"})},
 	}
 
 	var outcomes []caseOutcome
@@ -150,9 +151,14 @@ func main() {
 }
 
 func retrieveRun(ab retrieve.Ablation) runner {
+	return retrieveRunWith(retrieve.Options{Ablate: ab})
+}
+
+// retrieveRunWith runs the retrieval pipeline with the given options.
+func retrieveRunWith(opts retrieve.Options) runner {
 	return func(st *store.Store, prompt string) (callResult, error) {
 		t := time.Now()
-		res, err := retrieve.Search(context.Background(), st, prompt, retrieve.Options{Ablate: ab})
+		res, err := retrieve.Search(context.Background(), st, prompt, opts)
 		if err != nil {
 			return callResult{}, err
 		}

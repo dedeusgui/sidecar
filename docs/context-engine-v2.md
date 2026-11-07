@@ -1,6 +1,6 @@
 # ADR: Context Engine v2 — recuperação orientada à intenção e à sessão
 
-**Estado:** proposta algorítmica, não implementada · **Data:** 2026-11-06 · **Escopo:** subsistema de recuperação da **V2 completa**, conforme [product-v2.md](product-v2.md) e [roadmap.md](roadmap.md). Não exige novo agente.
+**Estado:** V2.0 (trace) e V2.1 (IntentRouter atrás de `EngineVersion: "v2"`) implementados em 2026-11-06; ContextPacker (V2.2), memória de sessão (V2.3) e LSP (V2.4) pendentes · **Data:** 2026-11-06 · **Escopo:** subsistema de recuperação da **V2 completa**, conforme [product-v2.md](product-v2.md) e [roadmap.md](roadmap.md). Não exige novo agente.
 
 ## 1. Problema e objetivos
 

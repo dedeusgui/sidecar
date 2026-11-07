@@ -236,7 +236,8 @@ func TestTraceExplainsFactorsAndTimings(t *testing.T) {
 	if len(res.Trace.Candidates) == 0 {
 		t.Fatal("trace has no candidate factors")
 	}
-	if res.Trace.Timings["lexical"] <= 0 {
+	// A fast stage can read as 0 on a coarse clock (Windows), so only presence and sign matter.
+	if d, ok := res.Trace.Timings["lexical"]; !ok || d < 0 {
 		t.Fatalf("lexical timing not recorded: %+v", res.Trace.Timings)
 	}
 	for _, c := range res.Trace.Candidates {

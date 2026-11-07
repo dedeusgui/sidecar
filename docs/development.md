@@ -27,18 +27,20 @@ go run ./cmd/sidecar-eval --cases bench/cases.json --compare bench/results/final
 go run ./cmd/sidecar doctor
 ```
 
+O método `v2.1 (intent router)` roteia só prompts com confiança de intenção ≥ 0,55 e limita a expansão estrutural às famílias da intenção; os demais produzem os mesmos itens do v1 (coberto por `TestRoutingFallsBackToV1BelowThreshold`). Ele não tem baseline em `final-state.json`, então aparece como não comparado até uma nova rodada congelada. Para ver quantos prompts roteiam, use `sidecar explain --json` e leia `intent` e `intent_routed`.
+
 Não commitar `bench/results/local.json` ou dados de diagnóstico gerados sem intenção; preferir caminho fora do repo.
 
 ## Loop mínimo de dogfooding (manual, barato, reproduzível)
 
 1. Identificar SHA atual, Go/SO, commit alvo e um prompt **pré-definido**. Usar worktree/ambiente isolado quando possível.
-2. Rodar `sidecar explain --root . --json` com o prompt em stdin. Guardar localmente trace com `evidence`, `translations`, `timings_ms`, `budget_tokens` e `context`. Não publicar texto sensível.
+2. Rodar `sidecar explain --root . --json` com o prompt em stdin. Guardar localmente trace com `evidence` (cada item traz `id`, `source`, `confidence` e `token_estimate`), `candidates` (cada um traz `reason_selected` ou `reason_suppressed`), `intent` (`kinds`, `confidence`, `signals`), `repo_fingerprint`, `translations`, `timings_ms`, `budget_tokens` e `context`. Não publicar texto sensível.
 3. Conferir manualmente se caminho/símbolo/linhas apontam para a implementação verdadeira. Classificar `hit`, `partial`, `miss`, `wrong`, `no_evidence_correct`.
 4. Repetir após a mudança; rodar as mesmas queries, mesmas fixtures e comparação com baseline. Se houve ganho de retrieval, registrar também o custo incremental de tokens e latência.
 5. Para validar auxílio ao **agente**, executar protocolo separado em `docs/evaluation-plan.md`; `explain` sozinho não mede rounds de modelo.
 6. Registrar falhas reproduzíveis como casos de regressão sem inserir os resultados da avaliação cega no conjunto de tuning.
 
-Consultas pinadas em `bench/dogfood_cases.json`, verificadas por `TestDogfoodQueries` (`go test ./internal/app/ -run TestDogfoodQueries`): os positivos exigem o par arquivo+símbolo no top-5 do `explain`; os negativos não podem injetar contexto. Se um símbolo for renomeado, atualize o arquivo no mesmo PR. Não são gabarito de tuning e não justificam mudar ranking sem A/B em `bench/cases.json`.
+Consultas pinadas em `bench/dogfood_cases.json`, verificadas por `TestDogfoodQueries` (`go test ./internal/app/ -run TestDogfoodQueries`) contra um snapshot congelado (`dogfoodSnapshot`: arquivos de produção de `internal/app`, `internal/gitx` e `internal/install`), não contra o repositório vivo. Os positivos exigem o par arquivo+símbolo no top-5 do `explain`; os negativos não podem injetar contexto. Se um símbolo for renomeado ou um arquivo movido, atualize o arquivo e a lista no mesmo PR. Não são gabarito de tuning e não justificam mudar ranking sem A/B em `bench/cases.json`.
 
 Limite conhecido: a consulta D01 apontava para `adapter.Format`. Depois dos testes novos em `internal/app/app_test.go`, `Format` caiu para o 6.º lugar (0,0323, contra 0,0325 da seção de `CLAUDE.md`), por causa de identificadores com “hook” no código de teste. O gabarito passou a ser `app.Hook`, que monta e emite o contexto do hook; **o ranking não foi alterado**. A margem é fina: outra mudança no repositório pode reordenar esses resultados.
 

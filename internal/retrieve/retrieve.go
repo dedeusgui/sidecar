@@ -27,7 +27,11 @@ type Options struct {
 	MaxPerFile int // items per file (default 2)
 	Candidates int // lexical candidates examined (default 60)
 	Seeds      int // strongest matches expanded structurally (default 8)
-	Ablate     Ablation
+	// EngineVersion "v2" enables intent routing; "" and "v1" keep the v1 pipeline.
+	EngineVersion string
+	// IntentRouting enables intent routing regardless of EngineVersion.
+	IntentRouting bool
+	Ablate        Ablation
 }
 
 // Ablation switches off parts of the pipeline. It exists to measure each component's
@@ -42,13 +46,17 @@ type Ablation struct {
 
 // Evidence is one item of retrieved context.
 type Evidence struct {
-	Hit       store.SymbolHit
-	Verdict   string // VERIFIED | INFERRED | UNKNOWN
-	Section   string // ctxbuild section the item belongs to
-	Score     float64
-	Matched   []string // query concepts matched by the item's own text
-	Relations []string // structural links, e.g. "calls:Enqueue(same_file)"
-	Dirty     bool     // the file has uncommitted changes in the working tree
+	Hit           store.SymbolHit
+	Verdict       string // VERIFIED | INFERRED | UNKNOWN
+	Section       string // ctxbuild section the item belongs to
+	Score         float64
+	Matched       []string // query concepts matched by the item's own text
+	Relations     []string // structural links, e.g. "calls:Enqueue(same_file)"
+	Dirty         bool     // the file has uncommitted changes in the working tree
+	ID            string   // deterministic identity: path, kind, name and start line
+	Source        string   // exact | lexical | contract | structural | git
+	Confidence    float64  // heuristic in [0, 1]; not fitted to labelled data
+	TokenEstimate int      // estimate of the item's rendered metadata line
 }
 
 // CandidateTrace explains one candidate for diagnostics.
@@ -61,21 +69,31 @@ type CandidateTrace struct {
 	Score            float64
 	Kept             bool
 	Reason           string
+	ID               string  `json:"id"`
+	Source           string  `json:"source"`
+	Confidence       float64 `json:"confidence"`
+	TokenEstimate    int     `json:"token_estimate"`
+	ReasonSelected   string  `json:"reason_selected,omitempty"`   // why the item was eligible
+	ReasonSuppressed string  `json:"reason_suppressed,omitempty"` // why it was not shown
 }
 
 // Trace records every factor behind a retrieval, for `sidecar explain`.
 type Trace struct {
-	Terms        []string
-	Phrases      []string
-	Translations map[string][]string
-	Concepts     int
-	Lexical      int
-	Exact        int
-	Structural   int
-	Final        int
-	Budget       int // suggested token budget for the context block
-	Timings      map[string]time.Duration
-	Candidates   []CandidateTrace
+	Terms         []string
+	Phrases       []string
+	Translations  map[string][]string
+	Concepts      int
+	Lexical       int
+	Exact         int
+	Structural    int
+	Final         int
+	Budget        int // suggested token budget for the context block
+	Timings       map[string]time.Duration
+	Candidates    []CandidateTrace
+	Intent        Intent            `json:"intent"`
+	Routed        bool              `json:"intent_routed"` // the intent changed the structural expansion
+	TokenEstimate int               `json:"token_estimate"`
+	Fingerprint   *repo.Fingerprint `json:"repo_fingerprint,omitempty"` // set by the caller that has the root
 }
 
 // Result is the outcome of Search.
@@ -132,6 +150,14 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	res.Trace.Concepts = len(concepts)
 	res.Trace.Timings["analyze"] = time.Since(t)
 
+	// Intent is always reported; it changes the search only when v2 routing is on and confident.
+	res.Trace.Intent = ClassifyIntent(prompt)
+	var families map[string]bool
+	if (opts.IntentRouting || opts.EngineVersion == "v2") && res.Trace.Intent.Confidence >= intentMinConfidence {
+		families = familiesFor(res.Trace.Intent.Kinds)
+		res.Trace.Routed = families != nil
+	}
+
 	t = time.Now()
 	cands := map[int64]*candidate{}
 	var lexOrder []int64
@@ -175,7 +201,8 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 				break
 			}
 			c := cands[id]
-			res.Evidence = append(res.Evidence, Evidence{Hit: c.hit, Verdict: "INFERRED", Section: ctxbuild.Code, Score: 1 / float64(i+1), Matched: c.matched})
+			res.Evidence = append(res.Evidence, Evidence{Hit: c.hit, Verdict: "INFERRED", Section: ctxbuild.Code, Score: 1 / float64(i+1), Matched: c.matched,
+				ID: idOf(c.hit), Source: sourceOf(c), Confidence: confidenceOf(c), TokenEstimate: tokensOf(c)})
 		}
 		res.Trace.Final = len(res.Evidence)
 		res.Trace.Budget = budgetFor(res.Evidence)
@@ -187,7 +214,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	seeds := pickSeeds(cands, opts.Seeds)
 	added := 0
 	if !opts.Ablate.NoStructure {
-		added, err = expand(st, seeds, cands, !opts.Ablate.NoGit)
+		added, err = expand(st, seeds, cands, !opts.Ablate.NoGit, families)
 		if err != nil {
 			return res, err
 		}
@@ -217,7 +244,9 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	res.Trace.Timings["fusion"] = time.Since(t)
 
 	for _, c := range kept {
-		res.Evidence = append(res.Evidence, evidenceOf(c))
+		ev := evidenceOf(c)
+		res.Evidence = append(res.Evidence, ev)
+		res.Trace.TokenEstimate += ev.TokenEstimate
 	}
 	res.Trace.Final = len(res.Evidence)
 	res.Trace.Budget = budgetFor(res.Evidence)
@@ -485,7 +514,9 @@ func rankOrMax(r int) int {
 
 // expand adds structural neighbours of the seeds. Each link is labelled with its kind so
 // the context and the trace can say why an item is there.
-func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate, withHistory bool) (int, error) {
+// A nil families map expands every family (v1). Otherwise only the listed families are queried.
+func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate, withHistory bool, families map[string]bool) (int, error) {
+	want := func(f string) bool { return families == nil || families[f] }
 	added := 0
 	addNeighbor := func(seed *candidate, h store.SymbolHit, label, basis string) {
 		c, ok := cands[h.ID]
@@ -510,40 +541,50 @@ func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate, wit
 	}
 	for _, seed := range seeds {
 		id := seed.hit.ID
-		members, err := st.MembersOf(id, 6)
-		if err != nil {
-			return added, err
+		if want(famMembers) {
+			members, err := st.MembersOf(id, 6)
+			if err != nil {
+				return added, err
+			}
+			for _, m := range members {
+				addNeighbor(seed, m.SymbolHit, "member_of:"+seed.hit.Name, m.Basis)
+			}
 		}
-		for _, m := range members {
-			addNeighbor(seed, m.SymbolHit, "member_of:"+seed.hit.Name, m.Basis)
+		if want(famParent) {
+			if parent, ok, err := st.ParentOf(id); err != nil {
+				return added, err
+			} else if ok {
+				addNeighbor(seed, parent, "contains:"+seed.hit.Name, "same_file")
+			}
 		}
-		if parent, ok, err := st.ParentOf(id); err != nil {
-			return added, err
-		} else if ok {
-			addNeighbor(seed, parent, "contains:"+seed.hit.Name, "same_file")
+		if want(famCallees) {
+			callees, err := st.CalleesOf(id, 6)
+			if err != nil {
+				return added, err
+			}
+			for _, r := range callees {
+				addNeighbor(seed, r.SymbolHit, fmt.Sprintf("called_by:%s(%s)", seed.hit.Name, r.Basis), r.Basis)
+			}
 		}
-		callees, err := st.CalleesOf(id, 6)
-		if err != nil {
-			return added, err
+		if want(famCallers) {
+			callers, err := st.CallersOf(id, 4)
+			if err != nil {
+				return added, err
+			}
+			for _, r := range callers {
+				addNeighbor(seed, r.SymbolHit, fmt.Sprintf("calls:%s(%s)", seed.hit.Name, r.Basis), r.Basis)
+			}
 		}
-		for _, r := range callees {
-			addNeighbor(seed, r.SymbolHit, fmt.Sprintf("called_by:%s(%s)", seed.hit.Name, r.Basis), r.Basis)
+		if want(famTests) {
+			tests, err := st.TestFilesReferencing(seed.hit.Name, 2)
+			if err != nil {
+				return added, err
+			}
+			for _, f := range tests {
+				addNeighbor(seed, f, "tested_by:"+f.Path, "same_file")
+			}
 		}
-		callers, err := st.CallersOf(id, 4)
-		if err != nil {
-			return added, err
-		}
-		for _, r := range callers {
-			addNeighbor(seed, r.SymbolHit, fmt.Sprintf("calls:%s(%s)", seed.hit.Name, r.Basis), r.Basis)
-		}
-		tests, err := st.TestFilesReferencing(seed.hit.Name, 2)
-		if err != nil {
-			return added, err
-		}
-		for _, f := range tests {
-			addNeighbor(seed, f, "tested_by:"+f.Path, "same_file")
-		}
-		if !withHistory {
+		if !withHistory || !want(famHistory) {
 			continue
 		}
 		co, err := st.CoChanged(seed.hit.Path, 3)
@@ -695,7 +736,54 @@ func evidenceOf(c *candidate) Evidence {
 	ev := Evidence{Hit: c.hit, Score: c.score, Matched: c.matched, Relations: c.rels, Dirty: c.git}
 	ev.Verdict = verdictOf(c)
 	ev.Section = sectionOf(c)
+	ev.ID, ev.Source, ev.Confidence, ev.TokenEstimate = idOf(c.hit), sourceOf(c), confidenceOf(c), tokensOf(c)
 	return ev
+}
+
+// idOf identifies a symbol by path, kind, name and start line. It does not depend on the
+// prompt, so the same symbol keeps its ID across runs.
+func idOf(h store.SymbolHit) string {
+	return fmt.Sprintf("%s#%s:%s@%d", h.Path, h.Kind, h.Name, h.Line)
+}
+
+// sourceOf names the candidate's principal origin among the retrieval sources.
+func sourceOf(c *candidate) string {
+	switch {
+	case c.exact:
+		return "exact"
+	case c.neighbor:
+		return "structural"
+	case c.lexRank > 0 || c.coverage > 0:
+		if sectionOf(c) == ctxbuild.Contracts {
+			return "contract"
+		}
+		return "lexical"
+	case c.git:
+		return "git"
+	}
+	return "none"
+}
+
+// confidenceOf is a fixed heuristic over the evidence path, ordered by how direct the match is.
+// It is not fitted to labelled data; calibrating it needs the evaluation set.
+func confidenceOf(c *candidate) float64 {
+	switch {
+	case c.exact || c.literal:
+		return 0.95
+	case c.coverage > 0:
+		return 0.5 + 0.4*math.Min(c.coverage, 1)
+	case c.neighbor:
+		return 0.3 + 0.3*math.Min(c.seedCoverage, 1)
+	case c.git:
+		return 0.3
+	}
+	return 0.2
+}
+
+// tokensOf estimates the metadata line that the brief renders for the item.
+func tokensOf(c *candidate) int {
+	h := c.hit
+	return ctxbuild.EstimateTokens(fmt.Sprintf("%s %s (%s:%d-%d) %s", h.Kind, h.Name, h.Path, h.Line, h.EndLine, strings.Join(c.rels, " ")))
 }
 
 func verdictOf(c *candidate) string {
@@ -741,11 +829,18 @@ func traceOf(cands map[int64]*candidate) []CandidateTrace {
 	}
 	out := make([]CandidateTrace, 0, len(list))
 	for _, c := range list {
-		out = append(out, CandidateTrace{
+		t := CandidateTrace{
 			Name: c.hit.Name, Path: c.hit.Path, Kind: c.hit.Kind,
 			Lexical: c.lexRank, Coverage: c.coverage, Exact: c.exact,
 			Relations: c.rels, Score: c.score, Kept: c.reason == "kept", Reason: c.reason,
-		})
+			ID: idOf(c.hit), Source: sourceOf(c), Confidence: confidenceOf(c), TokenEstimate: tokensOf(c),
+		}
+		if t.Kept {
+			t.ReasonSelected = gate(c)
+		} else {
+			t.ReasonSuppressed = c.reason
+		}
+		out = append(out, t)
 	}
 	return out
 }
