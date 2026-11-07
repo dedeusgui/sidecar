@@ -395,6 +395,47 @@ func (s *Store) TermSymbolFreq(term string) (int, error) {
 	return n, err
 }
 
+// TermFreq holds what TermDocFreq (Doc) and TermSymbolFreq (Symbol) return for one term.
+type TermFreq struct{ Doc, Symbol int }
+
+// termChunk keeps one batched lookup under SQLite's bound-parameter limit.
+const termChunk = 500
+
+// TermFreqs looks up many terms with one statement per chunk. A term missing from the
+// vocabulary has no entry, which reads as zero counts.
+func (s *Store) TermFreqs(terms []string) (map[string]TermFreq, error) {
+	out := make(map[string]TermFreq, len(terms))
+	for start := 0; start < len(terms); start += termChunk {
+		if err := s.termFreqChunk(out, terms[start:min(start+termChunk, len(terms))]); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func (s *Store) termFreqChunk(out map[string]TermFreq, terms []string) error {
+	args := make([]any, len(terms))
+	marks := make([]string, len(terms))
+	for i, t := range terms {
+		args[i], marks[i] = t, "?"
+	}
+	rows, err := s.db.Query(`SELECT term, SUM(doc), SUM(CASE WHEN col IN ('name_terms', 'sig_terms', 'doc_terms') THEN doc ELSE 0 END)
+		FROM symbol_vocab WHERE term IN (`+strings.Join(marks, ",")+`) GROUP BY term`, args...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var term string
+		var f TermFreq
+		if err := rows.Scan(&term, &f.Doc, &f.Symbol); err != nil {
+			return err
+		}
+		out[term] = f
+	}
+	return rows.Err()
+}
+
 // DirtyPaths lists files that differed from HEAD at the previous sync.
 func (s *Store) DirtyPaths() ([]string, error) {
 	rows, err := s.db.Query(`SELECT path FROM dirty_paths ORDER BY path`)

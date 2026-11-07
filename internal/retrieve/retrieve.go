@@ -385,16 +385,22 @@ func buildConcepts(st *store.Store, terms, phrases []string, total int, trans ma
 	// No frequency cut-off: a topical word (owner, in a repository about owners) is still the
 	// best discriminator available. Common terms are down-weighted by IDF and BM25 instead.
 	maxDF := total + 1
+	// One batched lookup for every term, translation and phrase. A statement per term made
+	// Voice Mode prompts (70+ terms) pay for every round trip on each search.
+	lookup := append([]string{}, terms...)
+	if !noTranslation {
+		for _, term := range terms {
+			lookup = append(lookup, lexical.Translations(term)...)
+		}
+		lookup = append(lookup, phrases...)
+	}
+	freq, err := st.TermFreqs(lookup)
+	if err != nil {
+		return nil, err
+	}
 	var out []concept
 	for _, term := range terms {
-		present, err := st.TermDocFreq(term)
-		if err != nil {
-			return nil, err
-		}
-		df, err := st.TermSymbolFreq(term)
-		if err != nil {
-			return nil, err
-		}
+		present, df := freq[term].Doc, freq[term].Symbol
 		c := concept{term: term}
 		if present > 0 && df <= maxDF {
 			c.termPresent = true
@@ -404,15 +410,7 @@ func buildConcepts(st *store.Store, terms, phrases []string, total int, trans ma
 			translations = nil
 		}
 		for _, en := range translations {
-			epresent, err := st.TermDocFreq(en)
-			if err != nil {
-				return nil, err
-			}
-			edf, err := st.TermSymbolFreq(en)
-			if err != nil {
-				return nil, err
-			}
-			if epresent > 0 && edf <= maxDF {
+			if f := freq[en]; f.Doc > 0 && f.Symbol <= maxDF {
 				c.alts = append(c.alts, en)
 			}
 		}
@@ -428,16 +426,8 @@ func buildConcepts(st *store.Store, terms, phrases []string, total int, trans ma
 		if noTranslation {
 			break
 		}
-		present, err := st.TermDocFreq(en)
-		if err != nil {
-			return nil, err
-		}
-		df, err := st.TermSymbolFreq(en)
-		if err != nil {
-			return nil, err
-		}
-		if present > 0 && df <= maxDF {
-			out = append(out, concept{term: en, termPresent: true, weight: idf(df, total)})
+		if f := freq[en]; f.Doc > 0 && f.Symbol <= maxDF {
+			out = append(out, concept{term: en, termPresent: true, weight: idf(f.Symbol, total)})
 			trans["phrase"] = append(trans["phrase"], en)
 		}
 	}

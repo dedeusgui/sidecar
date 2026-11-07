@@ -136,6 +136,11 @@ var stopwords = toSet(
 	"eu", "voce", "nao", "sim", "ser", "ter", "foi", "ja", "qual", "quando", "onde",
 	"sobre", "entre", "muito", "pode", "preciso", "quero", "deve", "ate", "somente",
 	"apenas", "tambem", "ainda", "aqui", "ali", "la",
+	// Spoken PT-BR filler from voice transcripts. Matched before stemming, so listed as spoken.
+	"cara", "tipo", "assim", "entao", "acho", "acredito", "queria", "entender", "fazer", "coisa",
+	"coisas", "alguma", "algum", "gente", "vamos", "olhando", "falando", "basicamente", "realmente",
+	"interessante", "melhor", "questao", "entende", "sabe", "beleza", "certo", "bom", "dia", "tarde",
+	"noite", "obrigado", "favor",
 	// English
 	"the", "an", "and", "or", "of", "to", "in", "on", "for", "with", "is", "are", "be",
 	"it", "this", "that", "by", "at", "from", "we", "i", "you", "can", "should", "would",

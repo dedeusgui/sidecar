@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -177,6 +178,37 @@ func TestTermDocumentFrequencyFromSearchVocabulary(t *testing.T) {
 	}
 	if df, _ := s.TermDocFreq("absent"); df != 0 {
 		t.Fatalf("absent term df = %d, want 0", df)
+	}
+}
+
+// TermFreqs must agree with the per-term helpers for present, absent and chunked lookups.
+func TestTermFreqsMatchesPerTermLookups(t *testing.T) {
+	s, _ := openTemp(t)
+	err := s.ReplaceFile(FileRecord{Path: "queue/a.go", Lang: "go", Kind: "code", Hash: "h"},
+		[]SymbolRecord{
+			{Kind: "function", Name: "Release", NameTerms: "release", DocTerms: "queue", Parent: -1},
+			{Kind: "function", Name: "Queue", NameTerms: "queue release", Parent: -1},
+		}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	terms := []string{"release", "queue", "absent"}
+	for i := 0; i < termChunk+10; i++ { // more than one chunk
+		terms = append(terms, fmt.Sprintf("filler%d", i))
+	}
+	got, err := s.TermFreqs(terms)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, term := range terms {
+		doc, _ := s.TermDocFreq(term)
+		sym, _ := s.TermSymbolFreq(term)
+		if got[term] != (TermFreq{Doc: doc, Symbol: sym}) {
+			t.Fatalf("%s: TermFreqs = %+v, per-term lookups = doc %d symbol %d", term, got[term], doc, sym)
+		}
+	}
+	if got["release"].Symbol == 0 {
+		t.Fatalf("release should count as a symbol term: %+v", got["release"])
 	}
 }
 

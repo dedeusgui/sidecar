@@ -95,6 +95,7 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 	if err != nil {
 		return ExplainReport{}, err
 	}
+	syncMS := ms(time.Since(t)) // taken before retrieval and fingerprinting, which are not sync
 	opts.Root = root
 	if opts.LSPTrusted == nil {
 		opts.LSPTrusted = lsp.Trusted
@@ -119,7 +120,7 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 		Engine:        engineOf(opts),
 		Contracts:     res.Trace.Contracts,
 		Packing:       res.Trace.Packing,
-		Sync:          SyncSummary{Files: sync.Files, Parsed: sync.Parsed, Complete: sync.Complete, Head: sync.Head, MS: ms(time.Since(t))},
+		Sync:          SyncSummary{Files: sync.Files, Parsed: sync.Parsed, Complete: sync.Complete, Head: sync.Head, MS: syncMS},
 		Terms:         res.Trace.Terms,
 		Phrases:       res.Trace.Phrases,
 		Translations:  res.Trace.Translations,

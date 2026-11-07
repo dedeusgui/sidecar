@@ -244,6 +244,7 @@ Quando o bloco traz o gabarito, o ganho é grande e consistente: 1 chamada contr
 ### 6.2 Onde não ajuda
 
 - **Tempo de ferramenta:** `sidecar explain` leva cerca de 40 ms por chamada, dos quais cerca de 28 ms são sincronização do índice (`sync.ms`, mesmo com índice aquecido e sem arquivos novos). Um `grep` local leva de 1 a 3 ms. Pela medição, o OFF é mais rápido.
+  - **Correção posterior (medição revisada):** o `sync.ms` antigo também contava a recuperação (~13 ms) e a fingerprint (~6 ms), e não só a sincronização. Medida isolada no chi aquecido, a sincronização leva ~5 ms, ou ~3 ms desde que um subprocesso `git` redundante foi removido (mediana de 40 execuções). Com o código atual, `sidecar explain` no chi leva ~32 a 37 ms de ponta a ponta (5 execuções), contra 1 a 3 ms do `grep`. A conclusão sobre o tempo de ferramenta continua valendo, mas o custo atribuído à sincronização estava superestimado.
 - **Quando o bloco falha:** o Sidecar paga o `explain` e ainda faz a busca do OFF. Nas tarefas R05 e R06, a nota do Sidecar é menor que a do OFF por isso.
 - **Bloco parcial (R05 e R06):** o bloco não trouxe o gabarito completo. O OFF precisou de 15 a 23 chamadas, e o `explain` foi custo extra pago antes da mesma sequência de buscas.
 
