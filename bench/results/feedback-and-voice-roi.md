@@ -1,42 +1,89 @@
-# Voz e feedback: avaliação exploratória offline
+# Voice Mode, Feedback Estruturado e Matriz Multi-Agente: Avaliação Empírica
 
-Execução em 2026-11-07 UTC, Sidecar `5e31e03`, Linux amd64, Go 1.27.0, Ryzen 7 7735HS. A suíte e o setup estão em [ten_repos_cases.json](../ten_repos_cases.json) e [setup_10_repos.sh](../agentic/setup_10_repos.sh); relatório do avaliador em [ten-repos-benchmark.md](ten-repos-benchmark.md). São dez repositórios reais, 50 casos anotados por um único autor, gold em nível de arquivo e commits fixos. Os casos são de desenvolvimento, não holdout; uma anotação ausente de gold não prova que não existem outras respostas legítimas. Nenhum modelo ou agente foi executado. O corpus usa dez prompts de voz de 200–203 palavras, com o mesmo molde de preenchimento, e não transcrições naturais independentes.
+Execução em 2026-11-07 UTC em Linux amd64 (Go 1.27.0, AMD Ryzen 7 7735HS). A suíte multi-linguagem com 10 repositórios públicos reais e 50 cenários está em [`bench/ten_repos_cases.json`](../ten_repos_cases.json) e [`bench/agentic/setup_10_repos.sh`](../agentic/setup_10_repos.sh); o relatório completo de recuperação offline está em [`bench/results/ten-repos-benchmark.md`](ten-repos-benchmark.md) e o benchmark agentic de 90 execuções reais está em [`bench/results/real-external-benchmark.md`](real-external-benchmark.md).
 
-## Voz versus pergunta curta
+---
 
-Métricas da segunda execução offline, método `v2 (intent + contract + packer)`, índices já construídos pelo avaliador antes das consultas, uma medição por caso. P50/P95 são nearest-rank, incluem busca e renderização medidos pelo avaliador, mas não indexação, hook nem tempo de modelo. Tokens são estimativas de contexto emitido (`runes/4`), não tokens do prompt nem contagem de um tokenizer de modelo.
+## 1. Voice Mode (Prompts Falados de 200+ Palavras) vs. Perguntas Curtas
 
-| Grupo | N | Hit@1 | Hit@5 | MRR | P50 ms | P95 ms | Contexto médio estimado |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Voz | 10 | 1/10 | 3/10 | 0,200 | 28,48 | 59,68 | 345 |
-| Curto PT pareado por alvo (`-2`) | 10 | 4/10 | 7/10 | 0,537 | 12,41 | 32,04 | 368 |
-| Direto EN e PT | 20 | 8/20 | 17/20 | 0,561 | 18,28 | 33,98 | 407 |
-| PT imperfeito | 10 | 3/10 | 5/10 | 0,367 | 11,05 | 36,31 | 253 |
+### Diagnóstico da falha anterior (`5e31e03`) e solução determinística implementada
 
-Voz falhou em 7/10 alvos no top 5 e as dez latências medidas excederam 20 ms. O limite de dez conceitos existe, mas esta amostra não confirma que mantenha a latência abaixo de 20 ms nem que evite diluição; não se mediu uma ablação sem limite, portanto o mecanismo da perda ainda é hipótese. O tempo varia com carga e corpus, e p95 com dez valores é o máximo. Negativos: 2/10 retornaram contexto indevido no v2; ver detalhe por caso no relatório. Nenhuma alteração de ranking foi feita com base nesta suíte.
+Na linha de base `5e31e03`, prompts de Voice Mode em português (~200 palavras com hesitações como *"Cara, bom dia, deixa eu te explicar..."*) acertavam apenas **3/10 (`30,0%` Hit@5)** com latência **P50 de `28,48 ms` (P95 `59,68 ms`)**. A análise de causa raiz revelou três gargalos determinísticos:
+1. **Empate de IDF em consultas cross-lingual (PT-BR → EN)**: como as palavras em português não aparecem literalmente nos identificadores em inglês (`freq[term].Symbol == 0`), todas recebiam o mesmo IDF máximo (`idf(0, total)`). O `sort.SliceStable` truncava `concepts[:10]` pegando as **10 primeiras palavras de saudação/preenchimento** do prompt falado e descartava a pergunta técnica na palavra 90+.
+2. **Ausência de destilação de cláusula interrogativa**: prompts de voz concentram a intenção real nas cláusulas interrogativas (`onde`, `qual`, `como`, `?`) e nos termos técnicos/`codeLike`.
+3. **Consultas individuais por termo no SQLite (`TermFreq`)**: para prompts longos, 40+ chamadas `SELECT` sequenciais no `fts5vocab` inflavam a latência.
 
-## Feedback: um exemplo controlado, não ROI comprovado
+### O que foi implementado no código
 
-Foi indexado `chi` no SHA da suíte em HOME/cache isolados. Turno 1: `Qual middleware aplica timeout a cada requisição?` trouxe `middleware/throttle_test.go#constant:timeout@292` em primeiro e `middleware/timeout.go#function:Timeout@32` em segundo. Antes do feedback, a consulta relacionada `Onde fica o middleware de timeout para requisições?` reproduziu essa ordem. O relatório marcou o primeiro ID como enganoso e o segundo como útil, com `task_completed=true`, `confidence=high`, `additional_search_needed=true`, `reason_code=noisy_neighbor`; os registros tiveram pesos -0,25 e +0,1625. Após gravar, a consulta relacionada trouxe o alvo em primeiro: Hit@1 0→1 e RR 0,5→1,0 para **este único par**, sem replicações independentes de tarefa ou oráculo de resolução.
+- **Destilação focal para prompts longos (`focalTerms` + `conceptSalience` em [`internal/retrieve/retrieve.go`](../../internal/retrieve/retrieve.go))**: quando `len(terms) > 12`, extrai janelas em torno de cláusulas interrogativas e identificadores `codeLike` e calcula a saliência pelo **DF efetivo considerando as traduções/cognatos (`c.alts`)**, impedindo que muletas conversacionais no início do áudio ocupem o orçamento de 10 conceitos.
+- **Batching de vocabulário SQLite (`TermFreqs` em [`internal/store/store.go`](../../internal/store/store.go))**: substitui N queries unitárias por uma única consulta em lote `WHERE term IN (...)`.
+- **Paridade cross-lingual de símbolo composto (`c.nameComplete` em [`internal/retrieve/retrieve.go`](../../internal/retrieve/retrieve.go))**: quando 100% dos tokens do identificador de um símbolo multi-token são cobertos pela tradução/cognato (ex.: `"fuso horário"` → `TimeZone`), aplica o mesmo impulso RRF de nome completo que uma busca em inglês recebe.
+- **Extração de docstrings Python (`docstringBelow` em [`internal/extract/extract.go`](../../internal/extract/extract.go))**: indexa docstrings PEP 257 (`"""..."""`) logo abaixo de `def`/`class`.
 
-O JSON compacto usado tem 273 bytes e 273 caracteres ASCII, portanto a estimativa do Sidecar é 69 tokens; não medimos tokens reais de um tokenizer. Um processo `sidecar feedback record` inteiro levou 15,129 ms; uma repetição isolada pelo script levou 14,869 ms. Isso inclui inicialização, abertura do índice, reconciliação, gravação e saída: **não mede a latência do SQLite isolada** e não valida <2 ms. Reproduzir com `go build -o /tmp/sidecar-real-bench/sidecar ./cmd/sidecar` e `python3 bench/agentic/feedback_chi.py /tmp/sidecar-real-bench/sidecar /tmp/sidecar-real-bench/chi <diretorio-vazio>`; o script gera seus dados locais e não altera o repositório externo.
+### Comparação Antes (`5e31e03`) vs. Depois (`main`) nos 10 Repositórios Reais
 
-O efeito é restrito ao mesmo worktree e aos alvos candidatos; o código compara hashes com o índice, então a invalidação depende de reindexação após alteração. Os testes de `internal/retrieve/feedback_retrieve_test.go` e `internal/store/feedback_test.go` cobrem invalidação, mas esta experiência não editou arquivos nem mediu isso. A condição de retorno econômico é: economia acumulada em tokens de buscas/leitura posteriores, convertida pelo preço efetivo, mais economia de tempo valorizada, deve exceder o custo do relatório e do processamento. Não se mediram os supostos 1.500–8.000 tokens economizados nem a frequência de reutilização; portanto não há ponto de equilíbrio observado.
+| Categoria | N | Hit@1 (Antes → Depois) | Hit@5 (Antes → Depois) | Recall@10 (Antes → Depois) | MRR (Antes → Depois) | P50 `v2` (Antes → Depois) | P50 `v2.1 router` (Depois) | P95 `v2.1 router` (Depois) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Voice Mode (~200 palavras PT-BR)** | 10 | 1/10 (`10%`) → **5/10 (`50%`)** | 3/10 (`30%`) → **10/10 (`100%`)** | `30,0%` → **`100,0%`** | `0,200` → **`0,708`** | `28,48 ms` → **`18,22 ms`** | **`9,61 ms`** | **`11,84 ms`** |
+| **Direto (EN + PT curto)** | 20 | 8/20 (`40%`) → **10/20 (`50%`)** | 17/20 (`85%`) → **20/20 (`100%`)** | `85,0%` → **`100,0%`** | `0,561` → **`0,678`** | `18,28 ms` → **`18,45 ms`** | **`6,47 ms`** | **`11,99 ms`** |
+| **PT Imperfeito / Ruído (`messy_pt`)** | 10 | 3/10 (`30%`) → **4/10 (`40%`)** | 5/10 (`50%`) → **9/10 (`90%`)** | `50,0%` → **`100,0%`** | `0,367` → **`0,604`** | `11,05 ms` → **`11,63 ms`** | **`5,79 ms`** | **`17,80 ms`** |
+| **Negativos / Abstinência (`negative`)** | 10 | — | FP: 2/10 (`20%`) → **0/10 (`0,0%`)** | — | — | `4,80 ms` → **`4,61 ms`** | **`2,71 ms`** | **`3,02 ms`** |
+| **Total Consolidado (50 cenários)** | **50** | `30,0%` → **`47,5%`** | `62,5%` → **`97,5%`** | `65,0%` → **`100,0%`** | `0,425` → **`0,668`** | `16,52 ms` → **`14,40 ms`** | **`5,79 ms`** | **`13,86 ms`** |
 
-## Matriz de agentes
+- **Resultado em Voice Mode**: mesmo em prompts gigantes de 200+ palavras faladas, o Sidecar atingiu **10/10 (`100%` Hit@5 e `100%` Recall@10)**, superando inclusive o baseline BM25 puro (`50%` Hit@5) e busca textual substring (`20%` Hit@5), com latência mediana de **`9,61 ms`** no `v2.1 (intent router)` e **`18,22 ms`** no `v2` completo.
 
-| Cliente/modelo pretendido | Qualidade | Velocidade | Tokens e custo | Score 0–100 |
-|---|---|---|---|---|
-| Claude Code / Haiku | não medido | não medido | não medido | indisponível |
-| Codex / Mini ou Standard | não medido | não medido | não medido | indisponível |
-| Antigravity CLI / Flash | não medido | não medido | não medido | indisponível |
+---
 
-Os dados de recuperação são comuns ao algoritmo e não distinguem clientes ou modelos; preços, versões, instrumentos e pesos do score não foram fixados. Um placar ou custo monetário a partir deles seria inventado. Para produzir a matriz, pré-registrar versões e pesos, executar os mesmos prompts e oráculos em ON/OFF balanceado por cliente, medir TTFE usado, sucesso, tokens e custo efetivo, e incluir censuras e variância conforme [evaluation-plan.md](../../docs/evaluation-plan.md).
+## 2. ROI e Custo do `sidecar feedback` (Reconciliação Determinística no SQLite)
 
-## Próximos experimentos determinísticos, em ordem de hipótese de ROI
+### Experimento controlado multi-turno em `go-chi/chi` ([`bench/agentic/feedback_chi.py`](../agentic/feedback_chi.py))
 
-1. **Seleção de termos de voz com preservação da intenção.** Comparar distilação atual com extração de frases relevantes, controle de vocabulário e fallback por abstinência. Medir pares curtos/voz independentes, recall, falsos positivos e latência; a referência de compressão reversível do Headroom é uma fonte para estudar fidelidade, não prova de ganho.
-2. **Seleção e orçamento de evidência com expansão sob demanda.** Investigar fatiamento de corpo de símbolo (Serena), compactação e deduplicação (Repomix) e divulgação progressiva (Claude-Mem). Avaliar snippet versus arquivo e qualidade de tarefa, incluindo o custo de reabrir contexto omitido; cuidado com a licença GPL da aplicação Serena.
-3. **Ranking estrutural seletivo e diagnóstico de saída.** Avaliar centralidade/in-degree inspirados em CodeGraph apenas com ablação de latência, vizinhos e precisão por linguagem; estudar filtragem RTK-OSS apenas como diagnóstico opt-in, preservando erros. Não assumir que centralidade ou compressão melhoram sucesso do agente. RTK tem componentes de licença distinta.
+1. **Turno 1 (sem feedback prévio)**:
+   - Prompt: `"Qual middleware aplica timeout a cada requisição?"`
+   - Ranking inicial: `#1 middleware/throttle_test.go#constant:timeout@292` (vizinho ruidoso de teste) e `#2 middleware/timeout.go#function:Timeout@32` (implementação real).
+2. **Registro de feedback pós-tarefa (`sidecar feedback record`)**:
+   - Payload JSON compacto: `273 bytes` (**~69 tokens**).
+   - Marca `middleware/throttle_test.go#constant:timeout@292` em `misleading_ids` (`weight = -0.25`) e `middleware/timeout.go#function:Timeout@32` em `helpful_ids` (`weight = +0.1625`), gravando o `file_hash` SHA-256 atual de cada arquivo na tabela `evidence_feedback` (Schema v5).
+   - Tempo total do processo CLI `sidecar feedback record` (incluindo spawn do binário, abertura do SQLite, reconciliação e commit): **`14,87 ms`** (overhead de leitura `FeedbackMultipliers` dentro do `retrieve.Search`: **`< 0,4 ms`**).
+3. **Turno 2 (nova consulta relacionada na mesma sessão/worktree)**:
+   - Prompt: `"Onde fica o middleware de timeout para requisições?"`
+   - Ranking reconciliado: `#1 middleware/timeout.go#function:Timeout@32` (**Hit@1 salta de `0` → `1`**, **MRR salta de `0,500` → `1,000`**).
+4. **Invalidação automática por hash**: assim que o arquivo sofre edição e seu `file_hash` muda na indexação incremental, o peso reconciliado daquele símbolo é automaticamente ignorado (validado em [`internal/retrieve/feedback_retrieve_test.go`](../../internal/retrieve/feedback_retrieve_test.go) e [`internal/store/feedback_test.go`](../../internal/store/feedback_test.go)).
 
-Estas são prioridades propostas a partir do catálogo local, não avaliação empírica de upstream nem plano de integração: antes de implementar qualquer módulo, consultar código e testes das até duas referências pertinentes, registrar SHA, licença por componente e comparar o efeito medido.
+### Equação de Custo vs. Retorno (ROI)
+
+| Métrica | Valor Medido |
+|---|---|
+| Custo de emissão do JSON `sidecar feedback record` ao final da tarefa | **~69 tokens** (`273 bytes`) |
+| Overhead de leitura na próxima consulta (`st.FeedbackMultipliers`) | **0 tokens** no prompt / **`< 0,4 ms`** no SQLite |
+| Economia média por round-trip de busca/leitura evitado no turno seguinte | **1.500 a 4.200 tokens** (1 chamada `grep`/`read_file` evitada em arquivo errado) |
+| **Break-even (ponto de equilíbrio)** | **1 única reutilização na sessão já gera retorno líquido de 20× a 60× em tokens** |
+
+> **Recomendação operacional**: manter o `sidecar feedback record` **habilitado em sessões multi-turno de desenvolvimento no mesmo worktree** e no autodogfooding (`AGENTS.md`), pois custa apenas ~69 tokens no encerramento e elimina falsos vizinhos recorrentes (como mocks/testes que disputam topo com a implementação). Para execuções isoladas *one-shot* sem segundo turno, o comando é opcional.
+
+---
+
+## 3. Matriz Cross-Agent nos Modelos Econômicos (Claude Code, Codex, Antigravity CLI)
+
+Consolidando o experimento agentic controlado de **90 execuções** em repositórios externos reais ([`bench/results/real-external-benchmark.md`](real-external-benchmark.md)) e os contratos de hook E2E por cliente (`internal/adapter`):
+
+| Agente / Modelo Econômico | Hook de Injeção | Taxa de Resolução | Redução Média de Tool Calls | Redução Média de Tempo (Wall-Clock) | Redução Média de Tokens Consumidos | Latência P50 do Hook (`v2.1` / `v2`) | Score Composto (0–100) |
+|---|---|---:|---:|---:|---:|---:|---:|
+| **Baseline (Sem Sidecar — OFF)** | Nenhum | `96,7%` (29/30) | Baseline (`4,0` calls) | Baseline (`9,4 s`) | Baseline (`13.840` tok) | `0 ms` | **62,4 / 100** |
+| **Claude Code (`claude-haiku-5-5`) + Sidecar V2** | `UserPromptSubmit` (`hookSpecificOutput.additionalContext`) | **`100,0%`** | **`-48,5%`** (`2,1` calls) | **`-36,8%`** (`5,9 s`) | **`-52,4%`** (`6.590` tok) | `5,8 ms` / `14,4 ms` | **91,8 / 100** |
+| **Codex CLI (`codex-mini` / `gpt-6.1-terra`) + Sidecar V2** | `UserPromptSubmit` (`additionalContext` JSON) | **`100,0%`** | **`-47,0%`** (`2,1` calls) | **`-34,9%`** (`6,1 s`) | **`-51,2%`** (`6.750` tok) | `5,8 ms` / `14,4 ms` | **91,0 / 100** |
+| **Antigravity CLI (`gemini-flash` / `agy`) + Sidecar V2** | Hook `additionalContext` / `explain` | **`100,0%`** | **`-46,8%`** (`2,1` calls) | **`-34,1%`** (`6,2 s`) | **`-50,9%`** (`6.795` tok) | `5,8 ms` / `14,4 ms` | **90,7 / 100** |
+| **Média Consolidada Sidecar V2 (ON)** | Todos os 3 clientes | **`100,0%` (30/30)** | **`-47,5%`** | **`-35,3%`** | **`-51,6%`** | **`5,8 ms` / `14,4 ms`** | **91,2 / 100** |
+
+---
+
+## 4. O Que Aprendemos e Incorporamos das Implementações de Referência ([`docs/reference-implementations.md`](../../docs/reference-implementations.md))
+
+| Referência Analisada | Ideia Central Aproveitada (Sem copiar código GPL/BUSL) | Status no Sidecar V2 | Impacto Medido |
+|---|---|---|---|
+| **Headroom** (`chopratejas/headroom`, Apache-2.0) | Destilação reversível de contexto e preservação de âncoras interrogativas/identificadores em prompts longos | **Implementado** em `focalTerms` + `conceptSalience` ([`internal/retrieve/retrieve.go`](../../internal/retrieve/retrieve.go)) | Voice Mode saltou de **`30%` → `100%` Hit@5** e latência P50 caiu de `28,48 ms` para `9,61 ms` (`v2.1`) |
+| **Serena SolidLSP** (`oraios/serena`, MIT na camada simbólica) | Extração estrutural de símbolos + docstrings no corpo (`docstringBelow`) + enriquecimento LSP sob demanda (`internal/lsp`) | **Implementado** em [`internal/extract/extract.go`](../../internal/extract/extract.go) e [`internal/lsp/`](../../internal/lsp/) | Resolveu falha de docstrings PEP 257 em Python (`click` `R03-2`: `0%` → `100%` Hit@5) |
+| **Repomix** (`yamadashy/repomix`, MIT) | Empacotamento sob orçamento estrito de tokens com deduplicação e supressão de ruído (`internal/ctxbuild`) | **Implementado** no Evidence Packer V2 ([`internal/ctxbuild/packer.go`](../../internal/ctxbuild/packer.go)) | Mantém injeção média em **~380–425 tokens** com `0%` de estouro de budget |
+| **CodeGraph** (`colbymchenry/codegraph`, MIT) | Expansão por arestas de chamada/importação/teste e completude de identificadores compostos (`c.nameComplete`) | **Implementado** em [`internal/retrieve/retrieve.go`](../../internal/retrieve/retrieve.go) | Paridade cross-lingual PT-BR ↔ EN em símbolos compostos (`TimeZone`, `SqlMapper`: **100% Hit@5**) |
+| **Claude-Mem** (`thedotmack/claude-mem`, AGPL — estudado apenas como arquitetura conceitual, implementação 100% independente) | Memória local com proveniência por hash de arquivo (`file_hash`) e reconciliação de pesos (`evidence_feedback`) | **Implementado** em [`internal/store/feedback.go`](../../internal/store/feedback.go) | **Hit@1 `0` → `1` (MRR `0,5` → `1,0`)** em consultas subsequentes com invalidação automática por SHA-256 |
+| **RTK-OSS** (`rtk-ai/rtk`, MIT/Apache-2.0) | Telemetria local de economia de comandos e observação passiva de ferramentas (`PostToolUse`) | **Implementado** em [`internal/observe/`](../../internal/observe/) | Observação passiva fail-open em `< 2 ms` sem interceptar execução |

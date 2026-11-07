@@ -190,3 +190,18 @@ func TestSecretLikeConstantsAreNeverStored(t *testing.T) {
 		t.Fatalf("string constant value stored: %q", s.Value)
 	}
 }
+
+func TestPythonTripleQuotedDocstringIsExtracted(t *testing.T) {
+	src := []byte("def echo(\n    message=None,\n    nl=True,\n):\n    \"\"\"Print a message and newline to stdout or a terminal.\"\"\"\n    pass\n")
+	res, err := New().File("python", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _, ok := find(res, "function", "echo")
+	if !ok {
+		t.Fatalf("function echo missing: %+v", res.Symbols)
+	}
+	if !strings.Contains(s.Doc, "terminal") {
+		t.Fatalf("docstring not extracted for echo: got %q", s.Doc)
+	}
+}

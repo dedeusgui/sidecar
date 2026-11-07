@@ -395,6 +395,14 @@ func (s *Store) TermSymbolFreq(term string) (int, error) {
 	return n, err
 }
 
+// TermCodeFreq counts occurrences in symbol names or file paths, excluding signatures and free-text comments.
+func (s *Store) TermCodeFreq(term string) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COALESCE(SUM(doc), 0) FROM symbol_vocab
+		WHERE term = ? AND col IN ('name_terms', 'path_terms')`, term).Scan(&n)
+	return n, err
+}
+
 // TermFreq holds what TermDocFreq (Doc) and TermSymbolFreq (Symbol) return for one term.
 type TermFreq struct{ Doc, Symbol int }
 

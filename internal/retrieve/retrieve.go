@@ -141,6 +141,7 @@ type candidate struct {
 	lexRank      int
 	exact        bool
 	literal      bool
+	nameComplete bool
 	matched      []string
 	coverage     float64
 	rels         []string
@@ -169,12 +170,34 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	if err != nil {
 		return res, err
 	}
-	concepts, err := buildConcepts(st, terms, res.Trace.Phrases, total, res.Trace.Translations, opts.Ablate.NoTranslation)
+	searchTerms := terms
+	if len(terms) > 12 {
+		if focal := focalTerms(prompt); len(focal) >= 2 {
+			searchTerms = focal
+		}
+	}
+	concepts, err := buildConcepts(st, searchTerms, res.Trace.Phrases, total, res.Trace.Translations, opts.Ablate.NoTranslation)
 	if err != nil {
 		return res, err
 	}
-	if len(terms) <= 10 && len(concepts)*2 <= len(terms) {
-		opts.hasAbsentAnchor, _ = hasAbsentAnchor(st, prompt, opts.Ablate.NoTranslation)
+	if len(concepts) < 2 && len(searchTerms) < len(terms) {
+		concepts, err = buildConcepts(st, terms, res.Trace.Phrases, total, res.Trace.Translations, opts.Ablate.NoTranslation)
+		if err != nil {
+			return res, err
+		}
+	}
+	if len(terms) <= 10 {
+		absentTerms, _ := absentAnchorTerms(st, prompt, opts.Ablate.NoTranslation)
+		if len(absentTerms) > 0 {
+			opts.hasAbsentAnchor = true
+			var filtered []concept
+			for _, c := range concepts {
+				if !absentTerms[c.term] {
+					filtered = append(filtered, c)
+				}
+			}
+			concepts = filtered
+		}
 	}
 	res.Trace.Concepts = len(concepts)
 	res.Trace.Timings["analyze"] = time.Since(t)
@@ -432,16 +455,108 @@ func buildConcepts(st *store.Store, terms, phrases []string, total int, trans ma
 		}
 	}
 	// Long / Voice Mode prompts contain many low-IDF conversational words that happen to
-	// appear in comments or docs. Distilling to the 10 highest-IDF concepts keeps FTS5 fast
-	// and prevents conversational filler from diluting coverage.
+	// appear in comments or docs. Distilling to the 10 highest-salience concepts keeps FTS5
+	// fast and prevents conversational filler from diluting coverage.
 	const maxSalientConcepts = 10
 	if len(out) > maxSalientConcepts {
 		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].weight > out[j].weight
+			return conceptSalience(out[i], freq, total) > conceptSalience(out[j], freq, total)
 		})
 		out = out[:maxSalientConcepts]
 	}
 	return out, nil
+}
+
+// conceptSalience scores a concept for long-prompt distillation using its effective symbol
+// frequency across the term and its translations, preferring symbol matches over comment-only matches.
+func conceptSalience(c concept, freq map[string]store.TermFreq, total int) float64 {
+	bestSym := freq[c.term].Symbol
+	bestDoc := freq[c.term].Doc
+	for _, a := range c.alts {
+		f := freq[a]
+		if f.Symbol > 0 && (bestSym == 0 || f.Symbol < bestSym) {
+			bestSym = f.Symbol
+		}
+		if f.Doc > 0 && (bestDoc == 0 || f.Doc < bestDoc) {
+			bestDoc = f.Doc
+		}
+	}
+	if bestSym > 0 {
+		return idf(bestSym, total) * 2.0
+	}
+	return idf(bestDoc, total)
+}
+
+var interrogativeCues = map[string]bool{
+	"qual": true, "quais": true, "onde": true, "cade": true, "como": true, "quem": true,
+	"which": true, "where": true, "how": true, "what": true, "why": true,
+}
+
+// focalTerms extracts the core question and code-like identifiers from a long / Voice Mode prompt
+// so spoken narrative filler around the question does not dilute concept coverage or FTS5 latency.
+func focalTerms(prompt string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(t string) {
+		if t != "" && !seen[t] {
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	clauses := splitClauses(prompt)
+	for _, cl := range clauses {
+		if strings.HasSuffix(cl, "?") && hasInterrogativeCue(cl) {
+			for _, t := range lexical.Analyze(cl) {
+				add(t)
+			}
+		}
+	}
+	if len(out) == 0 {
+		for _, cl := range clauses {
+			if hasInterrogativeCue(cl) && !strings.Contains(lexical.Fold(cl), "ponto de entrada") {
+				for _, t := range lexical.Analyze(cl) {
+					add(t)
+				}
+			}
+		}
+	}
+	for _, tok := range identRe.FindAllString(prompt, -1) {
+		if codeLike(tok) {
+			for _, t := range lexical.Analyze(tok) {
+				add(t)
+			}
+		}
+	}
+	return out
+}
+
+func splitClauses(s string) []string {
+	var out []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '.', '!', ';', ':', '\n', '?':
+			if seg := strings.TrimSpace(s[start : i+1]); seg != "" {
+				out = append(out, seg)
+			}
+			start = i + 1
+		}
+	}
+	if seg := strings.TrimSpace(s[start:]); seg != "" {
+		out = append(out, seg)
+	}
+	return out
+}
+
+func hasInterrogativeCue(clause string) bool {
+	for _, w := range strings.FieldsFunc(clause, func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && r <= 127
+	}) {
+		if interrogativeCues[lexical.Fold(w)] {
+			return true
+		}
+	}
+	return false
 }
 
 // ftsMatch builds an OR query over every present term and translation. Coverage is
@@ -508,33 +623,55 @@ func codeLike(tok string) bool {
 	return false
 }
 
-// hasAbsentAnchor reports whether the prompt explicitly names a code-like identifier or
-// mid-sentence capitalized proper noun (e.g. "Kafka", "gRPC", "RPCs") whose analyzed terms
-// and translations are completely absent from the repository.
-func hasAbsentAnchor(st *store.Store, prompt string, noTranslation bool) (bool, error) {
+// absentAnchorTerms reports analyzed terms from any code-like identifier or mid-sentence
+// capitalized proper noun (e.g. "Kafka", "MongoDB", "Express", "gRPC") whose primary root
+// and translations are absent from the repository's symbols.
+func absentAnchorTerms(st *store.Store, prompt string, noTranslation bool) (map[string]bool, error) {
+	var absent map[string]bool
 	for _, loc := range identRe.FindAllStringIndex(prompt, -1) {
 		tok := prompt[loc[0]:loc[1]]
-		midSentenceProper := loc[0] > 0 && tok[0] >= 'A' && tok[0] <= 'Z' && len(tok) >= 4 && !afterSentenceBreak(prompt, loc[0])
-		if !codeLike(tok) && !midSentenceProper {
+		isCode := codeLike(tok)
+		midSentenceProper := loc[0] > 0 && tok[0] >= 'A' && tok[0] <= 'Z' && len(tok) >= 4 && !afterSentenceBreak(prompt, loc[0]) && lexical.Fold(tok) != "code"
+		if !isCode && !midSentenceProper {
 			continue
 		}
 		sub := lexical.Analyze(tok)
 		if len(sub) == 0 {
 			continue
 		}
+		// For CamelCase technology names like "MongoDB" -> ["mongo", "db"] or "PostgreSQL" -> ["postgre", "sql"],
+		// check the primary proper root rather than a generic 2-3 letter suffix ("db", "sql").
+		checkTerms := sub
+		if len(sub) > 1 && len(sub[0]) >= 4 {
+			checkTerms = sub[:1]
+		}
+		isTermPresent := func(t string) (bool, error) {
+			if isCode {
+				n, err := st.TermDocFreq(t)
+				return n > 0, err
+			}
+			// Mid-sentence proper noun (e.g. "Kafka", "Express", "Redis"): must appear in at least
+			// one symbol name/signature/path or repeatedly in repository documentation (like "Rust").
+			codeN, err := st.TermCodeFreq(t)
+			if err != nil || codeN > 0 {
+				return codeN > 0, err
+			}
+			docN, err := st.TermDocFreq(t)
+			return docN >= 10, err
+		}
 		anyPresent := false
-		for _, t := range sub {
-			if n, err := st.TermDocFreq(t); err != nil {
-				return false, err
-			} else if n > 0 {
+		for _, t := range checkTerms {
+			if ok, err := isTermPresent(t); err != nil {
+				return nil, err
+			} else if ok {
 				anyPresent = true
 				break
 			}
 			if !noTranslation {
 				for _, en := range lexical.Translations(t) {
-					if n, err := st.TermDocFreq(en); err != nil {
-						return false, err
-					} else if n > 0 {
+					if ok, err := isTermPresent(en); err != nil {
+						return nil, err
+					} else if ok {
 						anyPresent = true
 						break
 					}
@@ -545,10 +682,15 @@ func hasAbsentAnchor(st *store.Store, prompt string, noTranslation bool) (bool, 
 			}
 		}
 		if !anyPresent {
-			return true, nil
+			if absent == nil {
+				absent = map[string]bool{}
+			}
+			for _, t := range sub {
+				absent[t] = true
+			}
 		}
 	}
-	return false, nil
+	return absent, nil
 }
 
 func afterSentenceBreak(s string, pos int) bool {
@@ -598,12 +740,15 @@ func scoreOwnText(c *candidate, concepts []concept) {
 	}
 	c.matched = nil
 	c.literal = false
+	c.nameComplete = false
+	matchedName := map[string]bool{}
 	for _, cp := range concepts {
 		switch {
 		case cp.termPresent && all[cp.term]:
 			c.matched = append(c.matched, cp.term)
 			if nameSet[cp.term] {
 				c.literal = true
+				matchedName[cp.term] = true
 			}
 		default:
 			// A translation match is a match, but never a literal one: only the prompt's own
@@ -611,10 +756,16 @@ func scoreOwnText(c *candidate, concepts []concept) {
 			for _, a := range cp.alts {
 				if all[a] {
 					c.matched = append(c.matched, cp.term+"→"+a)
+					if nameSet[a] {
+						matchedName[a] = true
+					}
 					break
 				}
 			}
 		}
+	}
+	if c.hit.Kind != "file" && len(nameSet) >= 2 && len(matchedName) == len(nameSet) {
+		c.nameComplete = true
 	}
 	var matchedWeight, totalWeight float64
 	for _, cp := range concepts {
@@ -848,10 +999,18 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 			exactList = append(exactList, idx(c))
 		}
 	}
+	for _, c := range pool {
+		if !c.exact && c.nameComplete {
+			exactList = append(exactList, idx(c))
+		}
+	}
 	byCoverage := append([]*candidate{}, pool...)
 	sort.SliceStable(byCoverage, func(i, j int) bool {
 		if byCoverage[i].coverage != byCoverage[j].coverage {
 			return byCoverage[i].coverage > byCoverage[j].coverage
+		}
+		if byCoverage[i].nameComplete != byCoverage[j].nameComplete {
+			return byCoverage[i].nameComplete
 		}
 		return rankOrMax(byCoverage[i].lexRank) < rankOrMax(byCoverage[j].lexRank)
 	})

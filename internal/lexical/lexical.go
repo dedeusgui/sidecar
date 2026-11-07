@@ -132,9 +132,10 @@ var stopwords = toSet(
 	// Portuguese
 	"a", "o", "as", "os", "um", "uma", "uns", "umas", "de", "do", "da", "dos", "das",
 	"em", "no", "na", "nos", "nas", "e", "ou", "que", "para", "pra", "por", "com", "sem",
-	"se", "ao", "aos", "como", "mais", "menos", "isso", "este", "esta", "esse", "essa",
-	"eu", "voce", "nao", "sim", "ser", "ter", "foi", "ja", "qual", "quando", "onde",
-	"sobre", "entre", "muito", "pode", "preciso", "quero", "deve", "ate", "somente",
+	"se", "ao", "aos", "pelo", "pela", "pelos", "pelas", "num", "numa",
+	"como", "mais", "menos", "isso", "isto", "este", "esta", "estao", "esse", "essa",
+	"eu", "voce", "nao", "sim", "ser", "ter", "foi", "ja", "qual", "quais", "quando", "onde", "cade",
+	"fica", "ficam", "sobre", "entre", "muito", "pode", "preciso", "quero", "deve", "ate", "somente",
 	"apenas", "tambem", "ainda", "aqui", "ali", "la",
 	// Spoken PT-BR filler from voice transcripts. Matched before stemming, so listed as spoken.
 	"cara", "tipo", "assim", "entao", "acho", "acredito", "queria", "entender", "fazer", "coisa",

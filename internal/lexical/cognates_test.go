@@ -40,6 +40,15 @@ func TestCognateTransducerDerivesUnlistedDomainTerms(t *testing.T) {
 		{"permissão", "permission"},
 		{"conversão", "convert"},
 		{"Esquelite", "sqlite"},
+		{"dinâmico", "dynamic"},
+		{"assíncrona", "async"},
+		{"assíncrona", "asynchronous"},
+		{"serializa", "serialize"},
+		{"deserializa", "deserialize"},
+		{"configura", "config"},
+		{"executa", "execute"},
+		{"valida", "validate"},
+		{"verifica", "verify"},
 	}
 
 	for _, tc := range cases {

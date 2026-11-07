@@ -48,7 +48,21 @@ func loadTSVLexicon(tsv string) {
 		if !ok {
 			continue
 		}
-		key := Stem(Fold(strings.TrimSpace(src)))
+		rawSrc := strings.TrimSpace(src)
+		if strings.Contains(rawSrc, " ") {
+			parts := strings.Fields(rawSrc)
+			for i := range parts {
+				parts[i] = Stem(Fold(parts[i]))
+			}
+			pkey := strings.Join(parts, " ")
+			for _, tgt := range strings.Split(targets, ",") {
+				if en := Stem(Fold(strings.TrimSpace(tgt))); en != "" {
+					phrases[pkey] = append(phrases[pkey], en)
+				}
+			}
+			continue
+		}
+		key := Stem(Fold(rawSrc))
 		if key == "" {
 			continue
 		}

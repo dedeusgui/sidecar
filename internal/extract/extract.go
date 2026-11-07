@@ -157,7 +157,7 @@ func (g *grammar) extract(src []byte) Result {
 					Kind:      kind,
 					Name:      name,
 					Signature: signature(src, tag.Range.StartByte, tag.Range.EndByte),
-					Doc:       lines.docAbove(int(tag.Range.StartPoint.Row)),
+					Doc:       lines.docFor(int(tag.Range.StartPoint.Row), int(tag.Range.EndPoint.Row)),
 					Line:      int(tag.Range.StartPoint.Row) + 1,
 					EndLine:   int(tag.Range.EndPoint.Row) + 1,
 					Parent:    -1,
@@ -421,6 +421,58 @@ func newLineIndex(src []byte) lineIndex {
 }
 
 var commentPrefixes = []string{"//", "#", "/*", "*", "--", "\"\"\""}
+
+// docFor returns docAbove when present, or a Python triple-quoted docstring at the start of the body.
+func (l lineIndex) docFor(row, endRow int) string {
+	if d := l.docAbove(row); d != "" {
+		return d
+	}
+	return l.docstringBelow(row, endRow)
+}
+
+// docstringBelow extracts a Python-style """...""" docstring immediately following a def/class header.
+func (l lineIndex) docstringBelow(row, endRow int) string {
+	limit := min(endRow, min(len(l.lines)-1, row+12))
+	for r := row + 1; r <= limit; r++ {
+		t := strings.TrimSpace(l.lines[r])
+		if t == "" {
+			continue
+		}
+		quote := ""
+		if strings.HasPrefix(t, `"""`) {
+			quote = `"""`
+		} else if strings.HasPrefix(t, `'''`) {
+			quote = `'''`
+		} else {
+			if strings.HasSuffix(t, ":") || strings.HasSuffix(t, ",") || strings.HasSuffix(t, "(") {
+				continue
+			}
+			return ""
+		}
+		rest := strings.TrimPrefix(t, quote)
+		if end := strings.Index(rest, quote); end >= 0 {
+			return truncate(strings.TrimSpace(rest[:end]), 400)
+		}
+		var block []string
+		if s := strings.TrimSpace(rest); s != "" {
+			block = append(block, s)
+		}
+		for j := r + 1; j <= endRow && j < len(l.lines) && len(block) < 8; j++ {
+			line := strings.TrimSpace(l.lines[j])
+			if end := strings.Index(line, quote); end >= 0 {
+				if s := strings.TrimSpace(line[:end]); s != "" {
+					block = append(block, s)
+				}
+				break
+			}
+			if line != "" {
+				block = append(block, line)
+			}
+		}
+		return truncate(strings.Join(block, " "), 400)
+	}
+	return ""
+}
 
 // docAbove collects the contiguous comment block directly above a 0-based row.
 func (l lineIndex) docAbove(row int) string {
