@@ -54,3 +54,11 @@ Exemplos de perguntas de dogfooding (não são gabaritos):
 ## Aprovação de mudanças de maior risco
 
 Mudanças em schema externo, hook JSON, caminhos de instalação, remoção de binário/cache, log de prompts, execução de comandos do repositório e acesso à rede exigem revisão explícita. Evitar testes pagos e alterações em configurações pessoais de agentes sem opt-in e ambientes temporários.
+
+## Implementação da V2 completa
+
+Antes de mexer no núcleo, ler [product-v2.md](product-v2.md), [roadmap.md](roadmap.md) e **apenas as linhas pertinentes** do [catálogo de implementações](reference-implementations.md). Investigar upstreams e testes do problema para não reinventar componentes maduros; licenças devem ser validadas no SHA/arquivo. Registrar escolhas e custo de runtime no PR.
+
+Ordem operacional: corrigir setup/release/hooks, congelar baseline e traces, corpus externo offline, IntentRouter/ContractEvidence/EvidencePacker, SessionObserver/DecisionMemory, LSP/providers/adapters, benchmarks agentic e hardening final. Cada integração passa por unit/contract tests, E2E real quando aplicável e benchmark antes/depois. Nenhum módulo que só compila é considerado validado.
+
+Para alteração de **contratos** adicionar caso em que docs e código estão alinhados, caso em que divergem e caso ambíguo; exigir referência de arquivo/linha, falsos conflitos medidos e ausência de instrução inventada. Para observador testar eventos indisponíveis, redaction, loops legítimos e injeção silenciosa por padrão. Para install/LSP testar consentimento e rollback.

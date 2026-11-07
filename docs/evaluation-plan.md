@@ -44,7 +44,7 @@ Não substituir sucesso por Hit@5. Não alegar ganho **do modelo** se só houve 
 ### Planejamento de custos — contratos baratos, experimentos curtos
 
 Painel de execução inicialmente **manual e opt-in**:
-- Anthropic: **Haiku**; OpenAI/Codex: **Luna** (nome/alias usado pelo operador; fixar ID real e esforço); Google/Gemini: **Flash**. Esses nomes não garantem o mesmo limite, preço, versão nem grau de esforço. Registrar versão exata, CLI, modo de autenticação, reasoning/effort e ferramentas efetivamente usadas. Não pressupor permissão de automação ou disponibilidade de API a partir de assinatura.
+- Anthropic: **Haiku**; OpenAI/Codex: **Luna** (nome/alias usado pelo operador; fixar ID real e esforço); Google/Antigravity CLI: **Gemini Flash**. Esses nomes não garantem o mesmo limite, preço, versão nem grau de esforço. Registrar versão exata, CLI, modo de autenticação, reasoning/effort e ferramentas efetivamente usadas. Não pressupor permissão de automação ou disponibilidade de API a partir de assinatura.
 - Modelos mais caros (ex.: **Tera**) podem ajudar a **desenvolver o harness**, nunca contam como resultados do conjunto barato e não participam de benchmark cego.
 - **Fase 0, sem chamadas pagas:** validar corpus, gold, linhas, scripts de replay e medição offline; rodar mocks/fixture.
 - **Piloto mínimo:** 4 tarefas × 3 modelos × 2 braços = **24 execuções**, uma tentativa por célula; apenas detectar falhas do protocolo, sem tirar conclusões de produtividade.
@@ -119,6 +119,23 @@ Relatório deve mostrar `N`, denominador, CI/intervalos, p50/p95, taxa de resolu
 - Autorrelato parametrizado pelo modelo pode ser pedido **após** conclusão e fora da rodada principal, como sinal fraco. Não obrigar o modelo a dizer “Sidecar ajudou” durante a tarefa, nem atualizar ranking em tempo real com sua opinião.
 - Critério forte: gold anotado/aceitação independente; arquivo acessado ≠ relevância demonstrada.
 - Registro padronizado de cobertura de eventos (`observed`, `unobserved`), sem contabilizar como zero o que não foi monitorado.
+
+## Qualidade de entrega e custo da V2 completa
+
+O objetivo primário da V2 é **tempo e custo por tarefa corretamente concluída**, não score isolado de ranking. Adicionar ao protocolo:
+- **Contract fidelity**: se implementação, teste e documentação divergem, identificar e **citar fontes reais**, sem inventar precedência. Medir precisão de conflitos, falso conflito, omissão de fonte e decisão humana desnecessária.
+- **Repository discovery**: acertar localização de contrato descrito vagamente em PT-BR/inglês; distinguir repo, worktree, branch e documentação stale.
+- **Loop inefficiency**: buscas repetidas sem evidência nova, arquivos reabertos sem motivo relevante, pesquisas que retornam ao mesmo conjunto e revisitas após compactação. Sinais são diagnóstico; confirmar com gold/traço anotado.
+- **Implementation quality**: solução testada, conformidade aos contratos existentes, regressões, mudança de arquivos irrelevantes, necessidade de intervenção humana e qualidade da documentação atualizada.
+- **Total task burden**: tokens do hook, skills e ferramentas, tempo index/IO/LSP, rondas de modelo, walltime, erro por timeout/rate-limit, custo observado e transições de contexto.
+- **Selective delivery**: proporção de mensagens com zero injeção, falso positivo contextual, contextos recebidos e **usados** comprovadamente, não apenas textos apresentados.
+- **Ablação por módulo**: OFF / Sidecar v1 / V2 completo; V2 sem IntentRouter, sem ContractResolver, sem SessionObserver, sem LSP, sem memória. Controlar capacidades próprias do agente para comparação justa.
+
+A suíte própria deve cobrir 10–15 cenários reproducíveis de uso pessoal (não usar repositórios privados sem consentimento para publicar resultados): prompt implícito, localização de regra, docs vs código, contrato/teste, busca circular, mudança multiarquivo, continuação de sessão, repo não convencional, PT/EN, ausência de evidência. Cada cenário precisa de gabarito, commit e oracle independente **antes** das execuções. Benchmark público permanece a base de generalização.
+
+**Orçamento:** 4 tarefas × 3 modelos baratos × 2 braços = 24 execuções é somente qualificação do harness, **não meta de V2 nem amostra conclusiva**. Ao medir OFF / v1 / V2 são 4 × 3 × 3 = **36 execuções por repetição**. Repetir somente após testar instrumentação sem modelos, fazer orçamento e registrar IDs exatos de Haiku, Luna e Flash; limite por tarefa de tempo, turnos e recursos. Nenhuma execução paga automática no CI.
+
+**Critério de decisão:** ganhos de TTFE, rounds ou tokens que reduzam a taxa de tarefas corretas são regressões; não reivindicar determinismo do modelo; usar bootstrap pareado por tarefa, incerteza, efeitos negativos e status `inconclusivo`. Metas de ≥15% TTFE utilizado e ≥20% buscas até evidência são **hipóteses pré-registráveis**, não resultados já demonstrados.
 
 ## Estrutura proposta para o harness futuro (não implementada)
 

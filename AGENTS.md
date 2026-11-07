@@ -30,6 +30,17 @@ Princípios inegociáveis:
 
 Separar adaptadores de agentes, recuperação, persistência e aplicação. Manter interfaces pequenas e operações determinísticas; alterações no ranking requerem benchmark A/B e ablação. Não fazer refatoração lateral não solicitada.
 
+## Contrato obrigatório da V2 completa e reuso de código aberto
+
+**Meta:** entregar uma V2 integrada e testada (não projeto demonstrativo/MVP), com ganho comprovado em **tempo/custo por tarefa correta**. Produto pessoal e zero configuração por repositório; código Go local, sem modelos ou rede necessários no funcionamento básico.
+
+1. **Antes de implementar qualquer módulo**, ler a parte correspondente do [produto V2](docs/product-v2.md), [roadmap](docs/roadmap.md) e no máximo **duas fontes relevantes** do [catálogo de implementações](docs/reference-implementations.md). Consultar **código e testes**, não somente README. Não carregar todo o catálogo em todo prompt.
+2. Registrar no PR upstream, SHA imutável, arquivos consultados, licença **por componente**, decisão de integração/adaptação/implementação independente e por que preserva custo e simplicidade. Ex.: CodeGraph, Context7, Serena SolidLSP, Repomix, RTK-OSS, Headroom e Claude-Mem. Não copiar GPL/BUSL ou backend privado por descuido, nem chamar reescrita de código de clean room.
+3. Não abrir PR só “adicionando biblioteca” sem necessidade funcional/benchmark; não duplicar LSP ou MCP existente só para aumentar a superfície da ferramenta.
+4. Para contrato código × docs × testes: registrar **evidências conflitantes**, proveniência e incerteza. Nunca decidir automaticamente qual é autoridade. Para memória: hashes, TTL e invalidação; nada de persistir transcript ou opiniões como verdade.
+5. Para observação de agente: somente metadados mínimos, sem execução/alteração do tool call; event coverage desconhecida é `unobserved`. Novos hooks e injeções requerem E2E por cliente, abstinência e medição de custo total.
+6. Testes **obrigatórios e pendentes** estão no roadmap, não podem ser marcados concluídos sem execução real. Proteger benchmark cego, relatórios negativos e rollback.
+
 ## Loop de engenharia (cada tarefa)
 
 1. **Observar:** ler código e testes pertinentes; reproduzir erro ou comportamento atual; registrar hipótese, escopo e critério verificável de conclusão.
@@ -58,7 +69,7 @@ Ler `docs/evaluation-plan.md` antes de declarar ganho. Reportar **retrieval offl
 
 ## Política de compatibilidade e extensões
 
-Hooks são contratos versionados de terceiros: não presumir que Codex, Claude e Gemini tenham schemas ou UI idênticos. Exigir testes de contrato e E2E reais por cliente. Recursos de UI (status line, plugin/mod), skills ou integrações extras devem ser **opt-in**, reversíveis, sem substituir statuslines ou configurações existentes. Não prometer execução de interface não verificada.
+Hooks são contratos versionados de terceiros: não presumir que Codex, Claude Code e Antigravity CLI tenham schemas ou UI idênticos. Exigir testes de contrato e E2E reais por cliente. Recursos de UI (status line, plugin/mod), skills ou integrações extras devem ser **opt-in**, reversíveis, sem substituir statuslines ou configurações existentes. Não prometer execução de interface não verificada.
 
 ## Navegação
 

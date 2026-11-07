@@ -50,7 +50,7 @@ Nenhuma referência acima prova que o agente dará menos rounds por receber cont
 
 **Integração com ferramentas existentes em vez de reimplementação cega:**
 - [LSP oficial](https://microsoft.github.io/language-server-protocol/) define navegação simbólica por JSON-RPC. [Claude Code já oferece plugins LSP](https://code.claude.com/docs/en/plugins/code-intelligence) e os recomenda quando encontra servidor no PATH; um cliente LSP do Sidecar é decisão **separada** e depende de benefício em recuperação pré-inferência.
-- [Hooks Claude](https://code.claude.com/docs/en/hooks), [Codex](https://learn.chatgpt.com/docs/hooks) e [Gemini](https://geminicli.com/docs/hooks/) permitem observar parte das ações. A cobertura difere por cliente e superfície; telemetria nunca substitui gold independente.
+- [Hooks Claude](https://code.claude.com/docs/en/hooks), [Codex](https://learn.chatgpt.com/docs/hooks) e [Antigravity CLI](https://antigravity.google/docs/hooks) permitem observar parte das ações. A cobertura difere por cliente e superfície; telemetria nunca substitui gold independente.
 - [Mods Claude](https://code.claude.com/docs/en/plugins/mods/create) oferecem visualização/contagem de ações em UI, mas dependem de versão e consentimento; a integração de observação permanece separada do runtime principal.
 
 **Decisão de desenho:** v1 é baseline de comparação; v2 propõe `IntentRouter` determinístico + seleção por utilidade marginal de evidências por token + estado mínimo de sessão. LSP e feedback parametrizado entram em experimentos isolados com **fallback, opt-in e ablação**. Ver [Context Engine v2](context-engine-v2.md), [LSP](lsp-strategy.md), [feedback](agent-feedback.md).
@@ -58,3 +58,11 @@ Nenhuma referência acima prova que o agente dará menos rounds por receber cont
 ## Decisão atual
 
 Investir primeiro em **evidência comparativa** (retrieval sem LLM + A/B com Haiku/Luna/Flash), E2E real de hooks e dogfooding. Só depois decidir ampliar linguagens, adicionar camada semântica ou UI. Para comunicação externa, evitar “mais rápido” até medir TTFE, rounds, sucesso e custo total.
+
+## Posicionamento consolidado da V2 (2026-11-06)
+
+CodeGraph já possui **contexto orientado à intenção**, ferramentas de contexto/impacto e, em outra implementação, **hook `UserPromptSubmit`**. Portanto grafo, front-loading e MCP isoladamente **não** distinguem Sidecar. O foco testável passa a ser **custo e qualidade por tarefa correta**, reduzindo busca, redescoberta e conflitos código/documentação sem skill extensa ou novo protocolo obrigatório.
+
+O [catálogo OSS](reference-implementations.md) documenta as implementações concretas e licenças por componente; [product-v2.md](product-v2.md) contém o desenho de produto completo; [roadmap.md](roadmap.md) lista entregas e validações. Priorizar integração/reuso responsável antes de reimplementar, sem importar módulos GPL/BUSL inadvertidamente.
+
+Leituras principais: [CodeGraph Apache-2.0](https://github.com/codegraph-ai/CodeGraph), [CodeGraph MIT](https://github.com/colbymchenry/codegraph), [Context7 MIT (backend privado)](https://github.com/upstash/context7), [Serena com licença mista](https://github.com/oraios/serena), [RTK com edição OSS e componentes BUSL](https://github.com/rtk-ai/rtk), [Agent Retrieval Bench](https://github.com/eyuansu62/agent-retrieval-bench).

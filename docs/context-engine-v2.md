@@ -1,6 +1,6 @@
 # ADR: Context Engine v2 — recuperação orientada à intenção e à sessão
 
-**Estado:** proposta técnica, não implementada · **Data:** 2026-11-06 · **Escopo:** algoritmo e arquitetura; não requer novo agente.
+**Estado:** proposta algorítmica, não implementada · **Data:** 2026-11-06 · **Escopo:** subsistema de recuperação da **V2 completa**, conforme [product-v2.md](product-v2.md) e [roadmap.md](roadmap.md). Não exige novo agente.
 
 ## 1. Problema e objetivos
 
@@ -8,7 +8,7 @@ O Sidecar hoje utiliza FTS5/BM25, normalização PT/EN, símbolos exatos, vizinh
 
 Hipótese do v2: o contexto deve ser determinado pela **intenção da tarefa**, pela **novidade/informatividade das evidências** e pelo **estado da sessão**, em vez de uma única configuração estática de ranking. Benefício a validar: menos navegação redundante, menor tempo até a primeira evidência correta (TTFE) e taxa de solução preservada.
 
-**Não objetivos:** substituir Claude/Codex/Gemini; impor convenções/AGENTS.md ao repositório do usuário; armazenar conversas completas; exigir embeddings ou modelos pagos; executar código de projeto; criar daemon pesado; afirmar ganho antes de medir.
+**Não objetivos:** substituir Claude Code/Codex/Antigravity CLI; impor convenções/AGENTS.md ao repositório do usuário; armazenar conversas completas; exigir embeddings ou modelos pagos; executar código de projeto; criar daemon pesado; afirmar ganho antes de medir.
 
 ## 2. Pipeline proposto (módulos conceituais, não novos serviços)
 
@@ -26,7 +26,7 @@ Stop/completion (opt-in) ─> feedback auxiliar / eval fora do runtime
 
 Preservar os limites atuais de CPU, budget de sincronização e fail-open; passagem de dados não confiáveis nunca cria autoridade instrucional.
 
-## 3. IntentRouter (MVP sem LLM)
+## 3. IntentRouter (componente determinístico sem LLM)
 
 Classes (multirrótulo opcional, com fallback `general`):
 - `locate`: encontrar definição/regra/rota; lexical/exato/path.
@@ -93,7 +93,24 @@ Plano de mudança incremental:
 
 Cada etapa requer benchmark offline independente e verificação de latência/segurança. O algoritmo deve poder ser desativado ou revertido sem migrar dados do usuário irreversivelmente.
 
-## 8. Riscos e questões abertas
+## 8. RepoFingerprint, contratos e conflitos integrados
+
+A V2 **não é apenas IntentRouter + contexto**. Ela deve ligar recuperação a [ContractEvidence/ConflictResolver](product-v2.md) e às fontes observáveis de projeto:
+- `RepoFingerprint` descobre linguagens, entrypoints, manifests, testes, convenções e estruturas sem impor padrões; sinais têm proveniência e hash de invalidação.
+- `ContractEvidence` vincula entidades do código, expectations de testes, documentos e decisões verificadas. Classificar `IMPLEMENTED`, `TEST_EXPECTED`, `DOCUMENTED`, `INFERRED` e `CONFLICT_CANDIDATE` sem escolher automaticamente um vencedor.
+- Dar prioridade a contradições que podem ser **verificadas deterministicamente** (endpoint, assinatura, enum, constante, assertion, tipo/rota) e tratar contradições em linguagem natural como possíveis conflitos.
+- `EvidencePacker` não pode transformar frase de documentação desatualizada em instrução autoritativa. Deve preservar ambas as evidências e sinalizar incerteza.
+- Os testes precisam de docs corretas/incorretas, alterações de branch, contratos divergentes, falsos conflitos e patches que passam no oracle. Retornar vazio se não houver prova suficiente.
+
+Fontes para estudar antes de implementar: [catálogo OSS](reference-implementations.md) (CodeGraph, SolidLSP/Serena, Superpowers), com licença por componente.
+
+## 9. Sistema completo sem aumento obrigatório de contexto
+
+O [plano da V2 completa](product-v2.md) adiciona `SessionObserver`, `LoopDiagnostics`, `DecisionMemory`, `LSP provider`, docs externas opt-in, adapters/UX e testes agentic. Todos devem usar os mesmos IDs/provenance, hashes e políticas de confiança da recuperação. Estar documentado **não significa implementado**.
+
+Nenhuma skill grande nem MCP obrigatório no fluxo cotidiano. Observar ferramenta não implica injetar; cada nova injeção exige informação nova, confiança adequada e budget. Não introduzir prompts “opine sobre Sidecar” durante tarefa principal.
+
+## 10. Riscos e questões abertas
 
 - Ganho em Hit@5 não garante queda de rounds nem correção de patch.
 - Adicionar informação a cada ferramenta pode piorar o loop por ruído; preferir observação silenciosa primeiro.
