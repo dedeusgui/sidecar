@@ -113,3 +113,13 @@ go run ./cmd/sidecar-eval --cases bench/cases.json --out bench/results/run.json
 ```
 
 O harness constrói os repositórios de fixture em um diretório temporário, indexa, roda os métodos e imprime as tabelas.
+
+## Verificação de regressão — Rodada D (2026-11-06)
+
+Mudança: `.rs`, `.php`, `.rb` e `.kt` passam a ser indexados com as gramáticas embutidas, e `extractVersion` sobe para 2. O corpus `bench/testdata` não tem arquivos dessas extensões, então a comparação mede só a ausência de regressão, não ganho.
+
+- Comando: `go run ./cmd/sidecar-eval --cases bench/cases.json --out <tmp>`, antes e depois da mudança.
+- Hit@5, Recall@10, precisão e falso positivo ficaram **idênticos** em todos os métodos, em ambos os splits.
+- BM25, léxico e grafo: MRR idêntico.
+- `textual (substring)`: MRR variou entre execuções **do mesmo binário** (0,075, 0,100 e 0,117 no split tune). A variação vem do desempate do `sort.SliceStable` sobre a ordem de `AllSymbols()`, que não é determinística. Isso já existia antes da mudança e não foi corrigido nesta rodada. Até corrigir, não compare MRR do baseline textual entre execuções.
+- Limite: o corpus de avaliação não cobre a mudança de linguagens. Os casos de Rust, PHP, Ruby e Kotlin foram verificados à parte, com um repositório temporário, pelo `sidecar explain`.

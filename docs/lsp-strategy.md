@@ -1,6 +1,6 @@
 # ADR: descoberta, integração e instalação segura de LSP
 
-**Estado:** proposta, **não implementado** · 2026-11-06.
+**Estado:** Rodada D1–D3 implementadas (descoberta, cliente opt-in, status/doctor/trust/setup); o hook de prompt **ainda não usa LSP**. Ver [seção de implementação](#implementação-rodada-d1d3) · 2026-11-06.
 
 ## Premissa
 
@@ -80,3 +80,33 @@ Servidores podem executar ferramentas de build, ler dependências e acessar rede
 - A **descoberta** é automática e leve; a **instalação** do servidor não é. O prompt só funciona se Sidecar já estiver instalado; nunca injetar ordem que mande o agente executar instalador de terceiros na máquina.
 - Documentação de dependências via [Context7](https://github.com/upstash/context7) é **opt-in**, pode usar rede e backend não aberto; deve validar versão identificada em manifest, origem e política de privacidade. Não é substituto das evidências do código.
 - Gates LSP: repositório desconhecido, servidor ausente/falhando/frio, Java/Go, monorepo, confiança, tool hook, Linux/Windows/macOS, timeout, cancelamento, uninstall e comparação do benefício líquido com o modo sem LSP. Ver [rodada D](roadmap.md).
+
+## Implementação (Rodada D1–D3)
+
+**Código:** `internal/lsp/` (`discover.go`, `trust.go`, `client.go`, `probe.go`, `setup.go`, `proc_unix.go`, `proc_windows.go`) e `cmd/sidecar/lsp.go`.
+
+**D1 — descoberta.** Marcadores por caminho (sem executar o projeto), monorepo com uma linha por linguagem e todos os marcadores. Estados na ordem: `not_applicable` → `missing` → `disabled` (sem `SIDECAR_LSP=1`) → `requires_consent` (worktree sem `sidecar lsp trust`) → `available`. `initializing`, `ready` e `failed` só existem no probe. `ready` exige `initialize`/`initialized` concluídos e pelo menos uma capacidade anunciada. O `pyright` (CLI) não conta como servidor: só `pyright-langserver` fala LSP. A coexistência com o LSP oficial do Claude Code lê `enabledPlugins` em `settings.json` e procura `gopls-lsp`, `typescript-lsp`, `pyright-lsp`, `rust-analyzer-lsp`, `csharp-lsp`, `jdtls-lsp` e `php-lsp` em `claude-plugins-official`, conforme a [documentação oficial](https://code.claude.com/docs/en/plugins/code-intelligence). Quando o plugin existe, o Sidecar mantém processo próprio e diz isso no motivo.
+
+**D2 — cliente JSON-RPC.** stdio com `Content-Length`, um leitor concorrente e correlação por `id`. Limites: cabeçalho de 64 KiB, corpo de 16 MiB, `didOpen` de até 512 KiB, timeout de 5 s por requisição e de 15 s no `initialize`. Métodos: `initialize`, `initialized`, `textDocument/didOpen`, `documentSymbol`, `definition`, `references`, `shutdown` e `exit`. Cada resultado passa por `filepath.IsLocal`, `EvalSymlinks` e checagem de prefixo da worktree; caminho fora dela é descartado, nunca injetado. `Span.Evidence()` gera `retrieve.Evidence` com `Source: "lsp"` e `Verdict: "VERIFIED"`. No Unix o servidor roda em grupo de processos e `Close` mata a árvore; no Windows só o processo principal é morto (limite conhecido, veja `proc_windows.go`).
+
+**Opt-in e confiança.** `Start` recusa sem `SIDECAR_LSP=1` e sem a raiz canônica em `lsp-trusted-roots.json` (dentro de `SIDECAR_CONFIG_HOME`). A confiança nunca é inferida do conteúdo do repositório. Quem concede é o usuário, com `sidecar lsp trust` (pergunta ou `--yes`). Esse subcomando não estava na lista do brief; foi adicionado porque sem ele não há como cumprir "workspace confiável".
+
+**D2 — fallback de linguagens (decisão).** O brief pedia `internal/extract/fallback.go` para Rust, PHP, Ruby e Kotlin, por supor que não há gramática embutida. A premissa está errada: `gotreesitter` v0.56.0 traz gramáticas e consultas de tags para as quatro (verificado por teste, `internal/extract/embedded_langs_test.go`). A lacuna real era o `repo.Classify`, que não mapeava essas extensões. Foram mapeadas (`.rs`, `.php`, `.rb`, `.kt`) e `extractVersion` subiu para 2, para que índices antigos sejam reprocessados em lotes. Um fallback por regex seria código morto e menos preciso, então **não foi criado**.
+
+**D3 — `sidecar lsp setup`.** Só entram comandos fixados e verificados nesta máquina: `go install golang.org/x/tools/gopls@v0.24.0`, `npm install -g typescript-language-server@6.0.3 typescript@7.0.2`, `npm install -g pyright@1.1.414` e `rustup component add rust-analyzer`. Os comandos rodam como argv, sem shell, e só depois de confirmação explícita. `csharp`, `java` e `php` estão **bloqueados** com o motivo: sem versão fixada verificada, sem gerenciador oficial confiável, ou licença proprietária (intelephense). A licença de `gopls` (BSD-3-Clause, `golang.org/x/tools`) está declarada no plano, mas o arquivo `LICENSE` do módulo não foi reconferido nesta rodada.
+
+**Verificação executada (2026-11-06, Linux, gopls v0.24.0, go 1.27):**
+- `go test -count=1 ./...` e `go test -race` em `internal/lsp`, `store`, `index`, `app`, `gitx`: passam.
+- Contract tests com servidor mock (o próprio binário de teste, via `SIDECAR_LSP_MOCK`): navegação dentro da worktree, descarte de URI externa e de symlink que aponta para fora, timeout em servidor lento com `Close` limitado, erro do servidor, capacidade não anunciada, e recusa sem opt-in ou sem confiança.
+- E2E real com `gopls`: `TestGoplsEndToEnd` confere símbolos, definição e referências com linhas exatas.
+- Probe manual pela CLI: `sidecar lsp doctor --probe` reportou `go ready` com `gopls` 0.24.0 numa worktree confiável de teste.
+
+**Pendências, sem afirmar o que não foi testado:**
+- O hook de prompt não consulta LSP. Integrar exige medir latência de cold start (o hook tem 1,5 s de orçamento) e custo total, conforme [roadmap](roadmap.md) C4/D2.
+- Probe real só para Go. TypeScript, Python e Rust têm plano e detecção, mas o handshake não foi executado nesta rodada.
+- Windows e macOS: compilação cruzada e `go vet` passam; nenhum teste de execução foi feito nesses sistemas.
+- Coexistência com o plugin oficial numa sessão real do Claude Code: não testada. Só a leitura de `enabledPlugins` tem teste.
+- `sidecar lsp setup` com execução real não foi rodado nesta máquina (instalaria software). Há teste de recusa sem consentimento e de bloqueio, e o caminho de execução é só `exec` de argv.
+- Context7 (provider remoto): não implementado. O `DependencyDocsProvider` tem apenas o cache local com proveniência (`internal/docprovider`).
+
+**Upstream consultado.** Serena em `ede329aaf0c824bea75455a2926f01420d7aa620` (`main` no momento da consulta): só o layout de `src/solidlsp` foi listado. Nenhum arquivo foi lido nem copiado. O `SolidLSP` é Python e o cliente é Go, então a referência usada foi a [especificação LSP](https://microsoft.github.io/language-server-protocol/). A licença MIT declarada no catálogo para `src/solidlsp` não foi reverificada no arquivo. Isso fica registrado como lacuna, porque o catálogo pedia a consulta antes da implementação, e ela não ocorreu nessa ordem.

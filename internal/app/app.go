@@ -78,6 +78,7 @@ func Hook(opts HookOptions) (exit int) {
 		return 0
 	}
 	rec["prompt_chars"] = utf8.RuneCountInString(in.Prompt)
+	rec["session"] = SessionKey(in.SessionID) // digest only: the raw session ID is never logged
 	if skipPrompt(in.Prompt) {
 		rec["status"] = "skipped"
 		return 0

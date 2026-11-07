@@ -45,6 +45,7 @@ var langByExt = map[string]string{
 	".go": "go", ".py": "python", ".ts": "typescript", ".tsx": "tsx",
 	".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
 	".java": "java", ".cs": "c_sharp", ".sql": "sql", ".md": "markdown", ".markdown": "markdown",
+	".rs": "rust", ".php": "php", ".rb": "ruby", ".kt": "kotlin",
 }
 
 var configExt = toSet(".yml", ".yaml", ".json", ".toml", ".xml", ".properties", ".gradle", ".ini", ".cfg", ".conf")

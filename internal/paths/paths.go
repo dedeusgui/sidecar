@@ -49,3 +49,6 @@ func SessionState(agent, sessionID string) string {
 
 // Manifest records exactly which files and entries the installer changed.
 func Manifest() string { return filepath.Join(ConfigHome(), "install.json") }
+
+// LSPTrust lists the worktree roots the user explicitly allowed to start language servers.
+func LSPTrust() string { return filepath.Join(ConfigHome(), "lsp-trusted-roots.json") }

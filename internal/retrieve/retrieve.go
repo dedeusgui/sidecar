@@ -49,6 +49,7 @@ type Evidence struct {
 	Matched   []string // query concepts matched by the item's own text
 	Relations []string // structural links, e.g. "calls:Enqueue(same_file)"
 	Dirty     bool     // the file has uncommitted changes in the working tree
+	Source    string   // "" = repository index; "lsp" = verified by a language server
 }
 
 // CandidateTrace explains one candidate for diagnostics.
