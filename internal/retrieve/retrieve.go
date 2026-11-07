@@ -46,7 +46,8 @@ type Options struct {
 	LSPTrusted func(root string) bool
 	LSPServer  func(ctx context.Context, root, rel string) string
 	// feedbackMults holds the post-task feedback multipliers of Root, keyed "path#symbol" or "path".
-	feedbackMults map[string]float64
+	feedbackMults   map[string]float64
+	hasAbsentAnchor bool
 }
 
 // Ablation switches off parts of the pipeline. It exists to measure each component's
@@ -171,6 +172,9 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	concepts, err := buildConcepts(st, terms, res.Trace.Phrases, total, res.Trace.Translations, opts.Ablate.NoTranslation)
 	if err != nil {
 		return res, err
+	}
+	if len(terms) <= 10 && len(concepts)*2 <= len(terms) {
+		opts.hasAbsentAnchor, _ = hasAbsentAnchor(st, prompt, opts.Ablate.NoTranslation)
 	}
 	res.Trace.Concepts = len(concepts)
 	res.Trace.Timings["analyze"] = time.Since(t)
@@ -325,8 +329,15 @@ func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evid
 		for _, ev := range pool {
 			top = max(top, ev.Score)
 		}
+		if top == 0 {
+			top = 1.0
+		}
 		concerns = append(concerns, docEvidence(ctx, tr.Fingerprint, prompt, top)...)
 		lspNotes(ctx, opts, pool)
+	}
+	if budget == 0 && len(concerns) > 0 {
+		budget = budgetFor(concerns)
+		tr.Budget = budget
 	}
 	if opts.Ablate.NoPacker {
 		out := pool
@@ -430,6 +441,16 @@ func buildConcepts(st *store.Store, terms, phrases []string, total int, trans ma
 			trans["phrase"] = append(trans["phrase"], en)
 		}
 	}
+	// Long / Voice Mode prompts contain many low-IDF conversational words that happen to
+	// appear in comments or docs. Distilling to the 10 highest-IDF concepts keeps FTS5 fast
+	// and prevents conversational filler from diluting coverage.
+	const maxSalientConcepts = 10
+	if len(out) > maxSalientConcepts {
+		sort.SliceStable(out, func(i, j int) bool {
+			return out[i].weight > out[j].weight
+		})
+		out = out[:maxSalientConcepts]
+	}
 	return out, nil
 }
 
@@ -495,6 +516,63 @@ func codeLike(tok string) bool {
 		}
 	}
 	return false
+}
+
+// hasAbsentAnchor reports whether the prompt explicitly names a code-like identifier or
+// mid-sentence capitalized proper noun (e.g. "Kafka", "gRPC", "RPCs") whose analyzed terms
+// and translations are completely absent from the repository.
+func hasAbsentAnchor(st *store.Store, prompt string, noTranslation bool) (bool, error) {
+	for _, loc := range identRe.FindAllStringIndex(prompt, -1) {
+		tok := prompt[loc[0]:loc[1]]
+		midSentenceProper := loc[0] > 0 && tok[0] >= 'A' && tok[0] <= 'Z' && len(tok) >= 4 && !afterSentenceBreak(prompt, loc[0])
+		if !codeLike(tok) && !midSentenceProper {
+			continue
+		}
+		sub := lexical.Analyze(tok)
+		if len(sub) == 0 {
+			continue
+		}
+		anyPresent := false
+		for _, t := range sub {
+			if n, err := st.TermDocFreq(t); err != nil {
+				return false, err
+			} else if n > 0 {
+				anyPresent = true
+				break
+			}
+			if !noTranslation {
+				for _, en := range lexical.Translations(t) {
+					if n, err := st.TermDocFreq(en); err != nil {
+						return false, err
+					} else if n > 0 {
+						anyPresent = true
+						break
+					}
+				}
+			}
+			if anyPresent {
+				break
+			}
+		}
+		if !anyPresent {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func afterSentenceBreak(s string, pos int) bool {
+	for i := pos - 1; i >= 0; i-- {
+		switch s[i] {
+		case ' ', '\t':
+			continue
+		case '.', '?', '!', '\n', '\r', ':':
+			return true
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func ensure(cands map[int64]*candidate, h store.SymbolHit) *candidate {
@@ -751,6 +829,11 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 		if hasExact && !c.exact && !c.neighbor && len(c.rels) == 0 && c.coverage < 1 {
 			c.suppressed = true
 			c.reason = "dropped: partial word match next to an exact identifier"
+			continue
+		}
+		if opts.hasAbsentAnchor && !hasExact && !c.exact && len(c.matched) <= 1 {
+			c.suppressed = true
+			c.reason = "dropped: named anchor identifier absent from repository"
 			continue
 		}
 		if c.hit.Kind == "file" && specificFiles[c.hit.Path] && !hasPrefixAny(c.rels, "tested_by:") {

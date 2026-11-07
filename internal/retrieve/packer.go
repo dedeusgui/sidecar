@@ -96,11 +96,11 @@ func Pack(cands []Evidence, o PackOptions) ([]Evidence, map[string]string, PackT
 	for {
 		pick, pickU := -1, 0.0
 		for k, e := range open {
-			v, c := st.value(e), costOf(e)
-			if v/float64(c) < minWorth || pt.Used+c > o.Budget {
+			v, c, uc := st.value(e), costOf(e), utilityCostOf(e)
+			if v/float64(uc) < minWorth || pt.Used+c > o.Budget {
 				continue
 			}
-			if u := v / float64(c); u > pickU {
+			if u := v / float64(uc); u > pickU {
 				pick, pickU = k, u
 			}
 		}
@@ -114,7 +114,7 @@ func Pack(cands []Evidence, o PackOptions) ([]Evidence, map[string]string, PackT
 		pt.Used += costOf(e)
 	}
 	for _, e := range open {
-		if st.value(e)/float64(costOf(e)) < minWorth {
+		if st.value(e)/float64(utilityCostOf(e)) < minWorth {
 			excluded[e.ID] = "not worth its tokens: marginal utility per token below threshold"
 		} else {
 			excluded[e.ID] = "dropped: token budget"
@@ -187,6 +187,11 @@ func (s *packState) diversity(e Evidence) float64 {
 func (s *packState) complement(e Evidence) float64 {
 	c := 1.0
 	isTest := repo.Kind(e.Hit.Path) == "test"
+	for _, rel := range e.Relations {
+		if strings.Contains(rel, "[DOCUMENTED]") || strings.Contains(rel, "[TEST_EXPECTED]") {
+			c = max(c, 1.2)
+		}
+	}
 	for _, sel := range s.chosen {
 		if isTest && hasString(sel.Relations, "tested_by:"+e.Hit.Path) {
 			c = max(c, 1.25)
@@ -212,4 +217,10 @@ func trustOf(e Evidence) float64 {
 // costOf is the item's rendered size in tokens, never less than one.
 func costOf(e Evidence) int {
 	return max(1, ctxbuild.EstimateTokens(Describe(e)))
+}
+
+// utilityCostOf caps the token denominator used for marginal utility so that rich docstrings
+// and contract annotations ([DOCUMENTED], [TEST_EXPECTED]) do not penalize well-documented code.
+func utilityCostOf(e Evidence) int {
+	return max(1, min(costOf(e), 25))
 }
