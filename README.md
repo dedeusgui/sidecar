@@ -55,6 +55,7 @@ estruturais, o orçamento de tokens, os tempos por fase e o contexto final. Use 
 | `sidecar uninstall [--purge]` | remove apenas o que o Sidecar instalou (inclusive a linha de status, se ainda for a do Sidecar) |
 | `sidecar status [--root DIR] [--json]` | resumo do índice do repositório |
 | `sidecar doctor` | instalação, binário, SQLite/FTS5, integridade do índice, falhas recentes |
+| `sidecar feedback record\|list\|purge [--root DIR] [--json]` | feedback pós-tarefa sobre evidências, opt-in; afeta o ranking só com `SIDECAR_ENGINE=v2`. `record --helpful ID --misleading ID` ou JSON no stdin; `purge` remove os obsoletos (`--all`: todos). Ver [agent-feedback.md](docs/agent-feedback.md) |
 | `sidecar explain [--root DIR] [--json]` | rastro completo de um prompt (lê stdin) |
 | `sidecar activity [--json] [--limit N]` | últimas execuções do hook: `injected`, `no_evidence`, `skipped`, `partial`, `failed`, com latência p50/p95; nunca mostra o prompt |
 | `sidecar statusline` | uma linha para a status line, p. ex. `Sidecar: injected · 4 refs · 18ms` ou `Sidecar: no match` |

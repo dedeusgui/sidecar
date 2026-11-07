@@ -17,7 +17,7 @@ import (
 
 // SchemaVersion is bumped whenever the on-disk layout changes. Databases with a
 // newer version are refused; older ones are migrated in place.
-const SchemaVersion = 4
+const SchemaVersion = 5
 
 // ErrSchemaTooNew reports an index written by a newer Sidecar build.
 var ErrSchemaTooNew = errors.New("index schema is newer than this sidecar build")
@@ -741,6 +741,25 @@ var migrations = [][]string{
 			status TEXT NOT NULL DEFAULT 'valid'
 		)`,
 		`CREATE INDEX decisions_worktree ON decisions(worktree)`,
+	},
+	{ // v4 -> v5: post-task feedback on evidence items, weighed by outcome and tied to file hashes
+		`CREATE TABLE IF NOT EXISTS evidence_feedback (
+			id INTEGER PRIMARY KEY,
+			worktree TEXT NOT NULL,
+			session_id TEXT NOT NULL DEFAULT '',
+			evidence_id TEXT NOT NULL,
+			file_path TEXT NOT NULL,
+			symbol TEXT NOT NULL DEFAULT '',
+			file_hash TEXT NOT NULL DEFAULT '',
+			polarity INTEGER NOT NULL,
+			reason_code TEXT NOT NULL DEFAULT '',
+			agent_confidence TEXT NOT NULL DEFAULT 'medium',
+			trace_corroborated INTEGER NOT NULL DEFAULT 0,
+			oracle_passed INTEGER NOT NULL DEFAULT 0,
+			reconciled_weight REAL NOT NULL DEFAULT 0,
+			created_at INTEGER NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS evidence_feedback_lookup ON evidence_feedback(worktree, file_path, symbol)`,
 	},
 }
 

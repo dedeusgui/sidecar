@@ -56,6 +56,23 @@ Perguntas pinadas (positivas):
 - “Como um hook com erro evita interromper o agente?”
 - “Onde o instalador preserva outros UserPromptSubmit hooks?”
 
+## Autodogfooding e feedback pós-tarefa
+
+Quem desenvolve o Sidecar deve trabalhar com ele instalado, para que o próprio uso gere evidência:
+
+1. Instalar com consentimento explícito (`--yes` autoriza a alteração dos hooks; `sidecar uninstall` desfaz): `sidecar install --yes --statusline --observe-tools`.
+2. Trabalhar normalmente. A injeção acontece no prompt. Com `SIDECAR_ENGINE=v2`, o feedback abaixo também passa a afetar o ranking.
+3. Ao terminar a tarefa, registrar quais evidências ajudaram ou enganaram, usando os IDs exatos de `sidecar explain --json` (`evidence[].id`):
+   ```bash
+   sidecar feedback record --root . --completed=true --confidence high \
+     --helpful 'internal/app/feedback.go#function:RecordFeedback@NN' \
+     --misleading 'internal/x.go#Y' --reason wrong_file
+   ```
+   Ou envie o relatório completo pela entrada padrão, com `schema_version: 1` (ver [agent-feedback.md](agent-feedback.md)).
+4. Conferir com `sidecar feedback list --json`. Remover os obsoletos com `sidecar feedback purge`; `--all` remove tudo do worktree.
+
+Fórmula, em resumo (detalhes e limites em [agent-feedback.md](agent-feedback.md)): pesos 0,45 para o oráculo (`oracle_passed`, por padrão `task_completed`), 0,35 para o rastro do `SessionObserver` (o agente leu ou editou o arquivo?) e 0,20 para o autorrelato, escalado pela confiança. Quando o rastro contradiz um elogio, o peso do autorrelato vale `0,25 ×`. O resultado é limitado a ±0,25 por alvo e decai `0,85^n` com registros mais antigos. Cada registro guarda o hash do arquivo: ao mudar e reindexar o arquivo, ele vira `stale` e deixa de valer. Feedback não gera ganho comprovado: avaliação end-to-end continua em [evaluation-plan.md](evaluation-plan.md).
+
 ## Contrato de alteração
 
 - Definir antes a hipótese mensurável. Preferir mudanças pequenas e reversíveis.

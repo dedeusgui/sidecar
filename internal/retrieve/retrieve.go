@@ -45,6 +45,8 @@ type Options struct {
 	// returns the server name that can confirm rel, or "" for none.
 	LSPTrusted func(root string) bool
 	LSPServer  func(ctx context.Context, root, rel string) string
+	// feedbackMults holds the post-task feedback multipliers of Root, keyed "path#symbol" or "path".
+	feedbackMults map[string]float64
 }
 
 // Ablation switches off parts of the pipeline. It exists to measure each component's
@@ -58,6 +60,7 @@ type Ablation struct {
 	NoIntent      bool // v2 without intent routing
 	NoContract    bool // v2 without contract links and conflict notes
 	NoPacker      bool // v2 without utility packing: the ranked top MaxItems are sent
+	NoFeedback    bool // v2 without post-task feedback multipliers
 }
 
 // Evidence is one item of retrieved context.
@@ -87,6 +90,7 @@ type CandidateTrace struct {
 	Score            float64
 	Kept             bool
 	Reason           string
+	Feedback         string  `json:"feedback,omitempty"` // feedback_boost | feedback_penalty
 	ID               string  `json:"id"`
 	Source           string  `json:"source"`
 	Confidence       float64 `json:"confidence"`
@@ -144,7 +148,8 @@ type candidate struct {
 	relBasis     []string
 	git          bool
 	reason       string
-	suppressed   bool // dropped before fusion; never shown or ranked
+	feedback     string // feedback_boost | feedback_penalty when post-task feedback moved its score
+	suppressed   bool   // dropped before fusion; never shown or ranked
 	score        float64
 }
 
@@ -260,6 +265,12 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	}
 	for _, c := range cands {
 		c.reason = gate(c)
+	}
+	if v2 && !opts.Ablate.NoFeedback && opts.Root != "" {
+		// A failed read leaves the ranking as it was: feedback only ever adjusts it.
+		if mults, err := st.FeedbackMultipliers(opts.Root); err == nil && len(mults) > 0 {
+			opts.feedbackMults = mults
+		}
 	}
 	kept := fuse(cands, lexOrder, opts)
 	res.Trace.Timings["fusion"] = time.Since(t)
@@ -792,6 +803,15 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 	byKey := map[string]*candidate{}
 	for _, c := range pool {
 		byKey[idx(c)] = c
+		if m, ok := feedbackMultiplier(c, opts.feedbackMults); ok {
+			scores[idx(c)] *= m
+			switch {
+			case m > 1.01:
+				c.feedback = "feedback_boost"
+			case m < 0.99:
+				c.feedback = "feedback_penalty"
+			}
+		}
 		c.score = scores[idx(c)]
 	}
 	var scored []fusion.Scored
@@ -826,6 +846,16 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 
 // direct reports whether the candidate matches the prompt through its own text.
 func (c *candidate) direct() bool { return c.exact || c.coverage > 0 }
+
+// feedbackMultiplier returns the feedback multiplier of c's symbol, or of its file when the
+// symbol has none of its own.
+func feedbackMultiplier(c *candidate, mults map[string]float64) (float64, bool) {
+	if m, ok := mults[c.hit.Path+"#"+c.hit.Name]; ok {
+		return m, true
+	}
+	m, ok := mults[c.hit.Path]
+	return m, ok
+}
 
 func evidenceOf(c *candidate) Evidence {
 	ev := Evidence{Hit: c.hit, Score: c.score, Matched: c.matched, Relations: c.rels, Dirty: c.git}
@@ -927,7 +957,7 @@ func traceOf(cands map[int64]*candidate) []CandidateTrace {
 		t := CandidateTrace{
 			Name: c.hit.Name, Path: c.hit.Path, Kind: c.hit.Kind,
 			Lexical: c.lexRank, Coverage: c.coverage, Exact: c.exact,
-			Relations: c.rels, Score: c.score, Kept: c.reason == "kept", Reason: c.reason,
+			Relations: c.rels, Score: c.score, Kept: c.reason == "kept", Reason: c.reason, Feedback: c.feedback,
 			ID: idOf(c.hit), Source: sourceOf(c), Confidence: confidenceOf(c), TokenEstimate: tokensOf(c),
 		}
 		if t.Kept {

@@ -153,7 +153,7 @@ Mudança: `.rs`, `.php`, `.rb` e `.kt` passam a ser indexados com as gramáticas
 - Comando: `go run ./cmd/sidecar-eval --cases bench/cases.json --out <tmp>`, antes e depois da mudança.
 - Hit@5, Recall@10, precisão e falso positivo ficaram **idênticos** em todos os métodos, em ambos os splits.
 - BM25, léxico e grafo: MRR idêntico.
-- `textual (substring)`: MRR variou entre execuções **do mesmo binário** (0,075, 0,100 e 0,117 no split tune). A variação vem do desempate do `sort.SliceStable` sobre a ordem de `AllSymbols()`, que não é determinística. Isso já existia antes da mudança e não foi corrigido nesta rodada. Até corrigir, não compare MRR do baseline textual entre execuções.
+- `textual (substring)`: MRR variou entre execuções **do mesmo binário** (0,075, 0,100 e 0,117 no split tune). A variação vem do desempate do `sort.SliceStable` sobre a ordem de `AllSymbols()`, que não é determinística. Isso já existia antes da mudança e não foi corrigido nesta rodada. Até corrigir, não compare MRR do baseline textual entre execuções. Na verificação de 2026-11-06 o problema apareceu em todas as linhas: duas execuções do `HEAD`, sem nenhuma mudança, diferiram em 56 caminhos JSON não temporais de `sidecar-eval` (ex.: `hit_at_1` de casos individuais). Um antes/depois sem esse controle não prova ausência de regressão.
 - Limite: o corpus de avaliação não cobre a mudança de linguagens. Os casos de Rust, PHP, Ruby e Kotlin foram verificados à parte, com um repositório temporário, pelo `sidecar explain`.
 
 ## Rodada E (2026-11-07): suíte v2, dicionário e experimentos rejeitados
