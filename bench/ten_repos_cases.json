@@ -1,0 +1,626 @@
+{
+  "repos": {
+    "spring-petclinic": {
+      "path": "spring-petclinic",
+      "commit": "500158f732419217507c7656904b8e6aa1bcc0d6",
+      "source": "https://github.com/spring-projects/spring-petclinic",
+      "license": "Apache-2.0"
+    },
+    "chi": {
+      "path": "chi",
+      "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+      "source": "https://github.com/go-chi/chi",
+      "license": "MIT"
+    },
+    "click": {
+      "path": "click",
+      "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+      "source": "https://github.com/pallets/click",
+      "license": "BSD-3-Clause"
+    },
+    "hono": {
+      "path": "hono",
+      "commit": "eb754bd5ef22c63f1634a4c374a86be086f85710",
+      "source": "https://github.com/honojs/hono",
+      "license": "MIT"
+    },
+    "serde-json": {
+      "path": "serde-json",
+      "commit": "8c535a260ce561eaab4111aafc29038eb9f77ff3",
+      "source": "https://github.com/serde-rs/json",
+      "license": "MIT OR Apache-2.0"
+    },
+    "sinatra": {
+      "path": "sinatra",
+      "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+      "source": "https://github.com/sinatra/sinatra",
+      "license": "MIT"
+    },
+    "monolog": {
+      "path": "monolog",
+      "commit": "3bed304b1905fed5c30d172872f4d890cbb03c6a",
+      "source": "https://github.com/Seldaek/monolog",
+      "license": "MIT"
+    },
+    "kotlinx-datetime": {
+      "path": "kotlinx-datetime",
+      "commit": "77c95cc8125015f83ea8fd900404c295fba7276e",
+      "source": "https://github.com/Kotlin/kotlinx-datetime",
+      "license": "Apache-2.0"
+    },
+    "dapper": {
+      "path": "dapper",
+      "commit": "eb47546a408bbf6c178bda4f04dc205bc51ffbfe",
+      "source": "https://github.com/DapperLib/Dapper",
+      "license": "Apache-2.0"
+    },
+    "express": {
+      "path": "express",
+      "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+      "source": "https://github.com/expressjs/express",
+      "license": "MIT"
+    }
+  },
+  "cases": [
+    {
+      "id": "R01-1",
+      "split": "development",
+      "repo": "spring-petclinic",
+      "category": "direct",
+      "prompt": "Which route shows one owner by id?",
+      "relevant": [
+        {
+          "path": "src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java"
+        }
+      ]
+    },
+    {
+      "id": "R01-2",
+      "split": "development",
+      "repo": "spring-petclinic",
+      "category": "direct",
+      "prompt": "Qual rota mostra os detalhes de um dono pelo identificador?",
+      "relevant": [
+        {
+          "path": "src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java"
+        }
+      ]
+    },
+    {
+      "id": "R01-3",
+      "split": "development",
+      "repo": "spring-petclinic",
+      "category": "messy_pt",
+      "prompt": "Onde registra uma visita de um animal?",
+      "relevant": [
+        {
+          "path": "src/main/java/org/springframework/samples/petclinic/owner/VisitController.java"
+        }
+      ]
+    },
+    {
+      "id": "R01-4",
+      "split": "development",
+      "repo": "spring-petclinic",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Qual rota mostra os detalhes de um dono pelo identificador? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java"
+        }
+      ]
+    },
+    {
+      "id": "R01-5",
+      "split": "development",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "Onde fica a integração Kafka publica eventos de visita?",
+      "no_gold": true
+    },
+    {
+      "id": "R02-1",
+      "split": "development",
+      "repo": "chi",
+      "category": "direct",
+      "prompt": "Which middleware applies a timeout to requests?",
+      "relevant": [
+        {
+          "path": "middleware/timeout.go"
+        }
+      ]
+    },
+    {
+      "id": "R02-2",
+      "split": "development",
+      "repo": "chi",
+      "category": "direct",
+      "prompt": "Qual middleware aplica timeout a cada requisição?",
+      "relevant": [
+        {
+          "path": "middleware/timeout.go"
+        }
+      ]
+    },
+    {
+      "id": "R02-3",
+      "split": "development",
+      "repo": "chi",
+      "category": "messy_pt",
+      "prompt": "Onde limita o tamanho do corpo da requisição?",
+      "relevant": [
+        {
+          "path": "middleware/request_size.go"
+        }
+      ]
+    },
+    {
+      "id": "R02-4",
+      "split": "development",
+      "repo": "chi",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Qual middleware aplica timeout a cada requisição? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "middleware/timeout.go"
+        }
+      ]
+    },
+    {
+      "id": "R02-5",
+      "split": "development",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "Onde fica a integração Kafka publica eventos de visita?",
+      "no_gold": true
+    },
+    {
+      "id": "R03-1",
+      "split": "development",
+      "repo": "click",
+      "category": "direct",
+      "prompt": "Where does the terminal ask the user for confirmation?",
+      "relevant": [
+        {
+          "path": "src/click/termui.py"
+        }
+      ]
+    },
+    {
+      "id": "R03-2",
+      "split": "development",
+      "repo": "click",
+      "category": "direct",
+      "prompt": "Onde o programa pede confirmação ao usuário no terminal?",
+      "relevant": [
+        {
+          "path": "src/click/termui.py"
+        }
+      ]
+    },
+    {
+      "id": "R03-3",
+      "split": "development",
+      "repo": "click",
+      "category": "messy_pt",
+      "prompt": "Cadê a saída simples escrita no terminal?",
+      "relevant": [
+        {
+          "path": "src/click/utils.py"
+        }
+      ]
+    },
+    {
+      "id": "R03-4",
+      "split": "development",
+      "repo": "click",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Onde o programa pede confirmação ao usuário no terminal? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "src/click/termui.py"
+        }
+      ]
+    },
+    {
+      "id": "R03-5",
+      "split": "development",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "Onde fica a integração servidor Kafka de eventos?",
+      "no_gold": true
+    },
+    {
+      "id": "R04-1",
+      "split": "development",
+      "repo": "hono",
+      "category": "direct",
+      "prompt": "Where is the middleware that configures CORS?",
+      "relevant": [
+        {
+          "path": "src/middleware/cors/index.ts"
+        }
+      ]
+    },
+    {
+      "id": "R04-2",
+      "split": "development",
+      "repo": "hono",
+      "category": "direct",
+      "prompt": "Onde fica o middleware que configura CORS para requisições?",
+      "relevant": [
+        {
+          "path": "src/middleware/cors/index.ts"
+        }
+      ]
+    },
+    {
+      "id": "R04-3",
+      "split": "development",
+      "repo": "hono",
+      "category": "messy_pt",
+      "prompt": "onde checa usuário e senha na autenticação básica?",
+      "relevant": [
+        {
+          "path": "src/middleware/basic-auth/index.ts"
+        }
+      ]
+    },
+    {
+      "id": "R04-4",
+      "split": "development",
+      "repo": "hono",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Onde fica o middleware que configura CORS para requisições? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "src/middleware/cors/index.ts"
+        }
+      ]
+    },
+    {
+      "id": "R04-5",
+      "split": "development",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "Onde fica a integração driver PostgreSQL para consultas?",
+      "no_gold": true
+    },
+    {
+      "id": "R05-1",
+      "split": "development",
+      "repo": "serde-json",
+      "category": "direct",
+      "prompt": "Where is a JSON string deserialized into a Rust value?",
+      "relevant": [
+        {
+          "path": "src/de.rs"
+        }
+      ]
+    },
+    {
+      "id": "R05-2",
+      "split": "development",
+      "repo": "serde-json",
+      "category": "direct",
+      "prompt": "Onde converte uma string JSON para um valor Rust?",
+      "relevant": [
+        {
+          "path": "src/de.rs"
+        }
+      ]
+    },
+    {
+      "id": "R05-3",
+      "split": "development",
+      "repo": "serde-json",
+      "category": "messy_pt",
+      "prompt": "onde transforma valor em texto JSON?",
+      "relevant": [
+        {
+          "path": "src/ser.rs"
+        }
+      ]
+    },
+    {
+      "id": "R05-4",
+      "split": "development",
+      "repo": "serde-json",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Onde converte uma string JSON para um valor Rust? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "src/de.rs"
+        }
+      ]
+    },
+    {
+      "id": "R05-5",
+      "split": "development",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "Onde fica a integração cliente Redis que publica mensagens?",
+      "no_gold": true
+    },
+    {
+      "id": "R06-1",
+      "split": "development",
+      "repo": "sinatra",
+      "category": "direct",
+      "prompt": "Where does the application register a GET route?",
+      "relevant": [
+        {
+          "path": "lib/sinatra/base.rb"
+        }
+      ]
+    },
+    {
+      "id": "R06-2",
+      "split": "development",
+      "repo": "sinatra",
+      "category": "direct",
+      "prompt": "Onde registra uma rota GET na aplicação?",
+      "relevant": [
+        {
+          "path": "lib/sinatra/base.rb"
+        }
+      ]
+    },
+    {
+      "id": "R06-3",
+      "split": "development",
+      "repo": "sinatra",
+      "category": "messy_pt",
+      "prompt": "onde interrompe a execução e devolve resposta?",
+      "relevant": [
+        {
+          "path": "lib/sinatra/base.rb"
+        }
+      ]
+    },
+    {
+      "id": "R06-4",
+      "split": "development",
+      "repo": "sinatra",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Onde registra uma rota GET na aplicação? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "lib/sinatra/base.rb"
+        }
+      ]
+    },
+    {
+      "id": "R06-5",
+      "split": "development",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "Onde fica a integração driver PostgreSQL para consultas?",
+      "no_gold": true
+    },
+    {
+      "id": "R07-1",
+      "split": "development",
+      "repo": "monolog",
+      "category": "direct",
+      "prompt": "Where is a handler pushed onto the logger stack?",
+      "relevant": [
+        {
+          "path": "src/Monolog/Logger.php"
+        }
+      ]
+    },
+    {
+      "id": "R07-2",
+      "split": "development",
+      "repo": "monolog",
+      "category": "direct",
+      "prompt": "Onde adiciona um handler à pilha do logger?",
+      "relevant": [
+        {
+          "path": "src/Monolog/Logger.php"
+        }
+      ]
+    },
+    {
+      "id": "R07-3",
+      "split": "development",
+      "repo": "monolog",
+      "category": "messy_pt",
+      "prompt": "cadê a gravação de um registro de log?",
+      "relevant": [
+        {
+          "path": "src/Monolog/Logger.php"
+        }
+      ]
+    },
+    {
+      "id": "R07-4",
+      "split": "development",
+      "repo": "monolog",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Onde adiciona um handler à pilha do logger? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "src/Monolog/Logger.php"
+        }
+      ]
+    },
+    {
+      "id": "R07-5",
+      "split": "development",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "Onde fica a integração servidor gRPC para chamadas remotas?",
+      "no_gold": true
+    },
+    {
+      "id": "R08-1",
+      "split": "development",
+      "repo": "kotlinx-datetime",
+      "category": "direct",
+      "prompt": "Where is a local date and time parsed?",
+      "relevant": [
+        {
+          "path": "core/common/src/LocalDateTime.kt"
+        }
+      ]
+    },
+    {
+      "id": "R08-2",
+      "split": "development",
+      "repo": "kotlinx-datetime",
+      "category": "direct",
+      "prompt": "Onde fica o parse de uma data e hora local?",
+      "relevant": [
+        {
+          "path": "core/common/src/LocalDateTime.kt"
+        }
+      ]
+    },
+    {
+      "id": "R08-3",
+      "split": "development",
+      "repo": "kotlinx-datetime",
+      "category": "messy_pt",
+      "prompt": "onde define um fuso horário?",
+      "relevant": [
+        {
+          "path": "core/common/src/TimeZone.kt"
+        }
+      ]
+    },
+    {
+      "id": "R08-4",
+      "split": "development",
+      "repo": "kotlinx-datetime",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Onde fica o parse de uma data e hora local? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "core/common/src/LocalDateTime.kt"
+        }
+      ]
+    },
+    {
+      "id": "R08-5",
+      "split": "development",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "Onde fica a integração cliente Kafka para filas de mensagens?",
+      "no_gold": true
+    },
+    {
+      "id": "R09-1",
+      "split": "development",
+      "repo": "dapper",
+      "category": "direct",
+      "prompt": "Where does an asynchronous SQL query return rows?",
+      "relevant": [
+        {
+          "path": "Dapper/SqlMapper.Async.cs"
+        }
+      ]
+    },
+    {
+      "id": "R09-2",
+      "split": "development",
+      "repo": "dapper",
+      "category": "direct",
+      "prompt": "Onde executa consulta SQL assíncrona e retorna linhas?",
+      "relevant": [
+        {
+          "path": "Dapper/SqlMapper.Async.cs"
+        }
+      ]
+    },
+    {
+      "id": "R09-3",
+      "split": "development",
+      "repo": "dapper",
+      "category": "messy_pt",
+      "prompt": "onde estão os parâmetros dinâmicos da consulta?",
+      "relevant": [
+        {
+          "path": "Dapper/DynamicParameters.cs"
+        }
+      ]
+    },
+    {
+      "id": "R09-4",
+      "split": "development",
+      "repo": "dapper",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Onde executa consulta SQL assíncrona e retorna linhas? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "Dapper/SqlMapper.Async.cs"
+        }
+      ]
+    },
+    {
+      "id": "R09-5",
+      "split": "development",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "Onde fica a integração roteador HTTP Express de requisições?",
+      "no_gold": true
+    },
+    {
+      "id": "R10-1",
+      "split": "development",
+      "repo": "express",
+      "category": "direct",
+      "prompt": "Where is a JSON response sent to the client?",
+      "relevant": [
+        {
+          "path": "lib/response.js"
+        }
+      ]
+    },
+    {
+      "id": "R10-2",
+      "split": "development",
+      "repo": "express",
+      "category": "direct",
+      "prompt": "Onde envia uma resposta em formato JSON?",
+      "relevant": [
+        {
+          "path": "lib/response.js"
+        }
+      ]
+    },
+    {
+      "id": "R10-3",
+      "split": "development",
+      "repo": "express",
+      "category": "messy_pt",
+      "prompt": "onde a aplicação abre a porta e começa a escutar?",
+      "relevant": [
+        {
+          "path": "lib/application.js"
+        }
+      ]
+    },
+    {
+      "id": "R10-4",
+      "split": "development",
+      "repo": "express",
+      "category": "voice_mode",
+      "prompt": "Cara, tô olhando aqui esse projeto e preciso de uma ajuda pra me localizar. Eu tava tentando acompanhar o fluxo e aí fui abrindo umas coisas, mas acabei me perdendo, sabe? Tipo assim, eu não quero mudar nada agora, só entender qual é o ponto de entrada certo pra depois conseguir investigar com calma. Talvez eu tenha falado o nome errado porque tô ditando e a transcrição pode sair meio torta, então não precisa levar cada palavra ao pé da letra. O que eu queria mesmo descobrir é o seguinte: Onde envia uma resposta em formato JSON? Se tiver mais de uma parte parecida, olha a implementação que de fato faz isso e me aponta o arquivo para eu continuar lendo. Eu vi uns exemplos e uns testes por aí, mas não sei se eles são o lugar principal. Pode ser que exista uma camada intermediária e eu esteja misturando as coisas, enfim, não precisa adivinhar a arquitetura inteira. Só quero uma referência concreta no código, com um pouco de contexto, porque depois eu mesmo vou conferir o comportamento. Ah, e não precisa executar o projeto nem alterar arquivo nenhum; estou só tentando entender o caminho antes de mexer. Valeu.",
+      "relevant": [
+        {
+          "path": "lib/response.js"
+        }
+      ]
+    },
+    {
+      "id": "R10-5",
+      "split": "development",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "Onde fica a integração driver MongoDB para consultas de banco?",
+      "no_gold": true
+    }
+  ]
+}
