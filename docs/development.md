@@ -23,6 +23,7 @@
 go test -count=1 ./...
 go test -race -count=1 ./internal/store/ ./internal/index/ ./internal/app/ ./internal/gitx/
 go run ./cmd/sidecar-eval --cases bench/cases.json --out bench/results/local.json
+go run ./cmd/sidecar-eval --cases bench/cases.json --compare bench/results/final-state.json --report-md <fora-do-repo>/relatorio.md
 go run ./cmd/sidecar doctor
 ```
 
@@ -37,7 +38,11 @@ Não commitar `bench/results/local.json` ou dados de diagnóstico gerados sem in
 5. Para validar auxílio ao **agente**, executar protocolo separado em `docs/evaluation-plan.md`; `explain` sozinho não mede rounds de modelo.
 6. Registrar falhas reproduzíveis como casos de regressão sem inserir os resultados da avaliação cega no conjunto de tuning.
 
-Exemplos de perguntas de dogfooding (não são gabaritos):
+Consultas pinadas em `bench/dogfood_cases.json`, verificadas por `TestDogfoodQueries` (`go test ./internal/app/ -run TestDogfoodQueries`): os positivos exigem o par arquivo+símbolo no top-5 do `explain`; os negativos não podem injetar contexto. Se um símbolo for renomeado, atualize o arquivo no mesmo PR. Não são gabarito de tuning e não justificam mudar ranking sem A/B em `bench/cases.json`.
+
+Limite conhecido: a consulta D01 apontava para `adapter.Format`. Depois dos testes novos em `internal/app/app_test.go`, `Format` caiu para o 6.º lugar (0,0323, contra 0,0325 da seção de `CLAUDE.md`), por causa de identificadores com “hook” no código de teste. O gabarito passou a ser `app.Hook`, que monta e emite o contexto do hook; **o ranking não foi alterado**. A margem é fina: outra mudança no repositório pode reordenar esses resultados.
+
+Perguntas pinadas (positivas):
 - “Onde é montado o contexto adicional do hook no Claude Code?”
 - “Onde o índice lida com arquivo renomeado no Git?”
 - “Como um hook com erro evita interromper o agente?”
@@ -50,6 +55,13 @@ Exemplos de perguntas de dogfooding (não são gabaritos):
 - Revisar diferenças em Windows e macOS; não tratar cross-build como prova de funcionamento da integração.
 - Atualizar documentação impactada **antes de concluir o PR**, incluindo números e limitações reais.
 - No PR: `Motivo / Escopo / Testes realmente executados / Comparação antes-depois / Riscos-rollback / Docs atualizadas`. Não afirmar que um teste rodou se não rodou.
+
+## Testes de risco e limites conhecidos
+
+- Smoke E2E de instalação e hooks: `go test ./internal/app/ -run 'Smoke|Shell|Unicode|Concurrent|Damaged'`. O teste de shell compila o binário real e é pulado com `-short` e no Windows.
+- Corrupção: o hook move o índice para `<db>.corrupt` quando o SQLite acusa dano na abertura ou numa consulta (`malformed`, `not a database`, `no such fts5 table`) e responde uma vez com índice reconstruído. `database is locked` não causa quarentena.
+- Limite: dano silencioso que nenhuma consulta toca não é detectado pelo hook, que responde normalmente. `sidecar doctor` detecta esse caso pelo `quick_check`.
+- `sidecar-eval --compare` marca regressão por caso só para Hit@5 e falso positivo, conforme o critério definido; mudanças apenas de posição aparecem no Δ MRR agregado, não na lista de casos.
 
 ## Aprovação de mudanças de maior risco
 

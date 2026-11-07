@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -108,6 +109,22 @@ func TestCorruptIndexIsMovedAsideAndRebuilt(t *testing.T) {
 	}
 	if v, err := s.SchemaVersion(); err != nil || v != SchemaVersion {
 		t.Fatalf("rebuilt schema version = %d, %v", v, err)
+	}
+}
+
+// A busy or missing database must not be quarantined: that would discard a healthy index.
+func TestIsCorruptOnlyMatchesDamagedFiles(t *testing.T) {
+	for msg, want := range map[string]bool{
+		"database disk image is malformed (11)":               true,
+		"file is not a database (26)":                         true,
+		"SQL logic error: no such fts5 table: symbol_fts (1)": true,
+		"database is locked (5)":                              false,
+		"unable to open database file (14)":                   false,
+		"disk I/O error":                                      false,
+	} {
+		if got := IsCorrupt(errors.New(msg)); got != want {
+			t.Errorf("IsCorrupt(%q) = %v, want %v", msg, got, want)
+		}
 	}
 }
 

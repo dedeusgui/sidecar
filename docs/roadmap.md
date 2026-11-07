@@ -17,7 +17,7 @@ Construir e entregar **a V2 integrada**, e não um MVP com capacidades essenciai
 
 **Não implementado / não comprovado:** IntentRouter por tarefa, pacote de evidências por utilidade marginal, fingerprint arquitetural, reconciliação de contratos código/docs/testes, observação de tool calls, detecção de redescoberta, memória de decisões entre sessões, cliente/instalador LSP gerenciado, provider Context7, Antigravity CLI adapter, feedback parametrizado, suíte A/B agentic confiável e prova de ganho real. A existência de interfaces de hook no cliente não prova E2E do Sidecar.
 
-**Pendências operacionais P0:** licença do Sidecar; GitHub default branch ainda `ccr-b6db8870-kl90n6` em vez de `main`; primeira release inexistente; PATH/upgrade/ownership; E2E Codex real; testes Windows de tempo (falha histórica intermitente em asserção `0s`, embora último CI tenha passado); testes de rollout/rollback e instalação por SO.
+**Pendências operacionais P0:** LICENSE MIT criado na raiz em 2026-11-06 (ainda não commitado); GitHub default branch `main` verificada em 2026-11-06 (`gh repo view`); primeira release inexistente; PATH/upgrade/ownership; E2E Codex real; testes Windows de tempo (falha histórica intermitente em asserção `0s`, embora último CI tenha passado); testes de rollout/rollback e instalação por SO.
 
 **Evidência hoje:** `docs/benchmark.md` é retrieval offline, não melhora de tempo/rounds; sinais de grafo/Git ainda não demonstraram ganho consistente frente a BM25 + tradução. Nenhuma cifra de economia agentic pode ser publicada como resultado Sidecar.
 
@@ -45,10 +45,12 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 
 ### Rodada A — tornar o produto testável e instalável
 
-- **A1 — Reparo de distribuição:** mudar default branch no GitHub; decidir/commitar LICENSE; fix de PATH/upgrade/uninstall Win; build release e smoke de instalação em Linux/macOS/Windows; teste de preservação de configuração externa.
+- **A1 — Reparo de distribuição:** default branch `main` já verificada no GitHub (2026-11-06); LICENSE MIT criado (2026-11-06, ainda não commitado); fix de PATH/upgrade/uninstall Win; build release e smoke de instalação em Linux/macOS/Windows; teste de preservação de configuração externa.
 - **A2 — E2E de adapters:** validar hook real Claude e Codex (consentimento/trust), perf e fail-open, configs existentes; observar eventos de ferramenta disponíveis e limitações por versão/superfície sem alegar cobertura universal.
 - **A3 — Observabilidade baseline:** fortalecer `explain --json` com razões de escolha/supressão/latência, IDs e token estimates; **nenhuma alteração no score/ranking**; resolver o teste de tempo com asserção robusta cross-platform.
 - **A4 — Corpus e harness:** adaptador offline do Agent Retrieval Bench e depois ContextBench, SHA/manifest/license checks, no-gold, gabaritos de arquivo/símbolo, resultados reprodutíveis em CI offline. Não baixar grandes corpora sempre no CI.
+
+**Estado em 2026-11-06 (A3/A4 parcial, sem alterar ranking):** `sidecar-eval --compare` e `--report-md` implementados; `bench/dogfood_cases.json` com 6 consultas pinadas e `TestDogfoodQueries`; testes de risco de install→doctor→hook→reinstall→uninstall, caminhos com espaço/Unicode, concorrência e corrupção de SQLite. Detalhes e limites em [development.md](development.md).
 
 **Gate A:** CI verde, install/uninstall/upgrade reversível, hooks reais reproduzidos nos clientes disponíveis, benchmark v1 congelado. Pendências de cliente indisponível são rotuladas bloqueio externo, nunca “aprovado”.
 

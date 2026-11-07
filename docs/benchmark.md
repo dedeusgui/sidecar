@@ -110,6 +110,9 @@ e o restante vai para o indexador em segundo plano.
 
 ```sh
 go run ./cmd/sidecar-eval --cases bench/cases.json --out bench/results/run.json
+go run ./cmd/sidecar-eval --cases bench/cases.json --compare bench/results/final-state.json --report-md <fora-do-repo>/relatorio.md
 ```
 
 O harness constrói os repositórios de fixture em um diretório temporário, indexa, roda os métodos e imprime as tabelas.
+
+Com `--compare`, o avaliador imprime o delta de Hit@5, Recall@10, MRR, precisão, falso positivo, P50 e tokens por split e método, e lista nominalmente os casos que regrediram (Hit@5 perdido ou falso positivo novo em caso negativo) ou melhoraram. Ele sai com código 0 mesmo com regressões: a decisão fica com quem lê o relatório. Latência varia entre máquinas; compare-a só com o cabeçalho de hardware do baseline.

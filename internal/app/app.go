@@ -21,6 +21,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/repo"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
+	"github.com/dedeusgui/sidecar/internal/store"
 )
 
 // SyncBudget bounds how long a prompt waits for the index. Work left over is resumed by
@@ -86,6 +87,12 @@ func Hook(opts HookOptions) (exit int) {
 	ctx, cancel := context.WithTimeout(context.Background(), opts.Budget+time.Second)
 	defer cancel()
 	block, err := answer(ctx, in, opts, rec)
+	var damage *damagedIndexError
+	if errors.As(err, &damage) && store.Quarantine(damage.db) == nil {
+		// Damage that appeared after the index opened: move it aside and answer once from a rebuilt index.
+		rec["index_recovered"] = true
+		block, err = answer(ctx, in, opts, rec)
+	}
 	if err != nil {
 		rec["status"] = "error"
 		rec["error"] = err.Error()
@@ -132,7 +139,7 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	sync, err := ix.Sync(syncCtx, index.Options{MaxFiles: hookMaxFiles})
 	cancelSync()
 	if err != nil {
-		return "", err
+		return "", damaged(paths.IndexDB(root), err)
 	}
 	rec["sync_ms"] = ms(time.Since(t))
 	rec["sync_parsed"] = sync.Parsed
@@ -147,7 +154,7 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	t = time.Now()
 	res, err := retrieve.Search(ctx, ix.Store(), in.Prompt, retrieve.Options{})
 	if err != nil {
-		return "", err
+		return "", damaged(paths.IndexDB(root), err)
 	}
 	rec["retrieve_ms"] = ms(time.Since(t))
 	rec["evidence"] = len(res.Evidence)
@@ -170,6 +177,22 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 		rec["status"] = "no_evidence"
 	}
 	return block, nil
+}
+
+// damagedIndexError marks a failure caused by a damaged index file; Hook quarantines that file.
+type damagedIndexError struct {
+	db  string
+	err error
+}
+
+func (e *damagedIndexError) Error() string { return e.err.Error() }
+func (e *damagedIndexError) Unwrap() error { return e.err }
+
+func damaged(db string, err error) error {
+	if store.IsCorrupt(err) {
+		return &damagedIndexError{db: db, err: err}
+	}
+	return err
 }
 
 // unsafeRoot refuses to index folders that are not projects: the home directory, the

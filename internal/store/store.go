@@ -158,18 +158,35 @@ func OpenOrRecover(path string) (s *Store, recovered bool, err error) {
 	if err == nil {
 		return s, false, nil
 	}
+	if qerr := Quarantine(path); qerr != nil {
+		return nil, false, qerr
+	}
+	s, err = Open(path)
+	return s, true, err
+}
+
+// Quarantine moves the index and its WAL files aside to path+".corrupt", replacing an earlier
+// quarantine, so the next Open starts empty. Close the store before calling it.
+func Quarantine(path string) error {
 	for _, suffix := range []string{"", "-wal", "-shm"} {
 		src := path + suffix
 		if _, statErr := os.Stat(src); statErr == nil {
 			dst := path + ".corrupt" + suffix
 			_ = os.Remove(dst)
 			if renameErr := os.Rename(src, dst); renameErr != nil {
-				return nil, false, fmt.Errorf("moving unreadable index aside: %w", renameErr)
+				return fmt.Errorf("moving unreadable index aside: %w", renameErr)
 			}
 		}
 	}
-	s, err = Open(path)
-	return s, true, err
+	return nil
+}
+
+// IsCorrupt reports errors that mean the index file itself is damaged. Busy or unavailable
+// databases are not corrupt: quarantining one would discard a healthy index.
+func IsCorrupt(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "malformed") || strings.Contains(msg, "not a database") ||
+		strings.Contains(msg, "no such fts5 table")
 }
 
 // Close releases the database handle.

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,6 +84,8 @@ type caseOutcome struct {
 func main() {
 	casesPath := flag.String("cases", "bench/cases.json", "cases file")
 	outPath := flag.String("out", "", "write full results as JSON to this path")
+	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
+	reportMD := flag.String("report-md", "", "write a Markdown report to this path (includes the comparison when --compare is set)")
 	flag.Parse()
 
 	raw, err := os.ReadFile(*casesPath)
@@ -127,6 +130,17 @@ func main() {
 	}
 
 	printTables(os.Stdout, methods, outcomes)
+	var cmp *comparison
+	if *comparePath != "" {
+		base, err := loadBaseline(*comparePath)
+		must(err)
+		c := compareRuns(base, outcomes, methodNames(methods))
+		cmp = &c
+		printComparison(os.Stdout, c)
+	}
+	if *reportMD != "" {
+		writeReportMD(*reportMD, methods, outcomes, cmp)
+	}
 	if *outPath != "" {
 		report := map[string]any{"hardware": hardware(), "methods": methodNames(methods), "outcomes": outcomes}
 		data, _ := json.MarshalIndent(report, "", "  ")
@@ -251,90 +265,31 @@ func score(name string, c caseSpec, res callResult) caseOutcome {
 	return o
 }
 
-type agg struct {
-	pos, neg, hit5, empty, falsePos, precN int
-	recall, rr, precision                  float64
-	latencies, tokens                      []float64
-}
-
-func printTables(w *os.File, methods []method, outs []caseOutcome) {
-	for _, split := range []string{"tune", "eval", "holdout"} {
+func printTables(w io.Writer, methods []method, outs []caseOutcome) {
+	for _, split := range splits {
 		_, _ = fmt.Fprintf(w, "\n### Split: %s\n\n", split)
 		_, _ = fmt.Fprintln(w, "| Método | Hit@5 | Recall@10 | MRR | Precisão | Sem evidência (positivos) | Falso positivo (negativos) | P50 ms | P95 ms | Tokens médios |")
 		_, _ = fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|---|---|")
 		for _, m := range methods {
-			a := aggregate(m.name, split, outs)
+			s := summarize(m.name, split, outs)
 			_, _ = fmt.Fprintf(w, "| %s | %.1f%% | %.1f%% | %.3f | %.1f%% | %.1f%% | %.1f%% | %.2f | %.2f | %.0f |\n",
-				m.name,
-				pct(a.hit5, a.pos), 100*a.recall/float64(max(a.pos, 1)), a.rr/float64(max(a.pos, 1)),
-				100*a.precision/float64(max(a.precN, 1)),
-				pct(a.empty, a.pos), pct(a.falsePos, a.neg),
-				percentile(a.latencies, 50), percentile(a.latencies, 95), mean(a.tokens))
+				m.name, s.Hit5, s.Recall10, s.MRR, s.Precision, s.Empty, s.FalsePos, s.P50, s.P95, s.Tokens)
 		}
 	}
 }
 
-func aggregate(name, split string, outs []caseOutcome) *agg {
-	a := &agg{}
-	for _, o := range outs {
-		if o.Method != name || (split != "all" && o.Split != split) {
-			continue
-		}
-		a.latencies = append(a.latencies, o.LatencyMS)
-		if o.Negative {
-			a.neg++
-			if !o.Empty {
-				a.falsePos++
-			}
-			continue
-		}
-		a.pos++
-		a.tokens = append(a.tokens, float64(o.Tokens))
-		if o.Hit5 {
-			a.hit5++
-		}
-		if o.Empty {
-			a.empty++
-		}
-		a.recall += o.Recall10
-		a.rr += o.RR
-		if !o.Empty {
-			a.precision += o.Precision
-			a.precN++
-		}
+// writeReportMD saves the split tables and, when a baseline was given, the comparison.
+func writeReportMD(path string, methods []method, outs []caseOutcome, cmp *comparison) {
+	f, err := os.Create(path)
+	must(err)
+	h := hardware()
+	_, _ = fmt.Fprintf(f, "# Relatório sidecar-eval\n\nAmbiente: %s · %s · %s\n", hardwareField(h, "date"), hardwareField(h, "go"), hardwareField(h, "cpu_model"))
+	printTables(f, methods, outs)
+	if cmp != nil {
+		printComparison(f, *cmp)
 	}
-	return a
-}
-
-func pct(n, d int) float64 {
-	if d == 0 {
-		return 0
-	}
-	return 100 * float64(n) / float64(d)
-}
-
-func mean(xs []float64) float64 {
-	if len(xs) == 0 {
-		return 0
-	}
-	s := 0.0
-	for _, x := range xs {
-		s += x
-	}
-	return s / float64(len(xs))
-}
-
-func percentile(xs []float64, p int) float64 {
-	if len(xs) == 0 {
-		return 0
-	}
-	c := append([]float64{}, xs...)
-	sort.Float64s(c)
-	idx := (p*len(c) + 99) / 100
-	if idx > len(c) {
-		idx = len(c)
-	}
-	return c[max(idx-1, 0)]
+	must(f.Close())
+	fmt.Fprintln(os.Stderr, "wrote", path)
 }
 
 func methodNames(ms []method) []string {

@@ -159,4 +159,4 @@ Estrutura: `cmd/sidecar` (CLI), `cmd/sidecar-eval` (benchmark), `internal/` com 
 `store` (SQLite/FTS5), `lexical`, `retrieve`, `fusion`, `brief`, `ctxbuild`, `adapter`, `app`, `install`, `paths`.
 Releases: `.goreleaser.yaml` e `.github/workflows/`.
 
-Licença: a definir pelo mantenedor.
+Licença: MIT (veja [LICENSE](LICENSE)).

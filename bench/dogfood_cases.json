@@ -1,0 +1,41 @@
+{
+  "description": "Consultas pinadas sobre o próprio repositório Sidecar, usadas por TestDogfoodQueries (internal/app). Positivos exigem path+name no top-5 do explain; negativos não podem injetar contexto. Se um símbolo for renomeado, atualize este arquivo no mesmo PR. Não são gabarito de tuning: não ajustar o ranking para estes casos sem benchmark A/B em bench/cases.json.",
+  "cases": [
+    {
+      "id": "D01",
+      "prompt": "Onde é montado o contexto adicional do hook no Claude Code?",
+      "negative": false,
+      "relevant": [{"path": "internal/app/app.go", "name": "Hook"}]
+    },
+    {
+      "id": "D02",
+      "prompt": "Onde o índice lida com arquivo renomeado no Git?",
+      "negative": false,
+      "relevant": [{"path": "internal/gitx/gitx.go", "name": "ChangedBetween"}]
+    },
+    {
+      "id": "D03",
+      "prompt": "Como um hook com erro evita interromper o agente?",
+      "negative": false,
+      "relevant": [{"path": "internal/app/app.go", "name": "Hook"}]
+    },
+    {
+      "id": "D04",
+      "prompt": "Onde o instalador preserva outros UserPromptSubmit hooks?",
+      "negative": false,
+      "relevant": [{"path": "internal/install/install.go", "name": "editHooks"}]
+    },
+    {
+      "id": "D05",
+      "prompt": "bom dia, tudo bem por aí?",
+      "negative": true,
+      "relevant": []
+    },
+    {
+      "id": "D06",
+      "prompt": "Qual a diferença entre TCP e UDP em termos gerais?",
+      "negative": true,
+      "relevant": []
+    }
+  ]
+}
