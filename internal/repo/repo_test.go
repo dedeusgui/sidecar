@@ -43,6 +43,10 @@ func TestClassify(t *testing.T) {
 		{"web/app.spec.ts", "typescript", "test"},
 		{"Billing/Invoice.cs", "c_sharp", "code"},
 		{"db/schema.sql", "sql", "code"},
+		{"src/lib.rs", "rust", "code"},
+		{"app/Models/User.php", "php", "code"},
+		{"lib/billing.rb", "ruby", "code"},
+		{"src/main/Service.kt", "kotlin", "code"},
 		{"docs/guia.md", "markdown", "doc"},
 		{"image.png", "", "binary"},
 		{"README", "", "doc"},
@@ -111,8 +115,8 @@ func TestLanguageOfNamesLanguagesTheIndexerDoesNotParse(t *testing.T) {
 			t.Errorf("LanguageOf(%q) = (%q, %q), want (%q, %q)", c.path, lang, kind, c.lang, c.kind)
 		}
 	}
-	// The indexer's contract is unchanged: these files still have no grammar.
-	if lang, kind := Classify("src/lib.rs"); lang != "" || kind != "" {
+	// The indexer's contract is unchanged for discovery-only languages without a grammar.
+	if lang, kind := Classify("app/View.swift"); lang != "" || kind != "" {
 		t.Errorf("Classify must keep ignoring discovery-only languages: got (%q, %q)", lang, kind)
 	}
 }

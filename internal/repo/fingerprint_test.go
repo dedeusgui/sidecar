@@ -134,7 +134,7 @@ func TestDiscoverReadsManifestsWithoutRunningAnything(t *testing.T) {
 	for _, l := range fp.Languages {
 		support[l.Name] = l.Support
 	}
-	if support["go"] != "ast_treesitter" || support["rust"] != "lexical_fallback" || support["markdown"] != "text_rules" {
+	if support["go"] != "ast_treesitter" || support["rust"] != "ast_treesitter" || support["markdown"] != "text_rules" {
 		t.Errorf("language support = %v", support)
 	}
 	if fp.Kinds["doc"] == 0 || fp.Kinds["config"] == 0 || fp.Kinds["code"] == 0 || fp.Kinds["test"] == 0 {

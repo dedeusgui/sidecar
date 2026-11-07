@@ -99,6 +99,8 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 - **D4 — Dependency docs:** detectar versões do repo e adapter externo opcional (Context7, documentação oficial); consentimento e cache; rede **nunca** requerida no core.
 - **D5 — Antigravity CLI + status UX:** validar hooks reais para Antigravity CLI; status local baixo custo, UI/mod Claude opcional; reverter configs com segurança.
 
+**Status da Rodada D (2026-11-06):** D1 (descoberta) e D2 (cliente opt-in) implementados e testados; D3 (`sidecar lsp status|doctor|trust|setup`) implementado, com setup bloqueado para csharp, java e php; D4 tem `DependencyDocsProvider` local com proveniência, sem adaptador de rede; D5 tem `status --json`, `activity`, `statusline` e `install --statusline` com rollback. Divergências do brief, todas em [lsp-strategy.md](lsp-strategy.md): sem `fallback.go` (Rust, PHP, Ruby e Kotlin já têm gramática embutida), `pyright` CLI não conta como servidor, e o subcomando `lsp trust` foi acrescentado. O hook de prompt não usa LSP ainda.
+
 **Gate D:** instalação/desinstalação e confiança verificáveis; sem LSP/docs online ainda há produto funcional; adapter por OS/superfície com cobertura efetivamente testada.
 
 ### Rodada E — qualidade integrada, benchmarking e release V2
@@ -121,7 +123,7 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 | Contratos | código/docs/testes de acordo, conflito explícito, falso conflito, fonte desatualizada, alteração de commit | **Pendente** |
 | SessionObserver | repetição real/legítima, concorrência, TTL, privacy, compactação, unobserved, session IDs | **Parcial: testes unitários executados; sem concorrência, compactação nem E2E de hook de ferramenta** |
 | Memória | decisão com hash, stale/invalidation, purge e opt-in, não misturar worktrees | **Parcial: testes de store e app executados; sem injeção de decisões no contexto** |
-| LSP/docs | handshake, Java/Go, absent, slow, untrusted, windows, cancelamento, checksum/rollback | **Pendente** |
+| LSP/docs | handshake, Java/Go, absent, slow, untrusted, windows, cancelamento, checksum/rollback | **Parcial**: handshake, absent, slow, untrusted, erro e cancelamento de processo testados em Linux; `gopls` real só para Go; Java, Windows, macOS e checksum/rollback de instalação de LSP pendentes |
 | Desempenho | cold/warm, p50/p95/p99, overhead do processo, memória, tokens, indexação grande | **Parcial v1** |
 | Segurança | entrada não confiável, injeção de instruções, symlinks, segredos, paths e logs sem conteúdo sensível | **Parcial v1** |
 | Agentes reais | OFF/v1/v2, sucesso, TTFE utilizado, tool calls, rounds, total tokens, walltime, interferência | **Não executado** |

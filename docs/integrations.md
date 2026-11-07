@@ -33,13 +33,15 @@ O Sidecar lê um evento `UserPromptSubmit` do stdin, identifica o repositório e
 Problema: hoje `sidecar doctor` e `sidecar explain` dão diagnóstico, mas o usuário não vê facilmente se o prompt corrente **recebeu** evidência. Proposta incremental:
 
 **Fase A — diagnóstico local primeiro (sem UI):**
-- Projetar `sidecar status --json` ou `sidecar activity --json` como leitura local barata; **não existem no CLI atual**.
+- **Implementado:** `sidecar status --json` e `sidecar activity [--json] [--limit N]`, leitura do log local do hook. Nenhum prompt, erro ou stack aparece na saída; o log guarda só um digest da sessão. Estados: `injected`, `no_evidence`, `skipped`, `partial`, `failed`, com p50/p95 e contagem de evidências.
 - Status com `active / skipped / partial / failed`, timestamp do último hook, tipo de agente, contagem de evidências, bytes/tokens estimados e latência. Nunca mostrar texto do prompt, conteúdo de arquivos ou caminhos sensíveis por padrão.
 - Atualização atômica, retenção curta, operação segura e sem backpressure no hook. Validar precisão quando não houve injeção.
 
 **Fase B — Claude Code status line opt-in:**
-- Exibir indicação discreta, por exemplo `Sidecar: injected · 4 refs · 19ms`; se não houver evidência exibir `no match`, não `active/injected`.
-- Antes de escrever `statusLine` existente, apresentar preview e pedir consentimento; preferir integração não invasiva/composição ou oferecer snippet manual. Não substituir statusline do usuário silenciosamente.
+- **Implementado:** `sidecar statusline` imprime `Sidecar: injected · N refs · Xms` ou `Sidecar: no match`. Quando o Claude Code envia `session_id` no stdin, mostra a última execução dessa sessão. O comando nunca falha e não bloqueia: a leitura de stdin tem limite de 300 ms.
+- **Opt-in:** `sidecar install --statusline` grava `statusLine` `{"type":"command","command":"<binário> statusline"}` em `settings.json`, com backup e registro no manifesto. Uma linha de status de outra ferramenta **nunca** é substituída: o instalador a mantém e imprime o trecho manual. `sidecar uninstall` remove a linha só se ela ainda for exatamente a do Sidecar. Schema conferido na [documentação oficial da status line](https://code.claude.com/docs/en/statusline) em 2026-11-06.
+- Limite: a status line de Claude Code atualiza por eventos. Não testamos ainda uma sessão real do Claude Code exibindo a linha; o teste cobre a saída do comando e a escrita em `settings.json`.
+- Antes de escrever `statusLine`, o instalador mostra o plano e pede consentimento (`--yes` ou resposta interativa). Não substitui statusline existente, em nenhum caso.
 - Uninstall reverte somente mudanças do Sidecar. Fallback somente CLI quando statusline indisponível.
 - Referência oficial: [Claude Code custom status line](https://code.claude.com/docs/en/statusline). O suporte a “mods”/UI in-process varia por versão e documentação de terceiros; **pesquisar e provar em teste E2E** antes de apostar em API específica. A status line documentada é o caminho mais estável no momento.
 

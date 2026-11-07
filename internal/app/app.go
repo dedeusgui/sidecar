@@ -79,6 +79,7 @@ func Hook(opts HookOptions) (exit int) {
 		return 0
 	}
 	rec["prompt_chars"] = utf8.RuneCountInString(in.Prompt)
+	rec["session"] = SessionKey(in.SessionID) // digest only: the raw session ID is never logged
 	if !InjectionAllowed(opts.Agent, in.Invocation) {
 		rec["status"] = "skipped_invocation"
 		_, _ = opts.Stdout.Write(adapter.Format(opts.Agent, ""))

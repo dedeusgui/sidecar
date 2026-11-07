@@ -54,6 +54,12 @@ func run(args []string, in io.Reader, out, errOut io.Writer) int {
 		return cmdObserve(rest, in)
 	case "memory":
 		return cmdMemory(rest, out, errOut)
+	case "lsp":
+		return cmdLSP(rest, in, out, errOut)
+	case "activity":
+		return cmdActivity(rest, out, errOut)
+	case "statusline":
+		return cmdStatusline(in, out)
 	case "version", "--version":
 		_, _ = fmt.Fprintln(out, "sidecar", version)
 		return 0
@@ -70,11 +76,15 @@ func usage(w io.Writer) {
 	_, _ = fmt.Fprint(w, `sidecar — contexto de repositório para Claude Code, Codex e Antigravity CLI
 
 Uso:
-  sidecar install [--yes] [--agent claude|codex|antigravity]...   configura os hooks (com autorização)
+  sidecar install [--yes] [--agent claude|codex|antigravity]... [--statusline]
+                                                      configura os hooks (com autorização)
   sidecar uninstall [--purge]                         remove apenas o que o Sidecar instalou
-  sidecar status [--root DIR]                         resumo do índice do repositório
+  sidecar status [--root DIR] [--json]                resumo do índice do repositório
+  sidecar activity [--json] [--limit N]               últimas execuções do hook (sem prompt)
+  sidecar statusline                                  linha de status (lê JSON do Claude Code)
   sidecar doctor                                      diagnóstico de instalação e ambiente
   sidecar explain [--root DIR] [--json] [--engine v1|v2]   mostra o rastro de um prompt (lê stdin)
+  sidecar lsp status|doctor|trust|setup               servidores de linguagem (opt-in; veja sidecar lsp)
   sidecar memory list|add|purge [--root DIR] [--json] decisões técnicas verificáveis (opt-in)
                                                       add: --target ARQUIVO|SIMBOLO --summary TEXTO [--ttl 720h]
                                                       purge: remove as invalidadas (--all: todas)
@@ -131,6 +141,7 @@ func cmdInstall(args []string, in io.Reader, out, errOut io.Writer) int {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	yes := fs.Bool("yes", false, "confirm the changes without asking")
+	statusline := fs.Bool("statusline", false, "also show Sidecar in the Claude Code status line (opt-in)")
 	var agents agentList
 	fs.Var(&agents, "agent", "limit to an agent (repeatable)")
 	if err := fs.Parse(args); err != nil {
@@ -141,7 +152,7 @@ func cmdInstall(args []string, in io.Reader, out, errOut io.Writer) int {
 		_, _ = fmt.Fprintln(errOut, err)
 		return 1
 	}
-	opts := install.Options{Env: env, Agents: agents, Yes: *yes, Out: out, In: in}
+	opts := install.Options{Env: env, Agents: agents, Yes: *yes, Out: out, In: in, StatusLine: *statusline}
 	if !isTerminal(in) && !*yes {
 		opts.In = nil
 	}
@@ -197,6 +208,7 @@ func cmdStatus(args []string, out, errOut io.Writer) int {
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	root := fs.String("root", ".", "folder inside the repository")
+	asJSON := fs.Bool("json", false, "print the full summary as JSON")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -206,6 +218,9 @@ func cmdStatus(args []string, out, errOut io.Writer) int {
 	if err != nil {
 		_, _ = fmt.Fprintln(errOut, "erro:", err)
 		return 1
+	}
+	if *asJSON {
+		return writeJSON(out, errOut, info)
 	}
 	for _, k := range []string{"root", "database", "files", "symbols", "commits", "dirty_files", "indexed_head", "last_sync", "index"} {
 		if v, ok := info[k]; ok {

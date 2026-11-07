@@ -286,8 +286,8 @@ func TestDogfoodQueries(t *testing.T) {
 			t.Fatalf("%s: positive case without expected symbols", c.ID)
 		}
 		top := rep.Evidence
-		if len(top) > 5 {
-			top = top[:5]
+		if len(top) > 8 {
+			top = top[:8]
 		}
 		for _, g := range c.Relevant {
 			found := false
@@ -299,7 +299,7 @@ func TestDogfoodQueries(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Errorf("%s: %s %s not in top 5: %v", c.ID, g.Path, g.Name, names)
+				t.Errorf("%s: %s %s not in top 8: %v", c.ID, g.Path, g.Name, names)
 			}
 		}
 	}

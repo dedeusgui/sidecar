@@ -65,7 +65,7 @@ type Evidence struct {
 	Relations     []string // structural links, e.g. "calls:Enqueue(same_file)"
 	Dirty         bool     // the file has uncommitted changes in the working tree
 	ID            string   // deterministic identity: path, kind, name and start line
-	Source        string   // exact | lexical | contract | structural | git
+	Source        string   // exact | lexical | contract | structural | git | lsp
 	Confidence    float64  // heuristic in [0, 1]; not fitted to labelled data
 	TokenEstimate int      // estimate of the item's rendered metadata line
 	// Note replaces the rendered line; set only for contract conflicts, which have no symbol of their own.

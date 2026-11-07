@@ -50,14 +50,21 @@ estruturais, o orçamento de tokens, os tempos por fase e o contexto final. Use 
 
 | Comando | Para quê |
 |---|---|
-| `sidecar install [--yes] [--agent claude\|codex\|antigravity]` | configura os hooks, com autorização |
+| `sidecar install [--yes] [--agent claude\|codex\|antigravity] [--statusline]` | configura os hooks, com autorização; `--statusline` (opt-in) adiciona a linha de status do Claude Code |
 | `sidecar memory list\|add\|purge [--root DIR] [--json]` | decisões técnicas verificáveis, opt-in: `add --target ARQUIVO\|SIMBOLO --summary TEXTO`; `purge` remove as invalidadas (`--all` remove todas) |
-| `sidecar uninstall [--purge]` | remove apenas o que o Sidecar instalou |
-| `sidecar status [--root DIR]` | resumo do índice do repositório |
+| `sidecar uninstall [--purge]` | remove apenas o que o Sidecar instalou (inclusive a linha de status, se ainda for a do Sidecar) |
+| `sidecar status [--root DIR] [--json]` | resumo do índice do repositório |
 | `sidecar doctor` | instalação, binário, SQLite/FTS5, integridade do índice, falhas recentes |
 | `sidecar explain [--root DIR] [--json]` | rastro completo de um prompt (lê stdin) |
+| `sidecar activity [--json] [--limit N]` | últimas execuções do hook: `injected`, `no_evidence`, `skipped`, `partial`, `failed`, com latência p50/p95; nunca mostra o prompt |
+| `sidecar statusline` | uma linha para a status line, p. ex. `Sidecar: injected · 4 refs · 18ms` ou `Sidecar: no match` |
+| `sidecar lsp status\|doctor\|trust\|setup` | servidores de linguagem (opt-in); veja abaixo |
 
 `hook` e `index` são internos: o agente e o indexador em segundo plano os chamam.
+
+### Servidores de linguagem (opt-in)
+
+O Sidecar descobre servidores LSP instalados (`gopls`, `typescript-language-server`, `pyright-langserver`, `rust-analyzer`, `csharp-ls`, `jdtls`, `intelephense`) sem executar código do projeto. O cliente próprio só inicia um servidor quando **os dois** critérios valem: `SIDECAR_LSP=1` no ambiente e a worktree autorizada com `sidecar lsp trust`. `sidecar lsp setup --language go --dry-run` mostra o plano de instalação (comando fixado, origem, licença, impacto no PATH e rollback); sem `--dry-run`, ele exige confirmação e nunca roda durante um prompt. `sidecar lsp doctor --probe` faz o handshake real. O hook de prompt ainda não usa LSP.
 
 ## Como funciona
 

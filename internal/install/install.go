@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/dedeusgui/sidecar/internal/paths"
@@ -50,6 +51,9 @@ type Options struct {
 	Yes    bool      // consent given in advance (--yes)
 	In     io.Reader // where the consent answer is read from; nil means non-interactive
 	Out    io.Writer
+	// StatusLine also configures the Claude Code status line (opt-in, --statusline). An existing
+	// status line from another tool is never replaced.
+	StatusLine bool
 }
 
 // UninstallOptions controls Uninstall.
@@ -65,10 +69,17 @@ type entry struct {
 	FileCreated bool   `json:"file_created"`
 }
 
+// statusLineEntry records a status line this install added, so uninstall removes only it.
+type statusLineEntry struct {
+	File    string `json:"file"`
+	Command string `json:"command"`
+}
+
 type manifest struct {
-	Binary        string  `json:"binary,omitempty"`
-	BinaryCreated bool    `json:"binary_created,omitempty"`
-	Entries       []entry `json:"entries"`
+	Binary        string           `json:"binary,omitempty"`
+	BinaryCreated bool             `json:"binary_created,omitempty"`
+	Entries       []entry          `json:"entries"`
+	StatusLine    *statusLineEntry `json:"statusline,omitempty"`
 }
 
 // DefaultEnv resolves the real locations for this user and platform.
@@ -132,7 +143,7 @@ func Install(opts Options) ([]string, error) {
 	if len(agents) == 0 {
 		return nil, errors.New("no supported agent found (Claude Code, Codex or Antigravity CLI)")
 	}
-	plan := describe(opts.Env, agents)
+	plan := describe(opts.Env, agents, opts.StatusLine)
 	for _, line := range plan {
 		_, _ = fmt.Fprintln(opts.Out, "  "+line)
 	}
@@ -183,6 +194,13 @@ func Install(opts Options) ([]string, error) {
 		m.upsert(entry{Agent: agent, File: file, Command: command, FileCreated: created || m.createdFor(file)})
 		done = append(done, fmt.Sprintf("%s: hook instalado em %s", agent, file))
 	}
+	if opts.StatusLine && slices.Contains(agents, "claude") {
+		msg, err := installStatusLine(opts.Env, dst, &m)
+		if err != nil {
+			return done, err
+		}
+		done = append(done, msg)
+	}
 	if err := saveManifest(opts.Env.Manifest, m); err != nil {
 		return done, err
 	}
@@ -196,6 +214,13 @@ func Uninstall(opts UninstallOptions) ([]string, error) {
 		return nil, errors.New("nothing to uninstall: no installation record found")
 	}
 	var done []string
+	// The status line goes first: the hook loop may delete a settings file that this step still edits.
+	if m.StatusLine != nil {
+		if err := editStatusLine(m.StatusLine.File, m.StatusLine.Command, true); err != nil {
+			return done, fmt.Errorf("%s: %w", m.StatusLine.File, err)
+		}
+		done = append(done, "claude: statusLine do Sidecar removida de "+m.StatusLine.File)
+	}
 	for _, e := range m.Entries {
 		if err := editAgentHooks(e.Agent, e.File, e.Command, false); err != nil {
 			return done, fmt.Errorf("%s: %w", e.File, err)
@@ -222,25 +247,40 @@ func Uninstall(opts UninstallOptions) ([]string, error) {
 
 // HookCommand is the command line an agent runs for a prompt.
 func HookCommand(bin, agent string) string {
-	q := bin
+	return quoteBin(bin) + " hook --agent " + agent
+}
+
+// statusLineCommand is the command Claude Code runs to render the status line.
+func statusLineCommand(bin string) string {
+	return quoteBin(bin) + " statusline"
+}
+
+func quoteBin(bin string) string {
 	if runtime.GOOS == "windows" || strings.ContainsAny(bin, " \t\"'&()") {
-		q = `"` + strings.ReplaceAll(bin, `"`, `\"`) + `"`
+		return `"` + strings.ReplaceAll(bin, `"`, `\"`) + `"`
 	}
-	return q + " hook --agent " + agent
+	return bin
 }
 
 // IsOurs reports whether a hook command was installed by Sidecar for an agent.
 func IsOurs(command, agent string) bool {
 	suffix := " hook --agent " + agent
-	if !strings.HasSuffix(command, suffix) {
-		return false
-	}
-	bin := strings.Trim(strings.TrimSuffix(command, suffix), `"`)
+	return strings.HasSuffix(command, suffix) && isSidecarBinary(strings.TrimSuffix(command, suffix))
+}
+
+// IsOursStatusLine reports whether a status line command was installed by Sidecar.
+func IsOursStatusLine(command string) bool {
+	suffix := " statusline"
+	return strings.HasSuffix(command, suffix) && isSidecarBinary(strings.TrimSuffix(command, suffix))
+}
+
+func isSidecarBinary(quoted string) bool {
+	bin := strings.Trim(quoted, `"`)
 	name := bin[strings.LastIndexAny(bin, `/\`)+1:]
 	return name == "sidecar" || name == "sidecar.exe"
 }
 
-func describe(env Env, agents []string) []string {
+func describe(env Env, agents []string, statusLine bool) []string {
 	lines := []string{fmt.Sprintf("Instalar o binário em %s", filepath.Join(env.InstallDir, BinaryName))}
 	for _, a := range agents {
 		event := "UserPromptSubmit"
@@ -253,7 +293,69 @@ func describe(env Env, agents []string) []string {
 		}
 		lines = append(lines, line)
 	}
+	if statusLine && slices.Contains(agents, "claude") {
+		file := settingsFile(env, "claude")
+		obj, _ := readObject(file)
+		if _, has := obj["statusLine"]; has && !ownStatusLine(obj["statusLine"]) {
+			lines = append(lines, "claude: statusLine já existe e será preservada (não substituída); o snippet manual será exibido")
+		} else {
+			lines = append(lines, "claude: configurar statusLine do Sidecar (opt-in) em "+file)
+		}
+	}
 	return lines
+}
+
+// installStatusLine adds the Sidecar status line when none exists. A status line from another
+// tool is left in place and its manual snippet is returned instead.
+func installStatusLine(env Env, bin string, m *manifest) (string, error) {
+	file := settingsFile(env, "claude")
+	obj, err := readObject(file)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", file, err)
+	}
+	command := statusLineCommand(bin)
+	if _, has := obj["statusLine"]; has && !ownStatusLine(obj["statusLine"]) {
+		return "claude: statusLine existente preservada (não substituída); para usar a do Sidecar, troque manualmente por: " + command, nil
+	}
+	if !ownStatusLine(obj["statusLine"]) {
+		if fileExists(file) {
+			if err := backupOnce(file); err != nil {
+				return "", err
+			}
+		}
+		obj["statusLine"] = map[string]any{"type": "command", "command": command}
+		if err := writeObject(file, obj); err != nil {
+			return "", fmt.Errorf("%s: %w", file, err)
+		}
+	}
+	m.StatusLine = &statusLineEntry{File: file, Command: command}
+	return "claude: statusLine do Sidecar configurada em " + file, nil
+}
+
+// editStatusLine removes the status line only when it is still exactly the one Sidecar added.
+func editStatusLine(file, command string, remove bool) error {
+	if !remove || !fileExists(file) {
+		return nil
+	}
+	obj, err := readObject(file)
+	if err != nil {
+		return err
+	}
+	cur, _ := obj["statusLine"].(map[string]any)
+	if cur == nil || cur["command"] != command {
+		return nil // the user changed it since: leave it alone
+	}
+	delete(obj, "statusLine")
+	return writeObject(file, obj)
+}
+
+func ownStatusLine(v any) bool {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return false
+	}
+	cmd, _ := m["command"].(string)
+	return IsOursStatusLine(cmd)
 }
 
 func settingsFile(env Env, agent string) string {
