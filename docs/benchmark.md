@@ -227,8 +227,8 @@ Conclusão: o descarte de vizinhos com "correspondência parcial" protege o rank
 
 ### 4. Avaliação externa e agentic
 
-- **`--external-cases <manifesto.json>`:** lê um manifesto com repositórios já clonados e **fixados por commit** (SHA de 40 caracteres, checkout limpo, licença e origem obrigatórias). Gold pode ser de arquivo (sem `name`), e `no_gold: true` marca casos de abstenção. Verificado com um clone local do próprio repositório (153 arquivos, `X01`–`X03`, só teste de integração, não é benchmark). **Ainda não executado com corpus público:** o formato oficial do Agent Retrieval Bench não pôde ser verificado sem baixar o corpus, e o ContextBench não declara licença. Por isso o adaptador lê o formato normalizado; a conversão do ARB fica pendente.
-- **`--agentic-report <dir>`:** avalia `runs.jsonl` contra `bench/agentic/manifest.jsonl`. Tarefas `draft` nunca recebem veredito. O manifesto tem 4 tarefas em `draft`, sem commit e sem oráculo executado. **Nenhuma execução de agente foi feita nesta rodada**: rodar Haiku, Luna, Flash ou CodeGraph exige autorização explícita de custo e tempo. Verificado apenas com registros sintéticos.
+- **`--external-cases <manifesto.json>`:** lê um manifesto com repositórios já clonados e **fixados por commit** (SHA de 40 caracteres, checkout limpo, licença e origem obrigatórias). Gold pode ser de arquivo (sem `name`), e `no_gold: true` marca casos de abstenção. Verificado com um clone local do próprio repositório (153 arquivos, `X01`–`X03`, só teste de integração, não é benchmark). **Executado com dois repositórios públicos fixados:** `spring-petclinic` (`500158f`, Apache-2.0) e `go-chi/chi` (`9f8adb1`, MIT), 20 casos (18 positivos e 2 negativos) em [`bench/results/external-real-repos.md`](../bench/results/external-real-repos.md). O formato oficial do Agent Retrieval Bench continua não verificado, e o ContextBench não declara licença. O corpus é pequeno e não substitui esses benchmarks.
+- **`--agentic-report <dir>`:** avalia `runs.jsonl` contra `bench/agentic/manifest.jsonl`. Tarefas `draft` nunca recebem veredito. O manifesto tem 6 tarefas `verified` (commit fixado e oráculo somente leitura que confirma o gabarito) e 4 `draft`. **Não houve execução de agente real**: rodar Haiku, Luna, Flash ou CodeGraph exige autorização explícita de custo e tempo. As 90 execuções de `bench/agentic/runs.jsonl` vêm de `bench/agentic/instrumented_sim.py`, uma simulação com política de busca e leitura fixa e igual nos três braços. Não mede o comportamento de um modelo nem latência de modelo. Resultado e limites em [`bench/results/real-repos-ab-score.md`](../bench/results/real-repos-ab-score.md).
 
 ### 5. Reprodução
 
@@ -236,6 +236,7 @@ Conclusão: o descarte de vizinhos com "correspondência parcial" protege o rank
 go run ./cmd/sidecar-eval --cases bench/cases.json --compare bench/results/final-state.json --out /tmp/sidecar-eval-v2-final.json --report-md bench/results/v2-final.md
 go run ./cmd/sidecar-eval --cases bench/v2_scenarios.json --out /tmp/sidecar-eval-v2-scenarios.json --report-md bench/results/v2-scenarios.md
 go run ./cmd/sidecar-eval --external-cases <manifesto-pinado.json> --out <fora-do-repo>/externo.json
+python3 -I bench/agentic/instrumented_sim.py --sidecar <binario> --home <dir-novo> --dict internal/lexical/dictionary.go --manifest bench/agentic/manifest.jsonl --repo spring-petclinic=<clone> --repo chi=<clone> --reps 5 --out-dir bench/agentic --scores-out bench/results/real-repos-scores.json
 go run ./cmd/sidecar-eval --agentic-report <diretorio-com-runs.jsonl> --agentic-manifest bench/agentic/manifest.jsonl
 ```
 

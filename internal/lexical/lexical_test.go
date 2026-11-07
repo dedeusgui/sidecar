@@ -148,3 +148,24 @@ func TestBenchmarkDomainTermsTranslate(t *testing.T) {
 		}
 	}
 }
+
+// PT-BR words from the real-repository prompts must reach the English names the repos use.
+func TestRealCorpusTermsTranslate(t *testing.T) {
+	cases := map[string]string{
+		"veterinário":  "vet",
+		"dono":         "owner",
+		"proprietário": "owner",
+		"visita":       "visit",
+		"animal":       "pet",
+		"mascote":      "pet",
+		"roteador":     "router",
+		"autenticação": "auth",
+		"cabeçalho":    "header",
+		"compressão":   "compress",
+	}
+	for word, want := range cases {
+		if got := Translations(word); !contains(got, want) {
+			t.Errorf("Translations(%q) = %v, want it to include %q", word, got, want)
+		}
+	}
+}

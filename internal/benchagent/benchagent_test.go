@@ -176,7 +176,7 @@ func TestLoadRunsRejectsRecordsOutsideTheContract(t *testing.T) {
 	}
 }
 
-func TestShippedManifestLoadsAndIsDraftUntilVerified(t *testing.T) {
+func TestShippedManifestLoadsAndVerifiedTasksArePinned(t *testing.T) {
 	tasks, err := LoadManifest("../../bench/agentic/manifest.jsonl")
 	if err != nil {
 		t.Fatalf("shipped manifest invalid: %v", err)
@@ -184,9 +184,16 @@ func TestShippedManifestLoadsAndIsDraftUntilVerified(t *testing.T) {
 	if len(tasks) < 4 {
 		t.Fatalf("manifest has %d tasks, want at least 4", len(tasks))
 	}
+	// A task is verified only with a pinned commit and an independent oracle; drafts carry neither.
 	for _, task := range tasks {
-		if task.Status != "draft" {
-			t.Errorf("%s is %q: a task becomes verified only after its oracle is run", task.ID, task.Status)
+		switch task.Status {
+		case "draft":
+		case "verified":
+			if task.Commit == "" || task.Oracle.Command == "" || !task.Oracle.Independent {
+				t.Errorf("%s is verified without a pinned commit and an independent oracle", task.ID)
+			}
+		default:
+			t.Errorf("%s has status %q", task.ID, task.Status)
 		}
 	}
 }
@@ -196,8 +203,14 @@ func TestMarkdownStatesThatNothingIsVerified(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var drafts []Task
+	for _, task := range tasks {
+		if task.Status == "draft" {
+			drafts = append(drafts, task)
+		}
+	}
 	var buf bytes.Buffer
-	Evaluate(tasks, nil).WriteMarkdown(&buf, "dir")
+	Evaluate(drafts, nil).WriteMarkdown(&buf, "dir")
 	if !strings.Contains(buf.String(), "Sem tarefas verificadas") {
 		t.Fatal("report with only drafts must say that no verdict is issued")
 	}

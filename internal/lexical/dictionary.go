@@ -95,6 +95,17 @@ var ptToEn = map[string][]string{
 	"frete":        {"shipping", "freight"},
 	"tentado":      {"retry", "retried", "attempt"},
 	"recusado":     {"declined", "refused"},
+	// Words from PT-BR prompts about Spring PetClinic and go-chi (bench/results/external-real-repos.md).
+	"veterinario":  {"vet"},
+	"dono":         {"owner"},
+	"proprietario": {"owner"},
+	"visita":       {"visit"},
+	"animal":       {"pet"},
+	"mascote":      {"pet"},
+	"roteador":     {"router"},
+	"autenticacao": {"auth"},
+	"cabecalho":    {"header"},
+	"compressao":   {"compress"},
 }
 
 // phraseToEn maps multi-word PT expressions (stemmed, folded words) to EN terms.

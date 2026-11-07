@@ -139,7 +139,7 @@ A suíte própria deve cobrir 10–15 cenários reproducíveis de uso pessoal (n
 
 ## Estrutura do harness agentic (parcialmente implementada, sem execuções)
 
-**Estado (2026-11-07):** `bench/agentic/manifest.jsonl` (4 tarefas em `draft`), `internal/benchagent` e `sidecar-eval --agentic-report`. O avaliador lê `runs.jsonl`, rejeita campos desconhecidos, pareia repetições e emite veredito só para tarefa verificada com ao menos 3 pares. **Nenhum agente foi executado.** O runner, o isolamento por worktree e a coleta de traces por cliente continuam pendentes. Ver [benchmark.md](benchmark.md), seção 4.
+**Estado (2026-11-06):** `bench/agentic/manifest.jsonl` (6 tarefas `verified` em spring-petclinic e go-chi/chi, 4 `draft`), `internal/benchagent` e `sidecar-eval --agentic-report`. O avaliador lê `runs.jsonl`, rejeita campos desconhecidos, pareia repetições e emite veredito só para tarefa verificada com ao menos 3 pares. **Nenhum agente real foi executado:** os 90 registros vêm de uma simulação instrumentada (`bench/agentic/instrumented_sim.py`), com política de busca fixa, descrita em [real-repos-ab-score.md](../bench/results/real-repos-ab-score.md). O runner real, o isolamento por worktree e a coleta de traces por cliente continuam pendentes. Ver [benchmark.md](benchmark.md), seção 4.
 
 Desenho original, mantido como referência:
 

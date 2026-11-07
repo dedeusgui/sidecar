@@ -106,7 +106,15 @@ func main() {
 	flag.Parse()
 
 	if *agenticDir != "" {
-		must(printAgenticReport(os.Stdout, *agenticDir, *agenticManifest))
+		if *reportMD == "" {
+			must(printAgenticReport(os.Stdout, *agenticDir, *agenticManifest))
+			return
+		}
+		f, err := os.Create(*reportMD)
+		must(err)
+		must(printAgenticReport(f, *agenticDir, *agenticManifest))
+		must(f.Close())
+		fmt.Fprintf(os.Stderr, "wrote %s\n", *reportMD)
 		return
 	}
 
