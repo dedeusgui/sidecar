@@ -1,4 +1,4 @@
-// Package install configures Claude Code and Codex to call Sidecar on every prompt, with
+// Package install configures Claude Code, Codex and Antigravity CLI to call Sidecar on every prompt, with
 // the user's consent, and reverses exactly what it changed. Existing settings are merged,
 // never replaced; a backup is taken before the first change; and a manifest records every
 // file and entry so uninstall removes only Sidecar's own entries.
@@ -37,13 +37,16 @@ type Env struct {
 	ClaudeSettings string // Claude Code user settings (~/.claude/settings.json)
 	CodexHooks     string // Codex user hooks (~/.codex/hooks.json)
 	CodexConfig    string // Codex config (read-only here, for diagnostics)
-	Manifest       string
+	// AntigravityHooks is Antigravity CLI's global hooks file (~/.gemini/config/hooks.json).
+	// Empty disables Antigravity entirely, so callers that do not set it never touch it.
+	AntigravityHooks string
+	Manifest         string
 }
 
 // Options controls Install.
 type Options struct {
 	Env    Env
-	Agents []string  // "claude", "codex"; empty means every detected agent
+	Agents []string  // "claude", "codex", "antigravity"; empty means every detected agent
 	Yes    bool      // consent given in advance (--yes)
 	In     io.Reader // where the consent answer is read from; nil means non-interactive
 	Out    io.Writer
@@ -94,12 +97,13 @@ func DefaultEnv() (Env, error) {
 		installDir = filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "sidecar")
 	}
 	return Env{
-		Source:         src,
-		InstallDir:     installDir,
-		ClaudeSettings: filepath.Join(claudeDir, "settings.json"),
-		CodexHooks:     filepath.Join(codexHome, "hooks.json"),
-		CodexConfig:    filepath.Join(codexHome, "config.toml"),
-		Manifest:       paths.Manifest(),
+		Source:           src,
+		InstallDir:       installDir,
+		ClaudeSettings:   filepath.Join(claudeDir, "settings.json"),
+		CodexHooks:       filepath.Join(codexHome, "hooks.json"),
+		CodexConfig:      filepath.Join(codexHome, "config.toml"),
+		AntigravityHooks: filepath.Join(home, ".gemini", "config", "hooks.json"),
+		Manifest:         paths.Manifest(),
 	}, nil
 }
 
@@ -113,6 +117,9 @@ func Detect(env Env) []string {
 	if dirExists(filepath.Dir(env.CodexHooks)) || onPath("codex") {
 		found = append(found, "codex")
 	}
+	if env.AntigravityHooks != "" && (dirExists(filepath.Dir(env.AntigravityHooks)) || onPath("agy")) {
+		found = append(found, "antigravity")
+	}
 	return found
 }
 
@@ -123,7 +130,7 @@ func Install(opts Options) ([]string, error) {
 		agents = Detect(opts.Env)
 	}
 	if len(agents) == 0 {
-		return nil, errors.New("no supported agent found (Claude Code or Codex)")
+		return nil, errors.New("no supported agent found (Claude Code, Codex or Antigravity CLI)")
 	}
 	plan := describe(opts.Env, agents)
 	for _, line := range plan {
@@ -170,7 +177,7 @@ func Install(opts Options) ([]string, error) {
 				return done, err
 			}
 		}
-		if err := editHooks(file, command, true); err != nil {
+		if err := editAgentHooks(agent, file, command, true); err != nil {
 			return done, fmt.Errorf("%s: %w", file, err)
 		}
 		m.upsert(entry{Agent: agent, File: file, Command: command, FileCreated: created || m.createdFor(file)})
@@ -190,7 +197,7 @@ func Uninstall(opts UninstallOptions) ([]string, error) {
 	}
 	var done []string
 	for _, e := range m.Entries {
-		if err := editHooks(e.File, e.Command, false); err != nil {
+		if err := editAgentHooks(e.Agent, e.File, e.Command, false); err != nil {
 			return done, fmt.Errorf("%s: %w", e.File, err)
 		}
 		if e.FileCreated && isEmptySettings(e.File) {
@@ -236,7 +243,11 @@ func IsOurs(command, agent string) bool {
 func describe(env Env, agents []string) []string {
 	lines := []string{fmt.Sprintf("Instalar o binário em %s", filepath.Join(env.InstallDir, BinaryName))}
 	for _, a := range agents {
-		line := fmt.Sprintf("%s: adicionar hook UserPromptSubmit em %s", a, settingsFile(env, a))
+		event := "UserPromptSubmit"
+		if a == "antigravity" {
+			event = "PreInvocation"
+		}
+		line := fmt.Sprintf("%s: adicionar hook %s em %s", a, event, settingsFile(env, a))
 		if a == "codex" {
 			line += " (o Codex pedirá para revisar e aprovar o hook na primeira execução)"
 		}
@@ -246,10 +257,66 @@ func describe(env Env, agents []string) []string {
 }
 
 func settingsFile(env Env, agent string) string {
-	if agent == "codex" {
+	switch agent {
+	case "codex":
 		return env.CodexHooks
+	case "antigravity":
+		return env.AntigravityHooks
 	}
 	return env.ClaudeSettings
+}
+
+// editAgentHooks dispatches to the editor of the agent's hook file.
+func editAgentHooks(agent, file, command string, add bool) error {
+	if agent == "antigravity" {
+		return editAntigravityHooks(file, command, add)
+	}
+	return editHooks(file, command, add)
+}
+
+// antigravityGroup is the hook group Sidecar owns in Antigravity CLI's hooks.json. That
+// file maps group names to events, so Sidecar's handler lives under its own group.
+const antigravityGroup = "sidecar"
+
+// editAntigravityHooks adds or removes Sidecar's PreInvocation handler, which runs once per
+// model call and receives the prompt. Other groups and handlers are left as they are.
+func editAntigravityHooks(file, command string, add bool) error {
+	obj, err := readObject(file)
+	if err != nil {
+		return err
+	}
+	group, _ := obj[antigravityGroup].(map[string]any)
+	if obj[antigravityGroup] != nil && group == nil {
+		return fmt.Errorf("group %q is not an object; left untouched", antigravityGroup)
+	}
+	if group == nil {
+		group = map[string]any{}
+	}
+	var kept []any
+	for _, h := range listOf(group["PreInvocation"]) {
+		m, _ := h.(map[string]any)
+		if cmd, _ := m["command"].(string); cmd == command {
+			continue
+		}
+		kept = append(kept, h)
+	}
+	if add {
+		kept = append(kept, map[string]any{"type": "command", "command": command, "timeout": hookTimeoutSeconds})
+	}
+	if len(kept) > 0 {
+		group["PreInvocation"] = kept
+	} else {
+		delete(group, "PreInvocation")
+	}
+	if len(group) > 0 {
+		obj[antigravityGroup] = group
+	} else {
+		delete(obj, antigravityGroup)
+	}
+	if !add && len(obj) == 0 && !fileExists(file) {
+		return nil
+	}
+	return writeObject(file, obj)
 }
 
 // editHooks adds (add=true) or removes Sidecar's UserPromptSubmit handler. Other groups,

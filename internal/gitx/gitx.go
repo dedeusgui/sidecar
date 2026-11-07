@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -66,6 +67,19 @@ func TopLevel(ctx context.Context, dir string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// CommonDir returns the git directory shared by a repository and all of its worktrees.
+func CommonDir(ctx context.Context, dir string) (string, error) {
+	out, err := gitRun(ctx, dir, "rev-parse", "--git-common-dir")
+	if err != nil {
+		return "", err
+	}
+	p := strings.TrimSpace(string(out))
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(dir, p)
+	}
+	return filepath.Clean(p), nil
 }
 
 // Head returns the commit hash of HEAD, or ErrNoHead.
