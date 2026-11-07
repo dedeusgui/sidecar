@@ -3,9 +3,11 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -221,5 +223,71 @@ func TestAntigravityLaterInvocationGetsNoContext(t *testing.T) {
 	out, _ = runHook(t, adapter.Antigravity, input, &spawned)
 	if !strings.Contains(out, "injectSteps") || !strings.Contains(out, "MaxActiveTickets") {
 		t.Fatalf("first invocation got no evidence: %q", out)
+	}
+}
+
+// TestObserverConcurrentWrites runs tool events in parallel, as Claude Code does for parallel
+// tool calls: sixteen on one session and sixteen each on their own session. Every state must
+// load whole; a torn or shared temporary file would make LoadSignals return fresh state.
+func TestObserverConcurrentWrites(t *testing.T) {
+	setupHome(t)
+	root := makeProject(t)
+	target := filepath.Join(root, "queue", "limits.go")
+	event := func(session string) string {
+		return `{"session_id":"` + session + `","cwd":"` + root + `","tool_name":"Read","tool_input":{"file_path":"` + target + `"}}`
+	}
+	const n = 16
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			Observe(adapter.Claude, "PreToolUse", strings.NewReader(event("shared")))
+		}()
+		go func(i int) {
+			defer wg.Done()
+			Observe(adapter.Claude, "PreToolUse", strings.NewReader(event(fmt.Sprintf("own-%d", i))))
+		}(i)
+	}
+	wg.Wait()
+
+	// Concurrent updates of one session may overwrite each other, so only the shape is asserted.
+	shared := brief.LoadSignals(paths.ObserverState(root, "claude", "shared"), worktreeVersion(root), time.Now())
+	if len(shared.Files) != 1 || len(shared.Reads) != 1 {
+		t.Fatalf("shared session state is torn or lost: files=%d reads=%d", len(shared.Files), len(shared.Reads))
+	}
+	for i := 0; i < n; i++ {
+		s := brief.LoadSignals(paths.ObserverState(root, "claude", fmt.Sprintf("own-%d", i)), worktreeVersion(root), time.Now())
+		if len(s.Files) != 1 || len(s.Reads) != 1 {
+			t.Fatalf("own-%d state = files %d reads %d, want exactly one read", i, len(s.Files), len(s.Reads))
+		}
+	}
+}
+
+// TestObserverPreCompactResetsSessionSeen checks that after a compaction the evidence the
+// session already received is sent again, and that the compaction is counted.
+func TestObserverPreCompactResetsSessionSeen(t *testing.T) {
+	setupHome(t)
+	root := makeProject(t)
+	var spawned []string
+	const prompt = "o MAX_ACTIVE_TICKETS limita a fila?"
+
+	if out, _ := runHook(t, adapter.Claude, payload(t, root, prompt, "c1"), &spawned); !strings.Contains(out, "MaxActiveTickets") {
+		t.Fatalf("no evidence before compaction: %q", out)
+	}
+	if out, _ := runHook(t, adapter.Claude, payload(t, root, prompt, "c1"), &spawned); strings.Contains(out, "MaxActiveTickets") {
+		t.Fatalf("evidence repeated within the session; the premise of this test does not hold: %q", out)
+	}
+
+	compact := `{"session_id":"c1","cwd":"` + root + `","hook_event_name":"PreCompact"}`
+	if code := Observe(adapter.Claude, "PreCompact", strings.NewReader(compact)); code != 0 {
+		t.Fatalf("exit = %d", code)
+	}
+	if out, _ := runHook(t, adapter.Claude, payload(t, root, prompt, "c1"), &spawned); !strings.Contains(out, "MaxActiveTickets") {
+		t.Fatalf("evidence not sent again after compaction: %q", out)
+	}
+	s := brief.LoadSignals(paths.ObserverState(root, "claude", "c1"), worktreeVersion(root), time.Now())
+	if s.Compactions != 1 {
+		t.Fatalf("compactions = %d, want 1", s.Compactions)
 	}
 }

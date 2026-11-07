@@ -174,6 +174,13 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	rec["evidence"] = len(res.Evidence)
 	rec["lexical"] = res.Trace.Lexical
 	rec["exact"] = res.Trace.Exact
+	if ropts.EngineVersion == "v2" {
+		n, err := attachDecisions(ix.Store(), root, in.Prompt, &res, time.Now())
+		if err != nil {
+			rec["decision_error"] = err.Error() // fail open: the prompt keeps its code evidence
+		}
+		rec["decisions"] = n
+	}
 
 	t = time.Now()
 	block, used := brief.RenderSession(res, statePath)

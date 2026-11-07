@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 
 	"github.com/dedeusgui/sidecar/internal/ctxbuild"
@@ -106,14 +105,7 @@ func saveState(path string, st state) {
 	if err != nil {
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return
-	}
-	_ = os.Rename(tmp, path)
+	_ = writeAtomic(path, data)
 }
 
 // items converts evidence into context items, adding a git note for dirty files.

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -48,8 +49,8 @@ type EventV1 struct {
 	Coverage           string  `json:"coverage"`
 }
 
-// Observe records one PreToolUse or PostToolUse event. It is passive: it writes nothing to
-// stdout, never changes the tool call, and returns 0 whatever happens.
+// Observe records one PreToolUse, PostToolUse or PreCompact event. It is passive: it writes
+// nothing to stdout, never changes the tool call, and returns 0 whatever happens.
 func Observe(agent adapter.Agent, event string, in io.Reader) (exit int) {
 	start := time.Now()
 	rec := logRecord{"at": start.UTC().Format(time.RFC3339), "agent": string(agent), "event": event}
@@ -83,13 +84,21 @@ func Observe(agent adapter.Agent, event string, in io.Reader) (exit int) {
 	}
 	statePath := paths.ObserverState(root, string(agent), call.Session)
 	s := brief.LoadSignals(statePath, worktreeVersion(root), start)
-	raised := applyTool(&s, call, root)
+	if call.Phase == "compact" {
+		// The agent lost what it saw before the compaction, so evidence suppressed as already
+		// sent must be sent again; reads before it are not loops after it.
+		_ = os.Remove(paths.SessionState(string(agent), call.Session))
+		s.Compactions++
+		s.ClearEpoch()
+		rec["status"] = "compacted"
+	} else {
+		rec["signals"] = applyTool(&s, call, root)
+		rec["tool"] = schemaV1(call, root, time.Since(start))
+		rec["status"] = "observed"
+	}
 	if err := brief.SaveSignals(statePath, s); err != nil {
 		rec["save_error"] = err.Error()
 	}
-	rec["tool"] = schemaV1(call, root, time.Since(start))
-	rec["signals"] = raised
-	rec["status"] = "observed"
 	return 0
 }
 

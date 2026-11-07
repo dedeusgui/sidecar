@@ -7,9 +7,48 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/store"
 )
+
+func TestDecisionMemoryIsInjectedInV2AndNeverWhenStale(t *testing.T) {
+	setupHome(t)
+	root := makeProject(t)
+	if _, err := MemoryAdd(root, "MaxActiveTickets", "limite fixo de tickets por decisão de produto", DecisionTTL, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	const prompt = "o MAX_ACTIVE_TICKETS limita a fila?"
+	var spawned []string
+
+	t.Setenv("SIDECAR_ENGINE", "")
+	if out, _ := runHook(t, adapter.Claude, payload(t, root, prompt, "m0"), &spawned); strings.Contains(out, "[DECISION]") {
+		t.Fatalf("decision injected under the default v1 engine: %q", out)
+	}
+
+	t.Setenv("SIDECAR_ENGINE", "v2")
+	out, _ := runHook(t, adapter.Claude, payload(t, root, prompt, "m1"), &spawned)
+	if !strings.Contains(out, "[DECISION] MaxActiveTickets") || !strings.Contains(out, "limite fixo de tickets") {
+		t.Fatalf("active decision not injected under v2: %q", out)
+	}
+
+	// Editing the symbol's file and reindexing makes the decision stale: the next prompt must not carry it.
+	limits := filepath.Join(root, "queue", "limits.go")
+	if err := os.WriteFile(limits, []byte("package queue\n\n// MaxActiveTickets limits concurrent tickets.\nconst MaxActiveTickets = 2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunIndexer(root, false); err != nil {
+		t.Fatal(err)
+	}
+	out, _ = runHook(t, adapter.Claude, payload(t, root, prompt, "m2"), &spawned)
+	if strings.Contains(out, "[DECISION]") {
+		t.Fatalf("stale decision injected after the edit: %q", out)
+	}
+	list, err := MemoryList(root, time.Now())
+	if err != nil || len(list) != 1 || list[0].Status != store.DecisionStale {
+		t.Fatalf("decision after the edit = %+v, %v; want stale", list, err)
+	}
+}
 
 func TestMemoryDecisionsTrackFileAndSymbolChanges(t *testing.T) {
 	setupHome(t)

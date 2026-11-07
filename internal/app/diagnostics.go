@@ -99,6 +99,11 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 	if err != nil {
 		return ExplainReport{}, err
 	}
+	if engineOf(opts) == "v2" {
+		if _, err := attachDecisions(ix.Store(), root, prompt, &res, time.Now()); err != nil {
+			return ExplainReport{}, err
+		}
+	}
 	fpStart := time.Now()
 	fp := repo.Discover(ctx, root)
 	res.Trace.Fingerprint = &fp

@@ -26,7 +26,7 @@ const (
 // memory only; callers persist hashes of them, never the strings.
 type ToolCall struct {
 	Agent   Agent
-	Phase   string // "pre" for PreToolUse, "post" for PostToolUse
+	Phase   string // "pre" for PreToolUse, "post" for PostToolUse, "compact" for PreCompact
 	Session string
 	CWD     string
 	Name    string
@@ -39,10 +39,10 @@ type ToolCall struct {
 }
 
 // ParseTool reads one tool event. event is the hook name the command was installed for
-// (PreToolUse or PostToolUse), because Antigravity payloads do not name it. Claude Code and
-// Codex do not document a failure field on PostToolUse, so their result is "unknown".
+// (PreToolUse, PostToolUse or PreCompact), because Antigravity payloads do not name it. Claude
+// Code and Codex do not document a failure field on PostToolUse, so their result is "unknown".
 func ParseTool(agent Agent, event string, r io.Reader) (ToolCall, error) {
-	phase := map[string]string{"PreToolUse": "pre", "PostToolUse": "post"}[event]
+	phase := map[string]string{"PreToolUse": "pre", "PostToolUse": "post", "PreCompact": "compact"}[event]
 	if phase == "" {
 		return ToolCall{}, fmt.Errorf("unsupported tool event %q", event)
 	}

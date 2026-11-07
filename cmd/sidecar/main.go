@@ -76,7 +76,7 @@ func usage(w io.Writer) {
 	_, _ = fmt.Fprint(w, `sidecar — contexto de repositório para Claude Code, Codex e Antigravity CLI
 
 Uso:
-  sidecar install [--yes] [--agent claude|codex|antigravity]... [--statusline]
+  sidecar install [--yes] [--agent claude|codex|antigravity]... [--statusline] [--observe-tools]
                                                       configura os hooks (com autorização)
   sidecar uninstall [--purge]                         remove apenas o que o Sidecar instalou
   sidecar status [--root DIR] [--json]                resumo do índice do repositório
@@ -88,7 +88,7 @@ Uso:
   sidecar memory list|add|purge [--root DIR] [--json] decisões técnicas verificáveis (opt-in)
                                                       add: --target ARQUIVO|SIMBOLO --summary TEXTO [--ttl 720h]
                                                       purge: remove as invalidadas (--all: todas)
-  sidecar observe --agent A --event PreToolUse|PostToolUse   registra eventos de ferramenta (silencioso)
+  sidecar observe --agent A --event PreToolUse|PostToolUse|PreCompact   registra eventos (silencioso)
   sidecar version
 
 Uso normal é automático: depois de instalar, cada prompt enviado ao agente é analisado.
@@ -142,6 +142,7 @@ func cmdInstall(args []string, in io.Reader, out, errOut io.Writer) int {
 	fs.SetOutput(errOut)
 	yes := fs.Bool("yes", false, "confirm the changes without asking")
 	statusline := fs.Bool("statusline", false, "also show Sidecar in the Claude Code status line (opt-in)")
+	observeTools := fs.Bool("observe-tools", false, "also observe tool calls, metadata only (opt-in; Claude Code and Antigravity CLI)")
 	var agents agentList
 	fs.Var(&agents, "agent", "limit to an agent (repeatable)")
 	if err := fs.Parse(args); err != nil {
@@ -152,7 +153,7 @@ func cmdInstall(args []string, in io.Reader, out, errOut io.Writer) int {
 		_, _ = fmt.Fprintln(errOut, err)
 		return 1
 	}
-	opts := install.Options{Env: env, Agents: agents, Yes: *yes, Out: out, In: in, StatusLine: *statusline}
+	opts := install.Options{Env: env, Agents: agents, Yes: *yes, Out: out, In: in, StatusLine: *statusline, ObserveTools: *observeTools}
 	if !isTerminal(in) && !*yes {
 		opts.In = nil
 	}
@@ -297,7 +298,7 @@ func cmdObserve(args []string, in io.Reader) int {
 	fs := flag.NewFlagSet("observe", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	agentName := fs.String("agent", "", "claude, codex or antigravity")
-	event := fs.String("event", "", "PreToolUse or PostToolUse")
+	event := fs.String("event", "", "PreToolUse, PostToolUse or PreCompact")
 	if err := fs.Parse(args); err != nil {
 		return 0
 	}

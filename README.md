@@ -50,7 +50,7 @@ estruturais, o orçamento de tokens, os tempos por fase e o contexto final. Use 
 
 | Comando | Para quê |
 |---|---|
-| `sidecar install [--yes] [--agent claude\|codex\|antigravity] [--statusline]` | configura os hooks, com autorização; `--statusline` (opt-in) adiciona a linha de status do Claude Code |
+| `sidecar install [--yes] [--agent claude\|codex\|antigravity] [--statusline] [--observe-tools]` | configura os hooks, com autorização; `--statusline` (opt-in) adiciona a linha de status do Claude Code; `--observe-tools` (opt-in) registra apenas metadados de chamadas de ferramenta no Claude Code e no Antigravity CLI, sem alterar a chamada |
 | `sidecar memory list\|add\|purge [--root DIR] [--json]` | decisões técnicas verificáveis, opt-in: `add --target ARQUIVO\|SIMBOLO --summary TEXTO`; `purge` remove as invalidadas (`--all` remove todas) |
 | `sidecar uninstall [--purge]` | remove apenas o que o Sidecar instalou (inclusive a linha de status, se ainda for a do Sidecar) |
 | `sidecar status [--root DIR] [--json]` | resumo do índice do repositório |

@@ -12,11 +12,54 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dedeusgui/sidecar/internal/ctxbuild"
 	"github.com/dedeusgui/sidecar/internal/gitx"
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/repo"
+	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
 )
+
+// maxDecisionsInContext bounds how many recorded decisions one prompt receives.
+const maxDecisionsInContext = 3
+
+// attachDecisions refreshes the decisions of the worktree at root and adds to res the valid ones
+// that concern its evidence or are named in the prompt. The refresh compares each decision's file
+// hash, symbol and TTL with the code now, so an edited, removed or expired decision is never attached.
+func attachDecisions(st *store.Store, root, prompt string, res *retrieve.Result, now time.Time) (int, error) {
+	list, err := st.RefreshDecisions(root, now, func(rel string) (string, bool) { return diskHash(root, rel) })
+	if err != nil {
+		return 0, err
+	}
+	files, names := map[string]bool{}, map[string]bool{}
+	for _, ev := range res.Evidence {
+		files[ev.Hit.Path] = true
+		names[ev.Hit.Name] = true
+	}
+	attached := 0
+	// Newest first: the latest decision is the one most likely to still be wanted.
+	for i := len(list) - 1; i >= 0 && attached < maxDecisionsInContext; i-- {
+		d := list[i]
+		if d.Status != store.DecisionValid {
+			continue
+		}
+		if !files[d.FilePath] && !(d.Symbol != "" && names[d.Symbol]) && !strings.Contains(prompt, d.SymbolOrPath) {
+			continue
+		}
+		hash := d.FileHash
+		if len(hash) > 12 {
+			hash = hash[:12]
+		}
+		note := fmt.Sprintf("[DECISION] %s (hash=%s): %s", d.SymbolOrPath, hash, d.Summary)
+		res.Evidence = append(res.Evidence, retrieve.Evidence{
+			Hit:     store.SymbolHit{Kind: "decision", Name: d.SymbolOrPath, Path: d.FilePath, FileHash: d.FileHash},
+			Verdict: "VERIFIED", Section: ctxbuild.Contracts, Source: "decision_memory", Confidence: 1,
+			ID: fmt.Sprintf("decision|%d", d.ID), Note: note, TokenEstimate: ctxbuild.EstimateTokens(note),
+		})
+		attached++
+	}
+	return attached, nil
+}
 
 // DecisionTTL is how long a recorded decision stays valid unless the user sets another.
 const DecisionTTL = 30 * 24 * time.Hour
