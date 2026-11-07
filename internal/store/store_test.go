@@ -274,6 +274,7 @@ func TestMigrationUpgradesVocabularyFromV1(t *testing.T) {
 	// Recreate the layout written by the first release: row-level vocabulary, version 1.
 	for _, stmt := range []string{
 		`ALTER TABLE files DROP COLUMN extract_ver`,
+		`DROP TABLE decisions`,
 		`DROP TABLE symbol_vocab`,
 		`CREATE VIRTUAL TABLE symbol_vocab USING fts5vocab(symbol_fts, 'row')`,
 		`PRAGMA user_version = 1`,

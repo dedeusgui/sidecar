@@ -30,8 +30,15 @@ func Render(res retrieve.Result, seen ctxbuild.Seen) string {
 // RenderForSession builds the block and records what it sent in statePath. An empty path
 // disables memory. Unreadable or corrupt state is treated as empty, never as an error.
 func RenderForSession(res retrieve.Result, statePath string) string {
+	text, _ := RenderSession(res, statePath)
+	return text
+}
+
+// RenderSession is RenderForSession that also returns the keys of the evidence it sent,
+// so the session observer can count what the agent was given.
+func RenderSession(res retrieve.Result, statePath string) (string, []string) {
 	if statePath == "" {
-		return Render(res, nil)
+		return Render(res, nil), nil
 	}
 	st := loadState(statePath)
 	st.Turn++
@@ -40,11 +47,13 @@ func RenderForSession(res retrieve.Result, statePath string) string {
 		return ok && e.Fingerprint == fingerprint && st.Turn-e.Turn < TTLTurns
 	}
 	text, used := ctxbuild.Compose(items(res), res.Trace.Budget, seen)
+	keys := make([]string, 0, len(used))
 	for _, it := range used {
 		st.Emitted[it.Key] = entry{Fingerprint: it.Fingerprint, Turn: st.Turn}
+		keys = append(keys, it.Key)
 	}
 	saveState(statePath, st)
-	return text
+	return text, keys
 }
 
 type entry struct {

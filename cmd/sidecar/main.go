@@ -1,20 +1,24 @@
-// Command sidecar adds repository context to Claude Code and Codex prompts. Normal use is
-// automatic after `sidecar install`; the other commands are for maintenance and debugging.
+// Command sidecar adds repository context to Claude Code, Codex and Antigravity CLI prompts.
+// Normal use is automatic after `sidecar install`; the other commands are for maintenance
+// and debugging.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/app"
 	"github.com/dedeusgui/sidecar/internal/install"
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/repo"
+	"github.com/dedeusgui/sidecar/internal/store"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -45,6 +49,10 @@ func run(args []string, in io.Reader, out, errOut io.Writer) int {
 		return cmdDoctor(out, errOut)
 	case "explain":
 		return cmdExplain(rest, in, out, errOut)
+	case "observe":
+		return cmdObserve(rest, in)
+	case "memory":
+		return cmdMemory(rest, out, errOut)
 	case "version", "--version":
 		_, _ = fmt.Fprintln(out, "sidecar", version)
 		return 0
@@ -58,14 +66,18 @@ func run(args []string, in io.Reader, out, errOut io.Writer) int {
 }
 
 func usage(w io.Writer) {
-	_, _ = fmt.Fprint(w, `sidecar — contexto de repositório para Claude Code e Codex
+	_, _ = fmt.Fprint(w, `sidecar — contexto de repositório para Claude Code, Codex e Antigravity CLI
 
 Uso:
-  sidecar install [--yes] [--agent claude|codex]...   configura os hooks (com autorização)
+  sidecar install [--yes] [--agent claude|codex|antigravity]...   configura os hooks (com autorização)
   sidecar uninstall [--purge]                         remove apenas o que o Sidecar instalou
   sidecar status [--root DIR]                         resumo do índice do repositório
   sidecar doctor                                      diagnóstico de instalação e ambiente
   sidecar explain [--root DIR] [--json]               mostra o rastro de um prompt (lê stdin)
+  sidecar memory list|add|purge [--root DIR] [--json] decisões técnicas verificáveis (opt-in)
+                                                      add: --target ARQUIVO|SIMBOLO --summary TEXTO [--ttl 720h]
+                                                      purge: remove as invalidadas (--all: todas)
+  sidecar observe --agent A --event PreToolUse|PostToolUse   registra eventos de ferramenta (silencioso)
   sidecar version
 
 Uso normal é automático: depois de instalar, cada prompt enviado ao agente é analisado.
@@ -86,7 +98,7 @@ func (a *agentList) Set(v string) error {
 func cmdHook(args []string, in io.Reader, out, errOut io.Writer) int {
 	fs := flag.NewFlagSet("hook", flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	agentName := fs.String("agent", "", "claude or codex")
+	agentName := fs.String("agent", "", "claude, codex or antigravity")
 	if err := fs.Parse(args); err != nil {
 		return 0 // a malformed hook invocation must never block the agent
 	}
@@ -248,6 +260,91 @@ func cmdExplain(args []string, in io.Reader, out, errOut io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// cmdObserve is the hook entry for tool events. It is silent and never fails the agent.
+func cmdObserve(args []string, in io.Reader) int {
+	fs := flag.NewFlagSet("observe", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	agentName := fs.String("agent", "", "claude, codex or antigravity")
+	event := fs.String("event", "", "PreToolUse or PostToolUse")
+	if err := fs.Parse(args); err != nil {
+		return 0
+	}
+	agent, err := adapter.ParseAgent(*agentName)
+	if err != nil {
+		return 0
+	}
+	return app.Observe(agent, *event, in)
+}
+
+func cmdMemory(args []string, out, errOut io.Writer) int {
+	if len(args) == 0 {
+		_, _ = fmt.Fprintln(errOut, "uso: sidecar memory list|add|purge [--root DIR] [--json]")
+		return 2
+	}
+	sub, rest := args[0], args[1:]
+	fs := flag.NewFlagSet("memory "+sub, flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	root := fs.String("root", ".", "folder inside the repository")
+	asJSON := fs.Bool("json", false, "print as JSON")
+	target := fs.String("target", "", "file path or symbol name (add)")
+	summary := fs.String("summary", "", "the decision, in one line (add)")
+	ttl := fs.Duration("ttl", app.DecisionTTL, "how long the decision stays valid (add)")
+	all := fs.Bool("all", false, "purge every decision, not only invalidated ones (purge)")
+	if err := fs.Parse(rest); err != nil {
+		return 2
+	}
+	abs, _ := filepath.Abs(*root)
+	rootDir, _ := repo.FindRoot(abs)
+	now := time.Now()
+	var err error
+	switch sub {
+	case "list":
+		var recs []store.DecisionRecord
+		if recs, err = app.MemoryList(rootDir, now); err == nil {
+			err = printDecisions(out, recs, *asJSON)
+		}
+	case "add":
+		var rec store.DecisionRecord
+		if rec, err = app.MemoryAdd(rootDir, *target, *summary, *ttl, now); err == nil {
+			_, err = fmt.Fprintf(out, "✓ decisão %d registrada (%s)\n", rec.ID, rec.SymbolOrPath)
+		}
+	case "purge":
+		var n int64
+		if n, err = app.MemoryPurge(rootDir, *all, now); err == nil {
+			_, err = fmt.Fprintf(out, "✓ %d decisão(ões) removida(s)\n", n)
+		}
+	default:
+		_, _ = fmt.Fprintf(errOut, "subcomando desconhecido: %q (use list, add ou purge)\n", sub)
+		return 2
+	}
+	if err != nil {
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	return 0
+}
+
+func printDecisions(out io.Writer, recs []store.DecisionRecord, asJSON bool) error {
+	if asJSON {
+		data, err := json.MarshalIndent(recs, "", "  ")
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(out, string(data))
+		return err
+	}
+	if len(recs) == 0 {
+		_, err := fmt.Fprintln(out, "nenhuma decisão registrada (use: sidecar memory add --target ARQUIVO --summary TEXTO)")
+		return err
+	}
+	for _, d := range recs {
+		if _, err := fmt.Fprintf(out, "%-4d %-12s %s  %s\n", d.ID, d.Status, d.SymbolOrPath, d.Summary); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func isTerminal(r io.Reader) bool {

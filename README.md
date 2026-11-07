@@ -50,7 +50,8 @@ estruturais, o orçamento de tokens, os tempos por fase e o contexto final. Use 
 
 | Comando | Para quê |
 |---|---|
-| `sidecar install [--yes] [--agent claude\|codex]` | configura os hooks, com autorização |
+| `sidecar install [--yes] [--agent claude\|codex\|antigravity]` | configura os hooks, com autorização |
+| `sidecar memory list\|add\|purge [--root DIR] [--json]` | decisões técnicas verificáveis, opt-in: `add --target ARQUIVO\|SIMBOLO --summary TEXTO`; `purge` remove as invalidadas (`--all` remove todas) |
 | `sidecar uninstall [--purge]` | remove apenas o que o Sidecar instalou |
 | `sidecar status [--root DIR]` | resumo do índice do repositório |
 | `sidecar doctor` | instalação, binário, SQLite/FTS5, integridade do índice, falhas recentes |
@@ -96,6 +97,7 @@ não commitada só reforça símbolos cujo nome contém a palavra do prompt, e a
 | Agente | Estado |
 |---|---|
 | **Claude Code** | Verificado de ponta a ponta nesta versão: instalação com `--yes`, hook real invocado pelo `claude -p`, o modelo respondeu usando o contexto injetado. Formato: `hookSpecificOutput.additionalContext`. |
+| **Antigravity CLI** | Adaptador e instalador conforme a documentação oficial (`~/.gemini/config/hooks.json`, grupo `sidecar`, evento `PreInvocation`, contexto em `injectSteps`). Contexto só na primeira chamada de cada turno (`invocationNum` 0; campo assumido, não verificado). **Não executado** contra o CLI real. |
 | **Codex** | Adaptador e `hooks.json` conforme o schema de hooks do Codex (`UserPromptSubmit`, `additionalContext`, campos `type`/`command`/`timeout`). **Não executado**: o Codex não está disponível neste ambiente. Precisa de teste local. O Codex só roda hooks que você aprovou na revisão de hooks dele; `sidecar doctor` avisa quando a aprovação falta. |
 
 Plataformas: o código compila sem CGo para Linux, macOS e Windows (amd64 e arm64). O CI da branch

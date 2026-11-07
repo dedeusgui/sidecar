@@ -78,8 +78,15 @@ func Hook(opts HookOptions) (exit int) {
 		return 0
 	}
 	rec["prompt_chars"] = utf8.RuneCountInString(in.Prompt)
+	if !InjectionAllowed(opts.Agent, in.Invocation) {
+		rec["status"] = "skipped_invocation"
+		_, _ = opts.Stdout.Write(adapter.Format(opts.Agent, ""))
+		return 0
+	}
 	if skipPrompt(in.Prompt) {
 		rec["status"] = "skipped"
+		// Antigravity and Codex expect a JSON object even when there is nothing to add.
+		_, _ = opts.Stdout.Write(adapter.Format(opts.Agent, ""))
 		return 0
 	}
 
@@ -159,7 +166,10 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	if in.SessionID != "" {
 		statePath = opts.StatePath(string(opts.Agent), in.SessionID)
 	}
-	block := brief.RenderForSession(res, statePath)
+	block, used := brief.RenderSession(res, statePath)
+	if in.SessionID != "" {
+		recordEvidence(root, opts.Agent, in.SessionID, used)
+	}
 	rec["render_ms"] = ms(time.Since(t))
 	rec["injected_chars"] = len(block)
 	rec["status"] = "ok"

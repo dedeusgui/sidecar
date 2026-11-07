@@ -47,5 +47,12 @@ func SessionState(agent, sessionID string) string {
 	return filepath.Join(Home(), "sessions", hex.EncodeToString(sum[:])[:32]+".json")
 }
 
+// ObserverState holds the session signals of one agent session in one worktree. The
+// worktree is part of the key, so sessions in different worktrees never share state.
+func ObserverState(worktreeRoot, agent, sessionID string) string {
+	sum := sha256.Sum256([]byte(filepath.Clean(worktreeRoot) + "\x00" + agent + "\x00" + sessionID))
+	return filepath.Join(Home(), "sessions", hex.EncodeToString(sum[:])[:32]+".signals.json")
+}
+
 // Manifest records exactly which files and entries the installer changed.
 func Manifest() string { return filepath.Join(ConfigHome(), "install.json") }

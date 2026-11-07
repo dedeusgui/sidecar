@@ -64,6 +64,8 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 
 ### Rodada C — acompanhar o agente com baixo custo
 
+**Estado (2026-11-06, rodadas C1–C5 e D5 parcial):** implementados com testes unitários executados e `go test -race` nos pacotes concorrentes. Não implementado ou não verificado, e portanto **não** concluído: (1) nenhum hook de `PreToolUse`/`PostToolUse` é instalado por padrão, `sidecar observe` existe mas precisa de E2E por cliente e medição de custo antes de ser ligado; (2) invalidação por compactação não tem evento ligado; (3) Claude Code e Codex não documentam campo de falha em `PostToolUse` (resultado `unknown`), então `repeated_error` só dispara com Antigravity; (4) C4 é apenas a política passiva (`InjectionAllowed`), sem injeção por evento de ferramenta; (5) `invocationNum` = 0 como primeira chamada do turno é assumido, não verificado; (6) os upstreams Claude-Mem e Beads **não foram lidos** e nenhum SHA foi registrado, exigência do AGENTS.md ainda aberta; (7) D5 sem E2E com o Antigravity CLI real.
+
 - **C1 — SessionObserver passivo:** normalizar eventos suportados de Claude, Codex e Antigravity CLI por adapter; IDs opacos, retenção curta, redaction, distinção `unobserved` vs zero; modo OFF possui instrumentação igual no benchmark.
 - **C2 — LoopDiagnostics:** detectar repetição de buscas/leituras sem novidade e mudanças de stage observáveis; testar falso alarme em loops legítimos; não interferir no agente nesta etapa.
 - **C3 — Continuidade/SessionSignals:** memória efêmera por sessão, hash de evidências, mudança de branch e compactação; retomar sem republicar contexto inteiro.
@@ -100,8 +102,8 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 | Hooks | schema por versão, aprovação Codex, Claude real, Antigravity CLI real, no evidence/failure/safe stdout, coexistência | **Parcial** |
 | Ranking/intenção | baselines v1, ablações, PT/EN, tie-break estável, negativas, mudanças de repo | **V2 pendente** |
 | Contratos | código/docs/testes de acordo, conflito explícito, falso conflito, fonte desatualizada, alteração de commit | **Pendente** |
-| SessionObserver | repetição real/legítima, concorrência, TTL, privacy, compactação, unobserved, session IDs | **Pendente** |
-| Memória | decisão com hash, stale/invalidation, purge e opt-in, não misturar worktrees | **Pendente** |
+| SessionObserver | repetição real/legítima, concorrência, TTL, privacy, compactação, unobserved, session IDs | **Parcial: testes unitários executados; sem concorrência, compactação nem E2E de hook de ferramenta** |
+| Memória | decisão com hash, stale/invalidation, purge e opt-in, não misturar worktrees | **Parcial: testes de store e app executados; sem injeção de decisões no contexto** |
 | LSP/docs | handshake, Java/Go, absent, slow, untrusted, windows, cancelamento, checksum/rollback | **Pendente** |
 | Desempenho | cold/warm, p50/p95/p99, overhead do processo, memória, tokens, indexação grande | **Parcial v1** |
 | Segurança | entrada não confiável, injeção de instruções, symlinks, segredos, paths e logs sem conteúdo sensível | **Parcial v1** |

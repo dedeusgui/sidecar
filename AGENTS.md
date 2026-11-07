@@ -16,7 +16,7 @@ Princípios inegociáveis:
 
 ## Arquitetura atual (validar sempre contra código)
 
-- `cmd/sidecar`: CLI install, uninstall, doctor, status, explain, hook e index.
+- `cmd/sidecar`: CLI install, uninstall, doctor, status, explain, hook, observe, memory e index.
 - `cmd/sidecar-eval`: avaliação offline das fixtures e ablações.
 - `internal/adapter`: contratos de hook Claude Code / Codex.
 - `internal/app`: orquestração, índices em segundo plano, diagnóstico.

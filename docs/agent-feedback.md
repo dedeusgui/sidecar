@@ -1,6 +1,6 @@
 # ADR: observação do agente e feedback parametrizado
 
-**Estado:** proposta, não implementada · 2026-11-06. **Separar telemetria de sessão, autoavaliação e gold independente.**
+**Estado:** normalização schema v1 (`internal/adapter/tool.go`) e observador passivo (`sidecar observe`, não instalado por padrão) implementados com testes unitários em 2026-11-06; E2E de observação por cliente e medição de custo **pendentes**. **Separar telemetria de sessão, autoavaliação e gold independente.**
 
 ## Pergunta de produto
 

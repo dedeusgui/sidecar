@@ -1,5 +1,5 @@
 // Package adapter translates between agent hook protocols and Sidecar. It is the only
-// place that knows the JSON shapes of Claude Code and Codex hooks.
+// place that knows the JSON shapes of Claude Code, Codex and Antigravity CLI hooks.
 package adapter
 
 import (
@@ -14,47 +14,64 @@ type Agent string
 
 // Supported agents.
 const (
-	Claude Agent = "claude"
-	Codex  Agent = "codex"
+	Claude      Agent = "claude"
+	Codex       Agent = "codex"
+	Antigravity Agent = "antigravity"
 )
 
 // MaxInputBytes bounds the hook payload read from stdin.
 const MaxInputBytes = 1 << 20
 
-// Input is the subset of a UserPromptSubmit payload that Sidecar uses.
+// Input is the subset of a prompt-time payload that Sidecar uses. Invocation is only set
+// by Antigravity CLI, whose PreInvocation runs once per model call; 0 is the first call of
+// a turn, the only one that may receive context.
 type Input struct {
-	SessionID string
-	CWD       string
-	Prompt    string
+	SessionID  string
+	CWD        string
+	Prompt     string
+	Invocation int
 }
 
 // ParseAgent validates an agent name.
 func ParseAgent(name string) (Agent, error) {
 	switch Agent(name) {
-	case Claude, Codex:
+	case Claude, Codex, Antigravity:
 		return Agent(name), nil
 	}
-	return "", fmt.Errorf("unsupported agent %q (want claude or codex)", name)
+	return "", fmt.Errorf("unsupported agent %q (want claude, codex or antigravity)", name)
 }
 
-// Parse reads one UserPromptSubmit payload. Both agents send the same fields used here
-// (session_id, cwd, prompt, hook_event_name); extra fields are ignored.
+// Parse reads one prompt-time payload. Claude Code and Codex send session_id, cwd, prompt
+// and hook_event_name; Antigravity CLI sends conversationId, workspacePaths, lastUserInput
+// and invocationNum. Extra fields are ignored.
 func Parse(agent Agent, r io.Reader) (Input, error) {
-	data, err := io.ReadAll(io.LimitReader(r, MaxInputBytes+1))
+	data, err := readPayload(r)
 	if err != nil {
 		return Input{}, err
 	}
-	if len(data) > MaxInputBytes {
-		return Input{}, errors.New("hook payload too large")
-	}
 	var raw struct {
-		SessionID     string `json:"session_id"`
-		CWD           string `json:"cwd"`
-		Prompt        string `json:"prompt"`
-		HookEventName string `json:"hook_event_name"`
+		SessionID      string          `json:"session_id"`
+		CWD            string          `json:"cwd"`
+		Prompt         string          `json:"prompt"`
+		HookEventName  string          `json:"hook_event_name"`
+		ConversationID string          `json:"conversationId"`
+		WorkspacePaths json.RawMessage `json:"workspacePaths"`
+		LastUserInput  string          `json:"lastUserInput"`
+		InvocationNum  int             `json:"invocationNum"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return Input{}, fmt.Errorf("%s payload: %w", agent, err)
+	}
+	if agent == Antigravity {
+		// workspacePaths is not documented as a typed list; an unexpected shape means no
+		// CWD, and the hook falls back to its own working directory.
+		var workspaces []string
+		_ = json.Unmarshal(raw.WorkspacePaths, &workspaces)
+		cwd := ""
+		if len(workspaces) > 0 {
+			cwd = workspaces[0]
+		}
+		return Input{SessionID: raw.ConversationID, CWD: cwd, Prompt: raw.LastUserInput, Invocation: raw.InvocationNum}, nil
 	}
 	if raw.HookEventName != "" && raw.HookEventName != "UserPromptSubmit" {
 		return Input{}, fmt.Errorf("unexpected hook event %q", raw.HookEventName)
@@ -62,10 +79,32 @@ func Parse(agent Agent, r io.Reader) (Input, error) {
 	return Input{SessionID: raw.SessionID, CWD: raw.CWD, Prompt: raw.Prompt}, nil
 }
 
+// readPayload reads one hook payload, refusing anything above MaxInputBytes.
+func readPayload(r io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, MaxInputBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > MaxInputBytes {
+		return nil, errors.New("hook payload too large")
+	}
+	return data, nil
+}
+
 // Format produces the bytes to write to stdout. Claude Code adds JSON
 // hookSpecificOutput.additionalContext as context for the model; with no context it
-// prints nothing. Codex requires a JSON object on stdout, so it gets {} instead.
+// prints nothing. Codex and Antigravity CLI require a JSON object on stdout, so they get
+// {} instead. Antigravity receives context as an ephemeral injected step.
 func Format(agent Agent, context string) []byte {
+	if agent == Antigravity {
+		if context == "" {
+			return []byte("{}")
+		}
+		b, _ := json.Marshal(map[string]any{
+			"injectSteps": []map[string]string{{"ephemeralMessage": context}},
+		})
+		return b
+	}
 	if context == "" {
 		if agent == Codex {
 			return []byte("{}")

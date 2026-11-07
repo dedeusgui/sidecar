@@ -17,7 +17,7 @@ import (
 
 // SchemaVersion is bumped whenever the on-disk layout changes. Databases with a
 // newer version are refused; older ones are migrated in place.
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 // ErrSchemaTooNew reports an index written by a newer Sidecar build.
 var ErrSchemaTooNew = errors.New("index schema is newer than this sidecar build")
@@ -705,6 +705,25 @@ var migrations = [][]string{
 	},
 	{ // v2 -> v3: each file remembers which extraction logic produced its rows
 		`ALTER TABLE files ADD COLUMN extract_ver INTEGER NOT NULL DEFAULT 0`,
+	},
+	{ // v3 -> v4: explicit decisions, written only by `sidecar memory add`
+		`CREATE TABLE decisions (
+			id INTEGER PRIMARY KEY,
+			repo_root TEXT NOT NULL,
+			worktree TEXT NOT NULL,
+			symbol_or_path TEXT NOT NULL,
+			file_path TEXT NOT NULL,
+			symbol TEXT NOT NULL DEFAULT '',
+			commit_hash TEXT NOT NULL DEFAULT '',
+			file_hash TEXT NOT NULL DEFAULT '',
+			summary TEXT NOT NULL,
+			origin TEXT NOT NULL,
+			session_id TEXT NOT NULL DEFAULT '',
+			created_at INTEGER NOT NULL,
+			ttl_seconds INTEGER NOT NULL,
+			status TEXT NOT NULL DEFAULT 'valid'
+		)`,
+		`CREATE INDEX decisions_worktree ON decisions(worktree)`,
 	},
 }
 
