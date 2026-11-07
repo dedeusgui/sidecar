@@ -1,0 +1,102 @@
+{
+ "repos": {
+  "v2": {
+   "fixture": "bench/testdata/fixtures/v2",
+   "history": [
+    ["orders/service.go", "inventory/reserve.go"],
+    ["orders/service.go", "inventory/reserve.go"]
+   ],
+   "dirty": ["shipping/rate.go"]
+  }
+ },
+ "cases": [
+  {
+   "id": "V01", "split": "v2", "repo": "v2", "category": "vague_pt",
+   "prompt": "tem alguma regra que cobra mais quando a fatura passa do vencimento?",
+   "relevant": [{"path": "billing/fee.go", "name": "LateFeePercent"}]
+  },
+  {
+   "id": "V02", "split": "v2", "repo": "v2", "category": "numeric_rule",
+   "prompt": "qual é a porcentagem da multa por atraso?",
+   "relevant": [{"path": "billing/fee.go", "name": "LateFeePercent"}]
+  },
+  {
+   "id": "V03", "split": "v2", "repo": "v2", "category": "conflict",
+   "prompt": "qual é o limite de tickets ativos ao mesmo tempo?",
+   "relevant": [{"path": "tickets/queue.go", "name": "MaxActiveTickets"}],
+   "expect_conflict": true
+  },
+  {
+   "id": "V04", "split": "v2", "repo": "v2", "category": "contract_test",
+   "prompt": "o teste confere se a multa por atraso é de 2 por cento?",
+   "relevant": [{"path": "billing/fee.go", "name": "LateFeePercent"}],
+   "expect_contract": "TEST_EXPECTED"
+  },
+  {
+   "id": "V05", "split": "v2", "repo": "v2", "category": "impact",
+   "prompt": "quem chama CalculateRate? preciso do impacto antes de mudar o frete",
+   "relevant": [
+    {"path": "checkout/cart.go", "name": "Checkout"},
+    {"path": "api/quote.go", "name": "QuoteHandler"}
+   ]
+  },
+  {
+   "id": "V06", "split": "v2", "repo": "v2", "category": "debug",
+   "prompt": "panic: payment failed\n\tbilling.ChargeInvoice(0x1, 0x0)\n\t/app/billing/charge.go:9 +0x2a",
+   "relevant": [{"path": "billing/charge.go", "name": "ChargeInvoice"}]
+  },
+  {
+   "id": "V07", "split": "v2", "repo": "v2", "category": "extend",
+   "prompt": "adicionar canal de notificação por SMS seguindo o padrão do EmailNotifier",
+   "relevant": [
+    {"path": "notify/email.go", "name": "EmailNotifier"},
+    {"path": "notify/notifier.go", "name": "Notifier"}
+   ]
+  },
+  {
+   "id": "V08", "split": "v2", "repo": "v2", "category": "continuation",
+   "prompt": "renovar a sessão do usuário enquanto ela ainda vale",
+   "relevant": [{"path": "auth/session.go", "name": "RefreshSession"}],
+   "seen_rerun": true
+  },
+  {
+   "id": "V09", "split": "v2", "repo": "v2", "category": "multi_module",
+   "prompt": "criar pedido e reservar o estoque no módulo de inventário",
+   "relevant": [
+    {"path": "orders/service.go", "name": "PlaceOrder"},
+    {"path": "inventory/reserve.go", "name": "Reserve"}
+   ]
+  },
+  {
+   "id": "V10", "split": "v2", "repo": "v2", "category": "grammar_rust",
+   "prompt": "quantas vezes um pagamento recusado é tentado de novo no Rust?",
+   "relevant": [{"path": "retry/policy.rs", "name": "MAX_RETRY_ATTEMPTS"}]
+  },
+  {
+   "id": "V11", "split": "v2", "repo": "v2", "category": "grammar_php",
+   "prompt": "envio da fatura por email no PHP",
+   "relevant": [{"path": "web/InvoiceMailer.php", "name": "sendInvoice"}]
+  },
+  {
+   "id": "V12", "split": "v2", "repo": "v2", "category": "generated_ignored",
+   "prompt": "onde ChargeInvoice é implementado?",
+   "relevant": [{"path": "billing/charge.go", "name": "ChargeInvoice"}],
+   "must_not": ["gen/schema_gen.go"]
+  },
+  {
+   "id": "V13", "split": "v2", "repo": "v2", "category": "bilingual_pt_en",
+   "prompt": "onde o peso do pacote define o frete?",
+   "relevant": [{"path": "shipping/rate.go", "name": "CalculateRate"}]
+  },
+  {
+   "id": "V14", "split": "v2", "repo": "v2", "category": "negative",
+   "prompt": "bom dia, tudo bem por aqui?",
+   "negative": true
+  },
+  {
+   "id": "V15", "split": "v2", "repo": "v2", "category": "negative",
+   "prompt": "qual é a capital da Austrália?",
+   "negative": true
+  }
+ ]
+}

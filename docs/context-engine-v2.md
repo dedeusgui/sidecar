@@ -119,4 +119,6 @@ Nenhuma skill grande nem MCP obrigatório no fluxo cotidiano. Observar ferrament
 - Classificador pode superajustar benchmark; manter teste cego intocado até versão congelada.
 - Se o v2 não vencer BM25 + tradução e Sidecar v1 no teste cego, preferir reduzir complexidade.
 
+**Evidência da Rodada E (2026-11-07), offline e sem agente:** em tune e eval, as camadas de intenção, contrato e packer não mudaram Hit@5 em relação à v1 (80,0 e 85,0), e não reduziram tokens (365 e 224 contra 354 e 223). Na suíte v2 de 15 cenários, v2 completo fica em 7/15 (igual a bm25 + tradução); v1 em 6/15. O peso dos vizinhos estruturais não teve efeito mensurável, e marcar vizinhos que também casam lexicalmente derrubou Hit@5 de 80,0 para 70,0 em tune. Detalhes em [benchmark.md](benchmark.md). Holdout deixou de ser cego após a calibração de dicionário.
+
 **Leitura obrigatória complementar:** `docs/evaluation-plan.md`, `docs/lsp-strategy.md`, `docs/agent-feedback.md`, `docs/benchmark.md`.

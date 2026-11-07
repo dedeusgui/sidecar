@@ -127,3 +127,24 @@ func contains(xs []string, s string) bool {
 	}
 	return false
 }
+
+// Terms documented as holdout misses in docs/benchmark.md must translate to the identifiers that
+// the holdout expects, so a regression in the dictionary shows up as a failing test.
+func TestBenchmarkDomainTermsTranslate(t *testing.T) {
+	cases := map[string][]string{
+		"encomenda": {"shipment"},
+		"pacote":    {"package"},
+		"rastreio":  {"track"},
+		"cupom":     {"coupon"},
+		"cobrar":    {"charge"},
+		"tentar":    {"retry"},
+	}
+	for word, want := range cases {
+		got := Translations(word)
+		for _, w := range want {
+			if !contains(got, w) {
+				t.Errorf("Translations(%q) = %v, want it to include %q", word, got, w)
+			}
+		}
+	}
+}

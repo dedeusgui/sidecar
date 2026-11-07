@@ -155,3 +155,99 @@ Mudança: `.rs`, `.php`, `.rb` e `.kt` passam a ser indexados com as gramáticas
 - BM25, léxico e grafo: MRR idêntico.
 - `textual (substring)`: MRR variou entre execuções **do mesmo binário** (0,075, 0,100 e 0,117 no split tune). A variação vem do desempate do `sort.SliceStable` sobre a ordem de `AllSymbols()`, que não é determinística. Isso já existia antes da mudança e não foi corrigido nesta rodada. Até corrigir, não compare MRR do baseline textual entre execuções.
 - Limite: o corpus de avaliação não cobre a mudança de linguagens. Os casos de Rust, PHP, Ruby e Kotlin foram verificados à parte, com um repositório temporário, pelo `sidecar explain`.
+
+## Rodada E (2026-11-07): suíte v2, dicionário e experimentos rejeitados
+
+Medido com `go run ./cmd/sidecar-eval` no Ryzen 7 7735HS (Go 1.27), sem agente e sem chamadas pagas. O histórico acima foi medido em outro Xeon; **compare só dentro desta seção**. Os números "antes" foram recalculados no mesmo binário e máquina, antes da mudança de dicionário, e reproduzem os valores históricos.
+
+### 1. Suíte v2 (`bench/v2_scenarios.json`, 15 cenários)
+
+Fixture nova `bench/testdata/fixtures/v2` (Go, Rust, PHP, arquivo gerado, documentos com conflito). Os gabaritos foram escritos **antes** de qualquer medição. Cada cenário tem checks mecânicos: gabarito completo no top 10, `CONFLICT_CANDIDATE` presente, contrato `TEST_EXPECTED` presente, caminho proibido ausente, nenhuma repetição após envio (`seen`) e, nos negativos, zero token injetado.
+
+Comando: `go run ./cmd/sidecar-eval --cases bench/v2_scenarios.json --out <arquivo> --report-md bench/results/v2-scenarios.md`
+
+| Método | Hit@1 | Hit@5 | MRR | Cenários que passam todos os checks | Falso positivo (negativos) |
+|---|---|---|---|---|---|
+| textual (substring) | 15,4 | 38,5 | 0,237 | 4/15 | 0,0 |
+| bm25 (fts5, raw terms) | 30,8 | 46,2 | 0,349 | 5/15 | 0,0 |
+| bm25 + traducao/normalizacao | 46,2 | 61,5 | 0,526 | 7/15 | 0,0 |
+| lexical + grafo | 46,2 | 61,5 | 0,538 | 6/15 | 0,0 |
+| lexical + grafo + git | 46,2 | 61,5 | 0,538 | 6/15 | 0,0 |
+| v2 (intent + contract + packer) | 46,2 | 53,8 | 0,500 | 7/15 | 0,0 |
+
+Falhas por cenário (método v2 completo), com a causa verificada no índice ou no código:
+
+| Cenário | Categoria | Resultado | Causa verificada |
+|---|---|---|---|
+| V01, V02 | prompt vago e regra numérica | gabarito ausente | Vocabulário: `multa`, `atraso`, `porcentagem` não estão no dicionário. |
+| V04 | contrato código ↔ teste | `TEST_EXPECTED` ausente | O símbolo `LateFeePercent` nunca é recuperado; a checagem depende da recuperação. |
+| V05 | impacto (chamadores) | 0/2 ou 1/2, varia entre execuções | `Checkout` é vizinho estrutural e também acerta "rate" lexicalmente; por não ter a marca de vizinho, é descartado como "correspondência parcial ao lado de identificador exato". Ver seção 3. |
+| V07 | extensão de padrão | 1/2 | A interface `Notifier` não é recuperada. |
+| V08 | continuação | gabarito ausente na 1.ª passada | Vocabulário (`sessão`, `renovar`). O check `seen` **não foi exercitado** por nenhum método. |
+| V10 | Rust | gabarito ausente | Extrator Rust não emite `const_item`: `MAX_RETRY_ATTEMPTS` não vira símbolo (só `next_delay` é indexado). |
+| V12 | arquivo gerado | `gen/schema_gen.go` aparece no top 10 | `excludedPath` exclui só diretórios; `IsGenerated` é usado apenas no fingerprint. Não corrigido nesta rodada (muda o conteúdo do índice). |
+
+Passam em todos os métodos: negativos (V14, V15, zero token), PHP (V11), depuração por stack trace (V06). V09 (multi-módulo) e V13 (PT→EN "peso do pacote") passam em v2.
+
+**Leitura:** a suíte discrimina (de 4/15 a 7/15), mas **não mostra ganho da v2 sobre bm25 + tradução**. Nenhuma falha foi corrigida ajustando o gabarito nem o dicionário para esta suíte, para que ela continue servindo como medição.
+
+### 2. Dicionário PT↔EN (E4)
+
+Termos adicionados (`internal/lexical/dictionary.go`): `encomenda`, `pacote`, `rastreio`, `rastreamento`, `cupom`, `cobrar`, `tentar`, `novamente`, `retentativa`. Foram escolhidos **apenas** entre as falhas documentadas de holdout acima. `dono`, `visita` e `controlador` não aparecem como falha em nenhum documento e não foram adicionados. Teste: `TestBenchmarkDomainTermsTranslate`.
+
+| Split | Método | Hit@1 antes → depois | Hit@5 antes → depois | MRR antes → depois | Tokens antes → depois |
+|---|---|---|---|---|---|
+| tune | bm25 + traducao/normalizacao | 45,0 → 45,0 | 70,0 → 70,0 | 0,557 → 0,557 | 248 → 248 |
+| tune | lexical + grafo + git | 55,0 → 55,0 | 80,0 → 80,0 | 0,629 → 0,629 | 354 → 354 |
+| tune | v2 | 55,0 → 55,0 | 80,0 → 80,0 | 0,629 → 0,629 | 365 → 367 |
+| eval | bm25 + traducao/normalizacao | 45,0 → 50,0 | 85,0 → **90,0** | 0,572 → 0,626 | 175 → 186 |
+| eval | lexical + grafo + git | 45,0 → 50,0 | 75,0 → **85,0** | 0,567 → 0,642 | 214 → 223 |
+| eval | v2 | 45,0 → 50,0 | 75,0 → **85,0** | 0,567 → 0,642 | 215 → 224 |
+| holdout | bm25 + traducao/normalizacao | 35,3 → 47,1 | 70,6 → **88,2** | 0,487 → 0,625 | 165 → 178 |
+| holdout | lexical + grafo + git | 35,3 → 52,9 | 64,7 → **82,4** | 0,490 → 0,667 | 215 → 222 |
+| holdout | v2 | 35,3 → 52,9 | 64,7 → **82,4** | 0,490 → 0,667 | 216 → 225 |
+
+Falsos positivos em negativos: **0,0 em todos os splits, antes e depois**. Não houve regressão de caso (`--compare` contra o histórico: 0 regressões, 14 melhorias, todas em eval e holdout).
+
+**Contaminação:** `eval` e `holdout` já tinham sido usados para diagnóstico. Os termos novos foram escolhidos a partir das falhas de **holdout**, então **holdout deixa de ser cego**. Os ganhos em eval e holdout não são estimativas limpas.
+
+**Meta da rodada não atingida:** a exigência era `lexical + grafo + git` e `v2` iguais ou superiores a `bm25 + tradução` em tune, eval e holdout. Resultado: tune sim (80,0 contra 70,0); eval não (85,0 contra 90,0 em Hit@5, mas MRR 0,642 contra 0,626); holdout não (82,4 contra 88,2, mas MRR 0,667 contra 0,625). As lacunas restantes são vocabulário (`reservado`, `tempo`, `concluída`, `marcar`) e ordem de ranking. Fechá-las agora exigiria mais termos escolhidos olhando eval e holdout, o que aumentaria a contaminação sem produzir medição nova.
+
+**Custo em tokens:** os termos novos aumentam o bloco de contexto em 1% a 6%. Não há economia de tokens nesta rodada.
+
+### 3. Experimentos rejeitados (sem mudança no produto)
+
+Todos medidos em tune e eval (escolha) e holdout (apenas observado; não foi usado para escolher). Os três foram revertidos; o código de ranking é o da rodada anterior.
+
+- **Peso dos vizinhos estruturais na fusão RRF** (1,0; 0,5; 0,25): resultados **idênticos** em todos os splits e métodos. Não há efeito mensurável nesta suíte; manter 1,0.
+- **Vizinho estrutural que também acertou lexicalmente é marcado como vizinho** (variante ampla, qualquer candidato): tune Hit@5 80,0 → 70,0 e MRR 0,629 → 0,368; eval 85,0 → 70,0; holdout 82,4 → 70,6. **Rejeitado: regressão grande.** Faz V05 passar em `lexical + grafo + git` (em v2 continua 1 de 2), mas derruba a qualidade geral.
+- Mesma marcação restrita a candidatos com cobertura própria (variante estreita): tune 80,0 → 70,0; eval 85,0 → 70,0; holdout 82,4 → 70,6. **Rejeitado.**
+
+Conclusão: o descarte de vizinhos com "correspondência parcial" protege o ranking de ruído, mesmo quando sacrifica o chamador em V05. Corrigir V05 exige desenhar a regra de forma diferente, com um A/B próprio. Não é um ajuste de peso.
+
+### 4. Avaliação externa e agentic
+
+- **`--external-cases <manifesto.json>`:** lê um manifesto com repositórios já clonados e **fixados por commit** (SHA de 40 caracteres, checkout limpo, licença e origem obrigatórias). Gold pode ser de arquivo (sem `name`), e `no_gold: true` marca casos de abstenção. Verificado com um clone local do próprio repositório (153 arquivos, `X01`–`X03`, só teste de integração, não é benchmark). **Ainda não executado com corpus público:** o formato oficial do Agent Retrieval Bench não pôde ser verificado sem baixar o corpus, e o ContextBench não declara licença. Por isso o adaptador lê o formato normalizado; a conversão do ARB fica pendente.
+- **`--agentic-report <dir>`:** avalia `runs.jsonl` contra `bench/agentic/manifest.jsonl`. Tarefas `draft` nunca recebem veredito. O manifesto tem 4 tarefas em `draft`, sem commit e sem oráculo executado. **Nenhuma execução de agente foi feita nesta rodada**: rodar Haiku, Luna, Flash ou CodeGraph exige autorização explícita de custo e tempo. Verificado apenas com registros sintéticos.
+
+### 5. Reprodução
+
+```sh
+go run ./cmd/sidecar-eval --cases bench/cases.json --compare bench/results/final-state.json --out /tmp/sidecar-eval-v2-final.json --report-md bench/results/v2-final.md
+go run ./cmd/sidecar-eval --cases bench/v2_scenarios.json --out /tmp/sidecar-eval-v2-scenarios.json --report-md bench/results/v2-scenarios.md
+go run ./cmd/sidecar-eval --external-cases <manifesto-pinado.json> --out <fora-do-repo>/externo.json
+go run ./cmd/sidecar-eval --agentic-report <diretorio-com-runs.jsonl> --agentic-manifest bench/agentic/manifest.jsonl
+```
+
+`final-state.json` não foi substituído: é o histórico. O relatório novo está em `bench/results/v2-final.md`.
+
+**Variância:** MRR e a ordem de empates oscilam entre execuções do mesmo código (documentado acima). V05 mudou de 0/2 para 1/2 entre duas execuções. Diferenças de MRR menores que 0,03 não são evidência.
+
+### 6. Próximos experimentos (ordem sugerida)
+
+1. **Extrator Rust:** emitir `const_item` e medir V10. `bench/cases.json` não tem casos Rust, então a medição de regressão precisa de um fixture próprio. Muda o conteúdo do índice: exige bump de `extractVersion` e A/B.
+2. **Arquivos gerados:** decidir entre excluir do índice e rebaixar no ranking. A/B em tune, eval e v2; cuidado com definições que chamadores realmente usam (`*.pb.go`).
+3. **Chamadores (V05):** desenhar a regra de descarte de "correspondência parcial" sem perder acertos em tune. Cada variante precisa de A/B próprio.
+4. **Split cego novo:** gabaritos escritos antes da medição, sem olhar a saída. Holdout atual não serve mais para isso.
+5. **Corpus externo:** baixar o Agent Retrieval Bench fora do repositório, verificar o esquema e escrever o conversor. Confirmar a licença do ContextBench antes de qualquer uso.
+6. **Piloto agentic:** 4 tarefas × 3 modelos × OFF e ON-v2, 24 execuções, só com autorização de custo e com oráculos verificados antes das execuções.

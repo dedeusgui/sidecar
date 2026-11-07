@@ -55,3 +55,5 @@ Problema: hoje `sidecar doctor` e `sidecar explain` dão diagnóstico, mas o usu
 - Como expor estado por **sessão**, sem vazar prompt e sem ambiguidade entre múltiplos agentes simultâneos?
 - O usuário prefere atividade discreta ou nenhum UI? Medir o uso.
 - Se um gerenciador de pacotes controla o binário, quem faz update dos paths do hook?
+
+**Rodada E (2026-11-07):** nenhum hook, adaptador ou instalador foi alterado. Os estados acima permanecem como estavam; o E2E de Codex e Antigravity CLI continua pendente.

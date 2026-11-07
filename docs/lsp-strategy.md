@@ -108,5 +108,6 @@ Servidores podem executar ferramentas de build, ler dependências e acessar rede
 - Coexistência com o plugin oficial numa sessão real do Claude Code: não testada. Só a leitura de `enabledPlugins` tem teste.
 - `sidecar lsp setup` com execução real não foi rodado nesta máquina (instalaria software). Há teste de recusa sem consentimento e de bloqueio, e o caminho de execução é só `exec` de argv.
 - Context7 (provider remoto): não implementado. O `DependencyDocsProvider` tem apenas o cache local com proveniência (`internal/docprovider`).
+- Rodada E (2026-11-07): nenhuma mudança de LSP. Pendências de Java, Windows, macOS e checksum de instalação seguem em aberto (ver [roadmap.md](roadmap.md), seção 4).
 
 **Upstream consultado.** Serena em `ede329aaf0c824bea75455a2926f01420d7aa620` (`main` no momento da consulta): só o layout de `src/solidlsp` foi listado. Nenhum arquivo foi lido nem copiado. O `SolidLSP` é Python e o cliente é Go, então a referência usada foi a [especificação LSP](https://microsoft.github.io/language-server-protocol/). A licença MIT declarada no catálogo para `src/solidlsp` não foi reverificada no arquivo. Isso fica registrado como lacuna, porque o catálogo pedia a consulta antes da implementação, e ela não ocorreu nessa ordem.

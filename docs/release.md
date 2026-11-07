@@ -44,6 +44,7 @@ No PowerShell, usar `go build -o sidecar.exe ./cmd/sidecar`, `.\sidecar.exe inst
 
 - [ ] Branch padrão do GitHub é `main` (verificada em 2026-11-06 com `gh repo view`); commit e tag pinados ainda pendentes.
 - [ ] Licença MIT em `LICENSE` (Copyright (c) 2026 Guilherme de Deus) criada em 2026-11-06, ainda não commitada; confirmar que o arquivo entra nos artefatos do GoReleaser antes da tag.
+- [ ] `THIRD_PARTY_NOTICES.md` criado em 2026-11-07 (dependências Go e referências do catálogo). Antes da tag, confirmar que entra nos artefatos junto com `LICENSE`, reconferir as licenças das referências nos SHAs consultados e auditar as gramáticas embutidas em `gotreesitter`.
 - [ ] Build/release provado em matriz e checksums verificados após download.
 - [ ] Smoke test isolado por SO (instalação, hooks reais, `doctor`, desinstalação, rollback).
 - [ ] README mostra comandos reais e limitações; nenhum link de download inexistente.

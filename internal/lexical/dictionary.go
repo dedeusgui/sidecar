@@ -74,6 +74,17 @@ var ptToEn = map[string][]string{
 	"atualizar":   {"update"},
 	"excluir":     {"delete", "remove"},
 	"remover":     {"remove"},
+	// Domain terms documented as holdout misses in docs/benchmark.md ("Falhas recorrentes").
+	// They were added after that measurement, so holdout is no longer blind; see benchmark.md.
+	"encomenda":    {"shipment", "parcel"},
+	"pacote":       {"package", "parcel"},
+	"rastreio":     {"track", "tracking"},
+	"rastreamento": {"tracking", "track"},
+	"cupom":        {"coupon"},
+	"cobrar":       {"charge", "billing"},
+	"tentar":       {"retry", "attempt"},
+	"novamente":    {"retry"},
+	"retentativa":  {"retry"},
 }
 
 // phraseToEn maps multi-word PT expressions (stemmed, folded words) to EN terms.

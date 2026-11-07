@@ -122,6 +122,7 @@ Tudo roda localmente no mesmo executável Go quando possível, reusando SQLite/F
 - Guardrails: sucesso de teste independente, qualidade de patch, intervenções humanas, falsos conflitos, regressões, TTL/memória, segurança, token spend, tempo total, tempo/rounds até primeira evidência efetivamente usada.
 - Avaliar Sidecar **OFF vs v1 vs v2 completo** e ablações (sem intents, sem observer, sem LSP, sem memória, sem contract, etc.) com condições iguais para ferramentas do agente.
 - Resultado `inconclusive` é permitido; não promovemos feature que melhore Hit@5 mas piore sucesso/custo de tarefa.
+- **Estado (2026-11-07):** suíte v2 com 15 cenários e checks mecânicos ([benchmark.md](benchmark.md), seção Rodada E). Nela, v2 empata com bm25 + tradução (7/15) e não o supera. O harness agentic (`--agentic-report`) está construído e testado com registros sintéticos; nenhuma execução foi feita, porque exige autorização de custo. Não há resultado agentic de P9 ainda.
 
 ## Política de instruções, hooks e tokens
 

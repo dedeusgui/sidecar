@@ -26,6 +26,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/store"
 )
 
+// gold is one relevant item. An empty Name is file-level gold: any symbol in Path counts.
 type gold struct {
 	Path string `json:"path"`
 	Name string `json:"name"`
@@ -35,9 +36,15 @@ type caseSpec struct {
 	ID       string `json:"id"`
 	Split    string `json:"split"`
 	Repo     string `json:"repo"`
+	Category string `json:"category,omitempty"`
 	Prompt   string `json:"prompt"`
 	Negative bool   `json:"negative"`
 	Relevant []gold `json:"relevant"`
+	// Mechanical checks, used by scenario suites. Each applies only when set.
+	ExpectConflict bool     `json:"expect_conflict,omitempty"` // a CONFLICT_CANDIDATE note reaches the output
+	ExpectContract string   `json:"expect_contract,omitempty"` // a contract finding with this status exists
+	MustNot        []string `json:"must_not,omitempty"`        // these paths must not appear in the top 10
+	SeenRerun      bool     `json:"seen_rerun,omitempty"`      // a second pass with the first pass's evidence must not repeat gold
 }
 
 type repoSpec struct {
@@ -55,9 +62,13 @@ type callResult struct {
 	hits      []store.SymbolHit
 	tokens    int
 	latencyMS float64
+	notes     []string // conflict notes that reached the output
+	contracts []string // contract statuses found, e.g. TEST_EXPECTED
+	keys      []string // keys of the evidence returned, for the seen rerun
 }
 
-type runner func(ix *index.Index, prompt string) (callResult, error)
+// runner answers one prompt. seen, when set, reports evidence already delivered in the session.
+type runner func(ix *index.Index, prompt string, seen ctxbuild.Seen) (callResult, error)
 
 type method struct {
 	name string
@@ -68,10 +79,12 @@ type caseOutcome struct {
 	Method    string   `json:"method"`
 	Case      string   `json:"case"`
 	Split     string   `json:"split"`
+	Category  string   `json:"category,omitempty"`
 	Negative  bool     `json:"negative"`
 	Top       []string `json:"top"`
 	Found     int      `json:"gold_found_top10"`
 	Gold      int      `json:"gold_total"`
+	Hit1      bool     `json:"hit_at_1"`
 	Hit5      bool     `json:"hit_at_5"`
 	Recall10  float64  `json:"recall_at_10"`
 	RR        float64  `json:"reciprocal_rank"`
@@ -79,37 +92,44 @@ type caseOutcome struct {
 	Empty     bool     `json:"empty"`
 	LatencyMS float64  `json:"latency_ms"`
 	Tokens    int      `json:"context_tokens"`
+	Failed    []string `json:"failed_checks,omitempty"` // mechanical checks that did not hold
 }
 
 func main() {
 	casesPath := flag.String("cases", "bench/cases.json", "cases file")
+	externalPath := flag.String("external-cases", "", "pinned external manifest (repos checked out at their commit); replaces --cases")
+	agenticDir := flag.String("agentic-report", "", "print the agentic A/B report for the run records in this directory and exit")
+	agenticManifest := flag.String("agentic-manifest", "bench/agentic/manifest.jsonl", "task manifest used by --agentic-report")
 	outPath := flag.String("out", "", "write full results as JSON to this path")
 	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
 	reportMD := flag.String("report-md", "", "write a Markdown report to this path (includes the comparison when --compare is set)")
 	flag.Parse()
 
-	raw, err := os.ReadFile(*casesPath)
-	must(err)
-	var cf casesFile
-	must(json.Unmarshal(raw, &cf))
-	base := filepath.Dir(filepath.Dir(*casesPath)) // fixtures are relative to the repo root
+	if *agenticDir != "" {
+		must(printAgenticReport(os.Stdout, *agenticDir, *agenticManifest))
+		return
+	}
 
 	tmp, err := os.MkdirTemp("", "sidecar-eval")
 	must(err)
 	defer func() { _ = os.RemoveAll(tmp) }()
 
-	indexes := map[string]*index.Index{}
-	for name, spec := range cf.Repos {
-		root := filepath.Join(tmp, name)
-		buildFixtureRepo(filepath.Join(base, spec.Fixture), root, spec)
-		ix, _, err := index.Open(root, filepath.Join(tmp, name+".db"))
+	var cf casesFile
+	var indexes map[string]*index.Index
+	if *externalPath != "" {
+		cf, indexes = openExternal(*externalPath, tmp)
+	} else {
+		raw, err := os.ReadFile(*casesPath)
 		must(err)
-		rep, err := ix.Sync(context.Background(), index.Options{WithHistory: true})
-		must(err)
-		fmt.Fprintf(os.Stderr, "indexed %-5s files=%d parsed=%d complete=%v\n", name, rep.Files, rep.Parsed, rep.Complete)
-		indexes[name] = ix
-		defer func() { _ = ix.Close() }()
+		must(json.Unmarshal(raw, &cf))
+		base := filepath.Dir(filepath.Dir(*casesPath)) // fixtures are relative to the repo root
+		indexes = buildFixtures(cf, base, tmp)
 	}
+	defer func() {
+		for _, ix := range indexes {
+			_ = ix.Close()
+		}
+	}()
 
 	methods := []method{
 		{"textual (substring)", textualRun},
@@ -128,13 +148,20 @@ func main() {
 	for _, m := range methods {
 		for _, c := range cf.Cases {
 			ix := indexes[c.Repo]
-			res, err := m.run(ix, c.Prompt)
+			res, err := m.run(ix, c.Prompt, nil)
 			must(err)
-			outcomes = append(outcomes, score(m.name, c, res))
+			o := score(m.name, c, res)
+			if c.SeenRerun {
+				rerun, err := m.run(ix, c.Prompt, seenSet(res.keys))
+				must(err)
+				o.Failed = append(o.Failed, seenFailures(c, res, rerun)...)
+			}
+			outcomes = append(outcomes, o)
 		}
 	}
 
 	printTables(os.Stdout, methods, outcomes)
+	printScenarios(os.Stdout, methodNames(methods), outcomes)
 	var cmp *comparison
 	if *comparePath != "" {
 		base, err := loadBaseline(*comparePath)
@@ -160,32 +187,43 @@ func retrieveRun(ab retrieve.Ablation) runner {
 
 // retrieveRunWith runs the retrieval pipeline with the given options.
 func retrieveRunWith(opts retrieve.Options) runner {
-	return func(ix *index.Index, prompt string) (callResult, error) {
+	return func(ix *index.Index, prompt string, seen ctxbuild.Seen) (callResult, error) {
 		t := time.Now()
 		o := opts
 		o.Root = ix.Root()
+		o.Seen = seen
 		res, err := retrieve.Search(context.Background(), ix.Store(), prompt, o)
 		if err != nil {
 			return callResult{}, err
 		}
 		// A conflict note is a second item about the same definition; the hit list counts each once.
 		var hits []store.SymbolHit
-		seen := map[string]bool{}
+		var notes, keys []string
+		dedup := map[string]bool{}
 		for _, e := range res.Evidence {
 			key := fmt.Sprintf("%s|%s|%s|%d", e.Hit.Path, e.Hit.Kind, e.Hit.Name, e.Hit.Line)
-			if !seen[key] {
-				seen[key] = true
+			if !dedup[key] {
+				dedup[key] = true
 				hits = append(hits, e.Hit)
 			}
+			if e.Note != "" {
+				notes = append(notes, e.Note)
+			}
+			keys = append(keys, e.Key())
+		}
+		var contracts []string
+		for _, f := range res.Trace.Contracts {
+			contracts = append(contracts, string(f.Status))
 		}
 		return callResult{hits: hits, tokens: ctxbuild.EstimateTokens(brief.Render(res, nil)),
-			latencyMS: float64(time.Since(t).Microseconds()) / 1000}, nil
+			latencyMS: float64(time.Since(t).Microseconds()) / 1000,
+			notes:     notes, contracts: contracts, keys: keys}, nil
 	}
 }
 
 // textualRun is the baseline a person would get from grep: raw prompt words (4+ letters,
 // no translation, no stemming, no stopwords) matched as substrings of symbol names and paths.
-func textualRun(ix *index.Index, prompt string) (callResult, error) {
+func textualRun(ix *index.Index, prompt string, _ ctxbuild.Seen) (callResult, error) {
 	t := time.Now()
 	words := strings.FieldsFunc(strings.ToLower(prompt), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
 	var terms []string
@@ -237,7 +275,7 @@ func textualRun(ix *index.Index, prompt string) (callResult, error) {
 }
 
 func score(name string, c caseSpec, res callResult) caseOutcome {
-	o := caseOutcome{Method: name, Case: c.ID, Split: c.Split, Negative: c.Negative, Gold: len(c.Relevant),
+	o := caseOutcome{Method: name, Case: c.ID, Split: c.Split, Category: c.Category, Negative: c.Negative, Gold: len(c.Relevant),
 		LatencyMS: res.latencyMS, Tokens: res.tokens, Empty: len(res.hits) == 0}
 	for i, h := range res.hits {
 		if i < 10 {
@@ -251,7 +289,7 @@ func score(name string, c caseSpec, res callResult) caseOutcome {
 	for i := 0; i < limit; i++ {
 		isGold := false
 		for gi, g := range c.Relevant {
-			if res.hits[i].Path == g.Path && res.hits[i].Name == g.Name {
+			if g.matches(res.hits[i]) {
 				isGold = true
 				matched[gi] = true
 				if firstRank == 0 {
@@ -269,8 +307,11 @@ func score(name string, c caseSpec, res callResult) caseOutcome {
 	}
 	for i := 0; i < min(len(res.hits), 5); i++ {
 		for _, g := range c.Relevant {
-			if res.hits[i].Path == g.Path && res.hits[i].Name == g.Name {
+			if g.matches(res.hits[i]) {
 				o.Hit5 = true
+				if i == 0 {
+					o.Hit1 = true
+				}
 			}
 		}
 	}
@@ -280,18 +321,24 @@ func score(name string, c caseSpec, res callResult) caseOutcome {
 	if limit > 0 {
 		o.Precision = float64(relevantInList) / float64(limit)
 	}
+	o.Failed = checkFailures(c, res, o)
 	return o
 }
 
+// matches reports whether a hit is this gold item. File-level gold matches any symbol in the file.
+func (g gold) matches(h store.SymbolHit) bool {
+	return h.Path == g.Path && (g.Name == "" || h.Name == g.Name)
+}
+
 func printTables(w io.Writer, methods []method, outs []caseOutcome) {
-	for _, split := range splits {
+	for _, split := range splitsOf(outs) {
 		_, _ = fmt.Fprintf(w, "\n### Split: %s\n\n", split)
-		_, _ = fmt.Fprintln(w, "| Método | Hit@5 | Recall@10 | MRR | Precisão | Sem evidência (positivos) | Falso positivo (negativos) | P50 ms | P95 ms | Tokens médios |")
-		_, _ = fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|---|---|")
+		_, _ = fmt.Fprintln(w, "| Método | Hit@1 | Hit@5 | Recall@10 | MRR | Precisão | Sem evidência (positivos) | Falso positivo (negativos) | P50 ms | P95 ms | Tokens médios |")
+		_, _ = fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|---|---|---|")
 		for _, m := range methods {
 			s := summarize(m.name, split, outs)
-			_, _ = fmt.Fprintf(w, "| %s | %.1f%% | %.1f%% | %.3f | %.1f%% | %.1f%% | %.1f%% | %.2f | %.2f | %.0f |\n",
-				m.name, s.Hit5, s.Recall10, s.MRR, s.Precision, s.Empty, s.FalsePos, s.P50, s.P95, s.Tokens)
+			_, _ = fmt.Fprintf(w, "| %s | %.1f%% | %.1f%% | %.1f%% | %.3f | %.1f%% | %.1f%% | %.1f%% | %.2f | %.2f | %.0f |\n",
+				m.name, s.Hit1, s.Hit5, s.Recall10, s.MRR, s.Precision, s.Empty, s.FalsePos, s.P50, s.P95, s.Tokens)
 		}
 	}
 }
@@ -303,6 +350,7 @@ func writeReportMD(path string, methods []method, outs []caseOutcome, cmp *compa
 	h := hardware()
 	_, _ = fmt.Fprintf(f, "# Relatório sidecar-eval\n\nAmbiente: %s · %s · %s\n", hardwareField(h, "date"), hardwareField(h, "go"), hardwareField(h, "cpu_model"))
 	printTables(f, methods, outs)
+	printScenarios(f, methodNames(methods), outs)
 	if cmp != nil {
 		printComparison(f, *cmp)
 	}

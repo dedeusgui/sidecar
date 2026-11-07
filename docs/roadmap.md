@@ -111,6 +111,12 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 - **E4 — Hardening final:** dados não confiáveis, prompt injection, paths, SQLite corrupção/locks, limites de CPU/memória, Windows/macOS/Linux, monorepos, sem Git, symlinks, Unicode, áreas sensíveis e transições de versão de storage.
 - **E5 — Distribuição:** documentação sem promessas falsas, LICENSE/THIRD_PARTY_NOTICES conforme aplicável, release com checksums, instalação simples, rollback/backup e relatório público honesto de limitações.
 
+**Estado em 2026-11-07 (Rodada E parcial; Gate E aberto):**
+- **E1 (parcial):** `bench/v2_scenarios.json` com 15 cenários e checks mecânicos, cobrindo as 12 áreas pedidas. Fixture `bench/testdata/fixtures/v2`. Nenhum cenário foi ajustado depois da medição. Resultado: a suíte discrimina, mas **v2 empata com bm25 + tradução (7/15)** e não o supera. Falhas com causa verificada em [benchmark.md](benchmark.md). `--external-cases` lê manifesto normalizado com commits fixados, testado com clone local. **Não executado com corpus público:** o esquema oficial do Agent Retrieval Bench não foi verificado e o ContextBench não declara licença.
+- **E2/E3 (construído, não executado):** `internal/benchagent` e `sidecar-eval --agentic-report` calculam TTFE (apresentado e usado), tool calls, rounds, resolução, fidelidade, ineficiência, tokens, IC bootstrap pareado e veredito por tarefa. `bench/agentic/manifest.jsonl` tem 4 tarefas em `draft`, sem oráculo executado; tarefa `draft` nunca recebe veredito. **Nenhuma execução de agente foi feita**: exige autorização de custo. CodeGraph e busca nativa não foram executados.
+- **E4 (parcial):** 9 termos de domínio documentados como falhas de holdout foram adicionados ao dicionário, sem falso positivo. **Meta não atingida** em eval e holdout (Hit@5). **Holdout deixou de ser cego.** Três ajustes de vizinhos estruturais foram medidos e rejeitados (peso RRF sem efeito; marcação de vizinho com regressão de 10 a 15 pontos). Lacunas conhecidas, não corrigidas: extração Rust de `const_item`, exclusão de arquivos gerados e vocabulário (`multa`, `atraso`, `sessão`, `frete`).
+- **E5 (parcial):** `THIRD_PARTY_NOTICES.md` criado com licenças conferidas nos módulos Go e licenças do catálogo de referências (não reverificadas). Documentação sincronizada com os números desta rodada. **Pendentes:** release, changelog, E2E de cliente e auditoria das gramáticas do gotreesitter.
+
 **Gate E:** a V2 só é considerada concluída quando o conjunto estiver integrado e verificável, com falhas/efeitos negativos publicados e caminho de recuperação. Metas de produto para amostra robusta são reduzir **≥15% tempo até evidência correta usada** e **≥20% buscas/leitura** sem degradar taxa de solução; são hipóteses, **não resultados nem gatilhos de fingir significância no piloto**.
 
 ## 4. Testes obrigatórios e rastreabilidade de status
@@ -119,16 +125,16 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 |---|---|---|
 | CLI/distribuição | build + checksums; install→reinstall→upgrade→uninstall→rollback; PATH e ownership; 3 SO | **Pendente E2E abrangente** |
 | Hooks | schema por versão, aprovação Codex, Claude real, Antigravity CLI real, no evidence/failure/safe stdout, coexistência | **Parcial** |
-| Ranking/intenção | baselines v1, ablações, PT/EN, tie-break estável, negativas, mudanças de repo | **V2 pendente** |
+| Ranking/intenção | baselines v1, ablações, PT/EN, tie-break estável, negativas, mudanças de repo | **Parcial:** suíte v2 de 15 cenários com checks mecânicos (v2 7/15, igual a bm25 + tradução); ablações e negativos medidos; tie-break estável **não** garantido (MRR oscila); mudanças de repo não testadas |
 | Contratos | código/docs/testes de acordo, conflito explícito, falso conflito, fonte desatualizada, alteração de commit | **Pendente** |
 | SessionObserver | repetição real/legítima, concorrência, TTL, privacy, compactação, unobserved, session IDs | **Parcial: testes unitários executados; sem concorrência, compactação nem E2E de hook de ferramenta** |
 | Memória | decisão com hash, stale/invalidation, purge e opt-in, não misturar worktrees | **Parcial: testes de store e app executados; sem injeção de decisões no contexto** |
 | LSP/docs | handshake, Java/Go, absent, slow, untrusted, windows, cancelamento, checksum/rollback | **Parcial**: handshake, absent, slow, untrusted, erro e cancelamento de processo testados em Linux; `gopls` real só para Go; Java, Windows, macOS e checksum/rollback de instalação de LSP pendentes |
 | Desempenho | cold/warm, p50/p95/p99, overhead do processo, memória, tokens, indexação grande | **Parcial v1** |
 | Segurança | entrada não confiável, injeção de instruções, symlinks, segredos, paths e logs sem conteúdo sensível | **Parcial v1** |
-| Agentes reais | OFF/v1/v2, sucesso, TTFE utilizado, tool calls, rounds, total tokens, walltime, interferência | **Não executado** |
+| Agentes reais | OFF/v1/v2, sucesso, TTFE utilizado, tool calls, rounds, total tokens, walltime, interferência | **Harness construído e testado com registros sintéticos; nenhuma execução (custo não autorizado)** |
 | Concorrentes | CodeGraph e busca nativa; mesmo modelo, tarefas, permissions, ferramentas e budget | **Não executado** |
-| Publicação | versão, changelog, licença, comparações, limitações, guia rápido, rollback | **Pendente** |
+| Publicação | versão, changelog, licença, comparações, limitações, guia rápido, rollback | **Parcial:** `THIRD_PARTY_NOTICES.md` e relatórios em `bench/results/`; versão, changelog, guia rápido e rollback pendentes |
 
 **Invariante de validação:** unit test verde não é substituto de E2E real; cross-compile não prova plugin funcionando; offline ranking não prova economia agentic; ausência de evento não é ausência de ferramenta usada; autoavaliação do modelo não é gold.
 

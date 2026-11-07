@@ -137,7 +137,11 @@ A suíte própria deve cobrir 10–15 cenários reproducíveis de uso pessoal (n
 
 **Critério de decisão:** ganhos de TTFE, rounds ou tokens que reduzam a taxa de tarefas corretas são regressões; não reivindicar determinismo do modelo; usar bootstrap pareado por tarefa, incerteza, efeitos negativos e status `inconclusivo`. Metas de ≥15% TTFE utilizado e ≥20% buscas até evidência são **hipóteses pré-registráveis**, não resultados já demonstrados.
 
-## Estrutura proposta para o harness futuro (não implementada)
+## Estrutura do harness agentic (parcialmente implementada, sem execuções)
+
+**Estado (2026-11-07):** `bench/agentic/manifest.jsonl` (4 tarefas em `draft`), `internal/benchagent` e `sidecar-eval --agentic-report`. O avaliador lê `runs.jsonl`, rejeita campos desconhecidos, pareia repetições e emite veredito só para tarefa verificada com ao menos 3 pares. **Nenhum agente foi executado.** O runner, o isolamento por worktree e a coleta de traces por cliente continuam pendentes. Ver [benchmark.md](benchmark.md), seção 4.
+
+Desenho original, mantido como referência:
 
 `bench/agentic/`: `manifest.jsonl` (tarefa + versão + gold), `run-manifest.json` (modelo/CLI/effort, orçamento, braço, seed/ordem), `traces/` privados locais, `report.json` e `report.md` derivados. Início com um runner de replay simples; **não** introduzir framework pesado nem abstrair três CLIs antes de observar seus eventos reais. Salvar metadados agregados por padrão; conteúdo bruto somente com opt-in em diretório privado e retenção definida.
 

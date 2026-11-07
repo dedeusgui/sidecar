@@ -113,10 +113,10 @@ Isso **não** comprova instalação/hook E2E em todos os sistemas; Codex CLI rea
 
 ## Limitações
 
-- **Vocabulário.** O dicionário PT→EN tem 64 termos (com tradução reversa e uma expressão composta). Palavras fora dele (`encomenda`, `cupom`,
-  `dono`, `visita`, `controlador`) não são traduzidas, e o Sidecar não recupera conceitos ausentes do prompt.
+- **Vocabulário.** O dicionário PT→EN tem 73 termos (com tradução reversa e uma expressão composta). Palavras fora dele não são traduzidas, e o Sidecar não recupera conceitos ausentes do prompt. Exemplos medidos na suíte v2: `multa`, `atraso`, `porcentagem`, `sessão`, `renovar`, `frete`. Também faltam `dono`, `visita` e `controlador`.
 - **Grafo e Git não provados.** Nos casos medidos, o grafo estrutural não superou a tradução sozinha, e os sinais de
   Git não mudaram os resultados. Veja `docs/benchmark.md`.
+- **Arquivos gerados e Rust.** Arquivos gerados fora de diretórios excluídos (`*_gen.go`, por exemplo) ainda entram no índice, e constantes Rust (`const`) não viram símbolos. Ambos aparecem como falhas na suíte v2.
 - **Idioma.** Análise morfológica simples; não há lematização completa.
 - **Escala.** Medido em repositórios pequenos e no PetClinic. Repositórios muito grandes dependem do indexador em
   segundo plano para convergir.
@@ -149,7 +149,8 @@ As funções novas são **planejadas, não entregues**. Toda alegação de ganho
 - [docs/integrations.md](docs/integrations.md): contratos de hooks e visibilidade UI opcional.
 - [docs/release.md](docs/release.md): build, instalação, update e gates de release.
 - [docs/roadmap.md](docs/roadmap.md): milestones, prioridades e critérios de aceite.
-- [docs/benchmark.md](docs/benchmark.md): **resultados existentes** de recuperação offline.
+- [docs/benchmark.md](docs/benchmark.md): **resultados existentes** de recuperação offline, inclusive a suíte v2 e os experimentos rejeitados.
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md): licenças das dependências Go e das referências consultadas.
 
 **Atenção:** os benchmarks atuais não demonstram redução de rounds, tempo ou tokens de um
 agente. Essas são hipóteses a testar em experimentos pareados, sem confundir qualidade de
@@ -161,6 +162,9 @@ retrieval com resultado de engenharia.
 go test ./...
 go test -race ./internal/store/ ./internal/index/ ./internal/app/ ./internal/gitx/
 go run ./cmd/sidecar-eval --cases bench/cases.json
+go run ./cmd/sidecar-eval --cases bench/v2_scenarios.json
+go run ./cmd/sidecar-eval --external-cases <manifesto-pinado.json>
+go run ./cmd/sidecar-eval --agentic-report <diretorio-com-runs.jsonl>
 go build -tags 'grammar_subset grammar_subset_go grammar_subset_python grammar_subset_typescript grammar_subset_tsx grammar_subset_javascript grammar_subset_java grammar_subset_c_sharp' ./cmd/sidecar
 ```
 
@@ -168,4 +172,4 @@ Estrutura: `cmd/sidecar` (CLI), `cmd/sidecar-eval` (benchmark), `internal/` com 
 `store` (SQLite/FTS5), `lexical`, `retrieve`, `fusion`, `brief`, `ctxbuild`, `adapter`, `app`, `install`, `paths`.
 Releases: `.goreleaser.yaml` e `.github/workflows/`.
 
-Licença: MIT (veja [LICENSE](LICENSE)).
+Licença: MIT (veja [LICENSE](LICENSE)). Avisos de terceiros: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

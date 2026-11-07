@@ -11,6 +11,23 @@ import (
 // splits lists the case splits in report order. The evaluation split is never used for tuning.
 var splits = []string{"tune", "eval", "holdout"}
 
+// splitsOf lists the fixed splits first, always (the report shape is documented), then any other
+// split in order of appearance. Scenario suites and external manifests bring their own names.
+func splitsOf(outs []caseOutcome) []string {
+	out := append([]string{}, splits...)
+	seen := map[string]bool{}
+	for _, s := range splits {
+		seen[s] = true
+	}
+	for _, o := range outs {
+		if !seen[o.Split] {
+			seen[o.Split] = true
+			out = append(out, o.Split)
+		}
+	}
+	return out
+}
+
 // baseline is a results file written earlier by --out. Only the fields the comparison needs are read.
 type baseline struct {
 	Hardware map[string]any `json:"hardware"`
@@ -19,9 +36,9 @@ type baseline struct {
 
 // summary holds the headline numbers of one method on one split. Percentages are 0-100.
 type summary struct {
-	Hit5, Recall10, MRR, Precision, Empty, FalsePos float64
-	P50, P95, Tokens                                float64
-	Positives, Negatives                            int
+	Hit1, Hit5, Recall10, MRR, Precision, Empty, FalsePos float64
+	P50, P95, Tokens                                      float64
+	Positives, Negatives                                  int
 }
 
 // deltaRow compares one method on one split against the baseline.
@@ -45,9 +62,9 @@ type comparison struct {
 }
 
 type agg struct {
-	pos, neg, hit5, empty, falsePos, precN int
-	recall, rr, precision                  float64
-	latencies, tokens                      []float64
+	pos, neg, hit1, hit5, empty, falsePos, precN int
+	recall, rr, precision                        float64
+	latencies, tokens                            []float64
 }
 
 // loadBaseline reads a results file produced by `sidecar-eval --out`.
@@ -126,6 +143,7 @@ func detectChanges(base, cur []caseOutcome) (regressions, improvements []caseCha
 func summarize(name, split string, outs []caseOutcome) summary {
 	a := aggregate(name, split, outs)
 	return summary{
+		Hit1:      pct(a.hit1, a.pos),
 		Hit5:      pct(a.hit5, a.pos),
 		Recall10:  100 * a.recall / float64(max(a.pos, 1)),
 		MRR:       a.rr / float64(max(a.pos, 1)),
@@ -156,6 +174,9 @@ func aggregate(name, split string, outs []caseOutcome) *agg {
 		}
 		a.pos++
 		a.tokens = append(a.tokens, float64(o.Tokens))
+		if o.Hit1 {
+			a.hit1++
+		}
 		if o.Hit5 {
 			a.hit5++
 		}
