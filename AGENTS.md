@@ -67,6 +67,10 @@ go run ./cmd/sidecar doctor
 
 Ler `docs/evaluation-plan.md` antes de declarar ganho. Reportar **retrieval offline** separadamente de **resultado end-to-end com agentes**. Use baseline Sidecar off, mesmas tarefas/commit/ambiente/permissões/modelo, ordem balanceada, medição do overhead e orçamento; incluir falhas, casos negativos, tamanho do corpus e intervalos de incerteza. Proibido mexer em holdout após observar os resultados e continuar chamando-o de cego.
 
+**Fixtures internas são portão mínimo.** `bench/cases.json` e `bench/v2_scenarios.json` servem só para sanidade e regressão locais: o mesmo autor do código os escreveu, então carregam o viés dele e não provam utilidade. A utilidade real, com agente caixa-preta, valida-se em **repositórios externos reais** (`--external-cases`, manifesto com commit fixado, ex.: `spring-petclinic`, `go-chi/chi`) com prompts realistas, imperfeitos, ruidosos e curtos (pedidos ambíguos, saudações, ruído), medindo tempo, qualidade e custo/tokens. Ver [evaluation-plan.md](docs/evaluation-plan.md#validade-externa-e-prompts-realistas).
+
+**Autodogfooding e feedback.** Quem desenvolve o Sidecar deve rodá-lo instalado (`sidecar install --yes --statusline --observe-tools`) e registrar o resultado ao fim da tarefa com `sidecar feedback record`. Procedimento e fórmula em [development.md](docs/development.md#autodogfooding-e-feedback-pós-tarefa) e [agent-feedback.md](docs/agent-feedback.md).
+
 ## Política de compatibilidade e extensões
 
 Hooks são contratos versionados de terceiros: não presumir que Codex, Claude Code e Antigravity CLI tenham schemas ou UI idênticos. Exigir testes de contrato e E2E reais por cliente. Recursos de UI (status line, plugin/mod), skills ou integrações extras devem ser **opt-in**, reversíveis, sem substituir statuslines ou configurações existentes. Não prometer execução de interface não verificada.

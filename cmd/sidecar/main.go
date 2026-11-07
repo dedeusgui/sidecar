@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -54,6 +55,8 @@ func run(args []string, in io.Reader, out, errOut io.Writer) int {
 		return cmdObserve(rest, in)
 	case "memory":
 		return cmdMemory(rest, out, errOut)
+	case "feedback":
+		return cmdFeedback(rest, in, out, errOut)
 	case "lsp":
 		return cmdLSP(rest, in, out, errOut)
 	case "activity":
@@ -88,6 +91,11 @@ Uso:
   sidecar memory list|add|purge [--root DIR] [--json] decisões técnicas verificáveis (opt-in)
                                                       add: --target ARQUIVO|SIMBOLO --summary TEXTO [--ttl 720h]
                                                       purge: remove as invalidadas (--all: todas)
+  sidecar feedback record|list|purge [--root DIR] [--json]   feedback pós-tarefa (opt-in; docs/agent-feedback.md)
+                                                      record: --helpful ID | --misleading ID (repetível) [--reason CODE]
+                                                      [--confidence high|medium|low] [--completed=true|false]
+                                                      [--additional-search=true|false] [--session ID]; sem IDs, lê JSON no stdin
+                                                      purge: remove os obsoletos (--all: todos)
   sidecar observe --agent A --event PreToolUse|PostToolUse|PreCompact   registra eventos (silencioso)
   sidecar version
 
@@ -372,6 +380,107 @@ func printDecisions(out io.Writer, recs []store.DecisionRecord, asJSON bool) err
 	}
 	for _, d := range recs {
 		if _, err := fmt.Fprintf(out, "%-4d %-12s %s  %s\n", d.ID, d.Status, d.SymbolOrPath, d.Summary); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// maxFeedbackBytes bounds a report read from stdin; the report is a few IDs and labels.
+const maxFeedbackBytes = 64 << 10
+
+// idList is a repeatable flag that collects evidence IDs.
+type idList []string
+
+func (l *idList) String() string { return strings.Join(*l, ",") }
+func (l *idList) Set(v string) error {
+	*l = append(*l, v)
+	return nil
+}
+
+func cmdFeedback(args []string, in io.Reader, out, errOut io.Writer) int {
+	if len(args) == 0 {
+		_, _ = fmt.Fprintln(errOut, "uso: sidecar feedback record|list|purge [--root DIR] [--json]")
+		return 2
+	}
+	sub, rest := args[0], args[1:]
+	fs := flag.NewFlagSet("feedback "+sub, flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	root := fs.String("root", ".", "folder inside the repository")
+	asJSON := fs.Bool("json", false, "print as JSON")
+	var helpful, misleading idList
+	fs.Var(&helpful, "helpful", "evidence ID the agent found helpful (record; repeatable)")
+	fs.Var(&misleading, "misleading", "evidence ID the agent found misleading (record; repeatable)")
+	reason := fs.String("reason", "other", "exact_match, wrong_file, stale_context, missing_caller, noisy_neighbor or other (record)")
+	confidence := fs.String("confidence", "medium", "high, medium or low (record)")
+	completed := fs.Bool("completed", false, "the task was completed (record)")
+	additional := fs.Bool("additional-search", false, "the agent needed another search (record)")
+	session := fs.String("session", "", "agent session ID, to read the observer trace (record)")
+	all := fs.Bool("all", false, "purge every record, not only stale ones (purge)")
+	if err := fs.Parse(rest); err != nil {
+		return 2
+	}
+	abs, _ := filepath.Abs(*root)
+	rootDir, _ := repo.FindRoot(abs)
+	var err error
+	switch sub {
+	case "record":
+		var report store.AgentFeedbackReport
+		switch {
+		case len(helpful) > 0 || len(misleading) > 0:
+			report = store.AgentFeedbackReport{
+				SchemaVersion: 1, SessionID: *session, TaskCompleted: *completed,
+				HelpfulEvidenceIDs: helpful, MisleadingEvidenceIDs: misleading,
+				ReasonCode: *reason, Confidence: *confidence, AdditionalSearchNeeded: *additional,
+			}
+		case isTerminal(in):
+			err = errors.New("pass --helpful or --misleading, or send the report as JSON on stdin")
+		default:
+			err = json.NewDecoder(io.LimitReader(in, maxFeedbackBytes)).Decode(&report)
+		}
+		if err != nil {
+			break
+		}
+		var recs []store.FeedbackRecord
+		if recs, err = app.RecordFeedback(rootDir, report); err == nil {
+			err = printFeedback(out, recs, *asJSON)
+		}
+	case "list":
+		var recs []store.FeedbackRecord
+		if recs, err = app.ListFeedback(rootDir); err == nil {
+			err = printFeedback(out, recs, *asJSON)
+		}
+	case "purge":
+		var n int64
+		if n, err = app.PurgeFeedback(rootDir, *all); err == nil {
+			_, err = fmt.Fprintf(out, "✓ %d registro(s) de feedback removido(s)\n", n)
+		}
+	default:
+		_, _ = fmt.Fprintf(errOut, "subcomando desconhecido: %q (use record, list ou purge)\n", sub)
+		return 2
+	}
+	if err != nil {
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	return 0
+}
+
+func printFeedback(out io.Writer, recs []store.FeedbackRecord, asJSON bool) error {
+	if asJSON {
+		data, err := json.MarshalIndent(recs, "", "  ")
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(out, string(data))
+		return err
+	}
+	if len(recs) == 0 {
+		_, err := fmt.Fprintln(out, "nenhum feedback registrado (use: sidecar feedback record --helpful ID | --misleading ID)")
+		return err
+	}
+	for _, r := range recs {
+		if _, err := fmt.Fprintf(out, "%-4d %-7s %+.3f %s\n", r.ID, r.Status, r.ReconciledWeight, r.EvidenceID); err != nil {
 			return err
 		}
 	}

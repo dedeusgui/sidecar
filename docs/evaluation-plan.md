@@ -56,6 +56,14 @@ Painel de execução inicialmente **manual e opt-in**:
 
 Bloquear divulgação de percentual de melhora quando: poucos pares, runs incompletas não reportadas, confusão de modelo/versão, corpus alterado entre ON e OFF, referência gold contaminada, warm index só em um braço, benchmarks usados no tuning, ou instrumentação assimétrica. Pré-registrar análise principal antes das runs. Preferir **bootstrap pareado** com intervalo de confiança por tarefa (não só por execução), relatório de n e variância; concluir `inconclusivo` quando apropriado.
 
+## Validade externa e prompts realistas
+
+- `bench/cases.json` e `bench/v2_scenarios.json` são **portão mínimo local** de sanidade e regressão. O autor do código também escreveu esses casos, então carregam o viés dele. Melhora neles não prova utilidade; piora neles é sinal de regressão a investigar.
+- A utilidade para um agente caixa-preta só se valida em **repositórios externos reais**, com commit fixado e `--external-cases` (ex.: `spring-petclinic`, `go-chi/chi`).
+- Os prompts devem ser realistas: curtos, imperfeitos, ruidosos, com pedidos ambíguos, saudações e ruído. Prompts escritos para casar com o índice não contam.
+- Cada execução mede **tempo**, **qualidade** (resolução com oráculo e uso verificável da evidência) e **custo/tokens**, incluindo o overhead do Sidecar. Os três são resumidos em um escore composto de 0 a 100, cujos pesos ainda não existem: devem ser definidos e pré-registrados antes da coleta. Mostrar sempre os componentes junto do escore.
+- Estado atual: `--external-cases` está implementado, mas nenhum corpus público foi executado (ver [benchmark.md](benchmark.md)). Nenhum número desta seção é resultado.
+
 ## Matriz de repositórios propostos (ainda não coletados)
 
 Seleção propositalmente heterogênea. Antes de usar, verificar licença, SHA, tamanho real, políticas de CI, build/testes, e se o projeto permite redistribuição da fixture. Clonar pinado, sem executar scripts arbitrários. Não guardar cópias não autorizadas em `bench/`.
