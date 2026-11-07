@@ -54,6 +54,9 @@ type Options struct {
 	// StatusLine also configures the Claude Code status line (opt-in, --statusline). An existing
 	// status line from another tool is never replaced.
 	StatusLine bool
+	// ObserveTools also adds the tool-event hooks that `sidecar observe` receives (--observe-tools,
+	// opt-in). They only record metadata; they never change a tool call.
+	ObserveTools bool
 }
 
 // UninstallOptions controls Uninstall.
@@ -64,9 +67,19 @@ type UninstallOptions struct {
 
 type entry struct {
 	Agent       string `json:"agent"`
+	Event       string `json:"event,omitempty"`
 	File        string `json:"file"`
 	Command     string `json:"command"`
 	FileCreated bool   `json:"file_created"`
+}
+
+// hookEvent is the client event an entry belongs to. Entries recorded before tool observation
+// existed have no Event and belong to the prompt hook.
+func (e entry) hookEvent() string {
+	if e.Event != "" {
+		return e.Event
+	}
+	return promptEvent(e.Agent)
 }
 
 // statusLineEntry records a status line this install added, so uninstall removes only it.
@@ -143,7 +156,7 @@ func Install(opts Options) ([]string, error) {
 	if len(agents) == 0 {
 		return nil, errors.New("no supported agent found (Claude Code, Codex or Antigravity CLI)")
 	}
-	plan := describe(opts.Env, agents, opts.StatusLine)
+	plan := describe(opts.Env, agents, opts.StatusLine, opts.ObserveTools)
 	for _, line := range plan {
 		_, _ = fmt.Fprintln(opts.Out, "  "+line)
 	}
@@ -181,18 +194,22 @@ func Install(opts Options) ([]string, error) {
 	var done []string
 	for _, agent := range agents {
 		file := settingsFile(opts.Env, agent)
-		command := HookCommand(dst, agent)
 		created := !fileExists(file)
 		if !created {
 			if err := backupOnce(file); err != nil {
 				return done, err
 			}
 		}
-		if err := editAgentHooks(agent, file, command, true); err != nil {
-			return done, fmt.Errorf("%s: %w", file, err)
+		for _, h := range hooksFor(dst, agent, opts.ObserveTools) {
+			if err := editAgentHooks(agent, file, h.event, h.command, true); err != nil {
+				return done, fmt.Errorf("%s: %w", file, err)
+			}
+			m.upsert(entry{Agent: agent, Event: h.event, File: file, Command: h.command, FileCreated: created || m.createdFor(file)})
 		}
-		m.upsert(entry{Agent: agent, File: file, Command: command, FileCreated: created || m.createdFor(file)})
 		done = append(done, fmt.Sprintf("%s: hook instalado em %s", agent, file))
+		if names := toolEventNames(agent); opts.ObserveTools && len(names) > 0 {
+			done = append(done, fmt.Sprintf("%s: observação de ferramentas (%s) instalada em %s", agent, strings.Join(names, ", "), file))
+		}
 	}
 	if opts.StatusLine && slices.Contains(agents, "claude") {
 		msg, err := installStatusLine(opts.Env, dst, &m)
@@ -222,7 +239,7 @@ func Uninstall(opts UninstallOptions) ([]string, error) {
 		done = append(done, "claude: statusLine do Sidecar removida de "+m.StatusLine.File)
 	}
 	for _, e := range m.Entries {
-		if err := editAgentHooks(e.Agent, e.File, e.Command, false); err != nil {
+		if err := editAgentHooks(e.Agent, e.File, e.hookEvent(), e.Command, false); err != nil {
 			return done, fmt.Errorf("%s: %w", e.File, err)
 		}
 		if e.FileCreated && isEmptySettings(e.File) {
@@ -248,6 +265,59 @@ func Uninstall(opts UninstallOptions) ([]string, error) {
 // HookCommand is the command line an agent runs for a prompt.
 func HookCommand(bin, agent string) string {
 	return quoteBin(bin) + " hook --agent " + agent
+}
+
+// observeCommand is the command a tool-event hook runs: `sidecar observe` for that event.
+func observeCommand(bin, agent, event string) string {
+	return quoteBin(bin) + " observe --agent " + agent + " --event " + event
+}
+
+// promptEvent is the event that runs Sidecar's prompt hook for an agent.
+func promptEvent(agent string) string {
+	if agent == "antigravity" {
+		return "PreInvocation"
+	}
+	return "UserPromptSubmit"
+}
+
+// toolEvent pairs a client's tool hook event with the --event name `sidecar observe` receives.
+// Antigravity CLI names its events PreTool and PostTool; the parser speaks the Claude Code names.
+type toolEvent struct{ event, observed string }
+
+// toolEvents lists the tool-event hooks --observe-tools installs for an agent. Codex is not
+// listed: its tool hooks are not verified against a live client yet.
+func toolEvents(agent string) []toolEvent {
+	switch agent {
+	case "claude":
+		return []toolEvent{{"PreToolUse", "PreToolUse"}, {"PostToolUse", "PostToolUse"}}
+	case "antigravity":
+		return []toolEvent{{"PreTool", "PreToolUse"}, {"PostTool", "PostToolUse"}}
+	}
+	return nil
+}
+
+// toolEventNames lists the client event names of an agent's tool hooks, for messages.
+func toolEventNames(agent string) []string {
+	var names []string
+	for _, t := range toolEvents(agent) {
+		names = append(names, t.event)
+	}
+	return names
+}
+
+// hookFor is one handler an install adds to an agent's hook file.
+type hookFor struct{ event, command string }
+
+// hooksFor lists the handlers an install adds for one agent: the prompt hook, and the tool
+// observers when observeTools is set.
+func hooksFor(bin, agent string, observeTools bool) []hookFor {
+	out := []hookFor{{promptEvent(agent), HookCommand(bin, agent)}}
+	if observeTools {
+		for _, t := range toolEvents(agent) {
+			out = append(out, hookFor{t.event, observeCommand(bin, agent, t.observed)})
+		}
+	}
+	return out
 }
 
 // statusLineCommand is the command Claude Code runs to render the status line.
@@ -280,18 +350,17 @@ func isSidecarBinary(quoted string) bool {
 	return name == "sidecar" || name == "sidecar.exe"
 }
 
-func describe(env Env, agents []string, statusLine bool) []string {
+func describe(env Env, agents []string, statusLine, observeTools bool) []string {
 	lines := []string{fmt.Sprintf("Instalar o binário em %s", filepath.Join(env.InstallDir, BinaryName))}
 	for _, a := range agents {
-		event := "UserPromptSubmit"
-		if a == "antigravity" {
-			event = "PreInvocation"
-		}
-		line := fmt.Sprintf("%s: adicionar hook %s em %s", a, event, settingsFile(env, a))
+		line := fmt.Sprintf("%s: adicionar hook %s em %s", a, promptEvent(a), settingsFile(env, a))
 		if a == "codex" {
 			line += " (o Codex pedirá para revisar e aprovar o hook na primeira execução)"
 		}
 		lines = append(lines, line)
+		if names := toolEventNames(a); observeTools && len(names) > 0 {
+			lines = append(lines, fmt.Sprintf("%s: adicionar observação de ferramentas (%s) em %s; só registra metadados, nunca altera a chamada", a, strings.Join(names, ", "), settingsFile(env, a)))
+		}
 	}
 	if statusLine && slices.Contains(agents, "claude") {
 		file := settingsFile(env, "claude")
@@ -368,21 +437,22 @@ func settingsFile(env Env, agent string) string {
 	return env.ClaudeSettings
 }
 
-// editAgentHooks dispatches to the editor of the agent's hook file.
-func editAgentHooks(agent, file, command string, add bool) error {
+// editAgentHooks dispatches to the editor of the agent's hook file for one event.
+func editAgentHooks(agent, file, event, command string, add bool) error {
 	if agent == "antigravity" {
-		return editAntigravityHooks(file, command, add)
+		return editAntigravityHooks(file, event, command, add)
 	}
-	return editHooks(file, command, add)
+	return editHooks(file, event, command, add)
 }
 
 // antigravityGroup is the hook group Sidecar owns in Antigravity CLI's hooks.json. That
 // file maps group names to events, so Sidecar's handler lives under its own group.
 const antigravityGroup = "sidecar"
 
-// editAntigravityHooks adds or removes Sidecar's PreInvocation handler, which runs once per
-// model call and receives the prompt. Other groups and handlers are left as they are.
-func editAntigravityHooks(file, command string, add bool) error {
+// editAntigravityHooks adds or removes Sidecar's handler for one event of the sidecar group. The
+// PreInvocation handler runs once per model call and receives the prompt. Other groups and
+// handlers are left as they are.
+func editAntigravityHooks(file, event, command string, add bool) error {
 	obj, err := readObject(file)
 	if err != nil {
 		return err
@@ -395,7 +465,7 @@ func editAntigravityHooks(file, command string, add bool) error {
 		group = map[string]any{}
 	}
 	var kept []any
-	for _, h := range listOf(group["PreInvocation"]) {
+	for _, h := range listOf(group[event]) {
 		m, _ := h.(map[string]any)
 		if cmd, _ := m["command"].(string); cmd == command {
 			continue
@@ -406,9 +476,9 @@ func editAntigravityHooks(file, command string, add bool) error {
 		kept = append(kept, map[string]any{"type": "command", "command": command, "timeout": hookTimeoutSeconds})
 	}
 	if len(kept) > 0 {
-		group["PreInvocation"] = kept
+		group[event] = kept
 	} else {
-		delete(group, "PreInvocation")
+		delete(group, event)
 	}
 	if len(group) > 0 {
 		obj[antigravityGroup] = group
@@ -421,9 +491,10 @@ func editAntigravityHooks(file, command string, add bool) error {
 	return writeObject(file, obj)
 }
 
-// editHooks adds (add=true) or removes Sidecar's UserPromptSubmit handler. Other groups,
-// handlers and events are kept in place. Unparseable files are never rewritten.
-func editHooks(file, command string, add bool) error {
+// editHooks adds (add=true) or removes Sidecar's handler for one event: UserPromptSubmit for the
+// prompt hook, or a tool event under --observe-tools. Other groups, handlers and events are kept
+// in place. Unparseable files are never rewritten.
+func editHooks(file, event, command string, add bool) error {
 	obj, err := readObject(file)
 	if err != nil {
 		return err
@@ -434,7 +505,7 @@ func editHooks(file, command string, add bool) error {
 	}
 	var kept []any
 	insertAt := -1
-	for _, g := range listOf(hooks["UserPromptSubmit"]) {
+	for _, g := range listOf(hooks[event]) {
 		group, ok := g.(map[string]any)
 		if !ok {
 			kept = append(kept, g)
@@ -466,16 +537,16 @@ func editHooks(file, command string, add bool) error {
 	if add {
 		handler := map[string]any{"type": "command", "command": command, "timeout": hookTimeoutSeconds}
 		if insertAt < 0 {
-			kept = append(kept, map[string]any{"hooks": []any{handler}})
+			kept = append(kept, newGroup(event, handler))
 		} else {
-			group := map[string]any{"hooks": []any{handler}}
+			group := newGroup(event, handler)
 			kept = append(kept[:insertAt], append([]any{group}, kept[insertAt:]...)...)
 		}
 	}
 	if len(kept) == 0 {
-		delete(hooks, "UserPromptSubmit")
+		delete(hooks, event)
 	} else {
-		hooks["UserPromptSubmit"] = kept
+		hooks[event] = kept
 	}
 	if len(hooks) == 0 {
 		delete(obj, "hooks")
@@ -486,6 +557,16 @@ func editHooks(file, command string, add bool) error {
 		return nil
 	}
 	return writeObject(file, obj)
+}
+
+// newGroup wraps a handler in a matcher group. Tool events use the "*" matcher: Sidecar observes
+// every tool, and the matcher is what Claude Code reads to decide which calls the handler sees.
+func newGroup(event string, handler map[string]any) map[string]any {
+	g := map[string]any{"hooks": []any{handler}}
+	if event == "PreToolUse" || event == "PostToolUse" {
+		g["matcher"] = "*"
+	}
+	return g
 }
 
 func listOf(v any) []any {
@@ -590,7 +671,7 @@ func saveManifest(path string, m manifest) error {
 
 func (m *manifest) upsert(e entry) {
 	for i := range m.Entries {
-		if m.Entries[i].Agent == e.Agent {
+		if m.Entries[i].Agent == e.Agent && m.Entries[i].hookEvent() == e.hookEvent() {
 			// Keep the original FileCreated: only the first install knows whether the file was ours.
 			e.FileCreated = m.Entries[i].FileCreated
 			m.Entries[i] = e

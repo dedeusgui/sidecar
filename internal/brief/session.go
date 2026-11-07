@@ -2,6 +2,7 @@ package brief
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -30,6 +31,7 @@ type SessionSignals struct {
 	Version      string          `json:"version"`
 	Expires      int64           `json:"expires"`
 	Stage        string          `json:"stage"`
+	Compactions  int             `json:"compactions,omitempty"`
 	EvidenceSent int             `json:"evidence_sent"`
 	Symbols      map[string]bool `json:"symbols_visited"`
 	Files        map[string]bool `json:"files_seen"`
@@ -69,14 +71,31 @@ func SaveSignals(path string, s SessionSignals) error {
 	if err != nil {
 		return err
 	}
+	return writeAtomic(path, data)
+}
+
+// writeAtomic replaces path with data through a temporary file of its own. Two processes
+// may save the same session at once (parallel tool calls run parallel observers), so a shared
+// temporary name could interleave their bytes and leave a torn file behind.
+func writeAtomic(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmp := f.Name()
+	_, werr := f.Write(data)
+	if err := errors.Join(werr, f.Close()); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // ClearEpoch forgets reads, searches and errors. An edit calls it: what was read or tried
