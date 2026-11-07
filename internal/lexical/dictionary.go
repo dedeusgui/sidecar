@@ -40,7 +40,7 @@ var ptToEn = map[string][]string{
 	"consulta":    {"query", "lookup"},
 	"agendamento": {"schedule", "scheduling"},
 	"prazo":       {"deadline"},
-	"notificacao": {"notification"},
+	"notificacao": {"notification", "notifier"},
 	"tarefa":      {"task", "job"},
 	"cancelar":    {"cancel"},
 	"ticket":      {"ticket"},
@@ -81,15 +81,26 @@ var ptToEn = map[string][]string{
 	"rastreio":     {"track", "tracking"},
 	"rastreamento": {"tracking", "track"},
 	"cupom":        {"coupon"},
-	"cobrar":       {"charge", "billing"},
+	"cobrar":       {"charge", "billing", "fee"},
 	"tentar":       {"retry", "attempt"},
 	"novamente":    {"retry"},
 	"retentativa":  {"retry"},
+	"multa":        {"fee", "fine", "penalty"},
+	"atraso":       {"late", "delay", "overdue"},
+	"vencimento":   {"due", "overdue", "late"},
+	"porcentagem":  {"percent", "percentage"},
+	"sessao":       {"session"},
+	"renovar":      {"refresh", "renew"},
+	"fatura":       {"invoice"},
+	"frete":        {"shipping", "freight"},
+	"tentado":      {"retry", "retried", "attempt"},
+	"recusado":     {"declined", "refused"},
 }
 
 // phraseToEn maps multi-word PT expressions (stemmed, folded words) to EN terms.
 var phraseToEn = map[string][]string{
 	"nota fiscal": {"invoice"},
+	"de novo":     {"retry"},
 }
 
 // translation tables built once at init: PT→EN (forward) and EN→PT (reverse).

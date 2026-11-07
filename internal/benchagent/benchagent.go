@@ -464,14 +464,14 @@ func (rep Report) WriteMarkdown(w io.Writer, source string) {
 			verified++
 		}
 	}
-	fmt.Fprintf(w, "# Relatório agentic (A/B pareado)\n\n")
-	fmt.Fprintf(w, "Fonte: `%s` · execuções: %d · tarefas no manifesto: %d (verificadas: %d)\n\n", source, rep.Runs, len(rep.Tasks), verified)
+	_, _ = fmt.Fprintf(w, "# Relatório agentic (A/B pareado)\n\n")
+	_, _ = fmt.Fprintf(w, "Fonte: `%s` · execuções: %d · tarefas no manifesto: %d (verificadas: %d)\n\n", source, rep.Runs, len(rep.Tasks), verified)
 	if verified == 0 {
-		fmt.Fprintf(w, "> **Sem tarefas verificadas.** Todas as tarefas estão em `draft`: gold e oráculo independente ainda não foram confirmados. Nenhum veredito é emitido.\n\n")
+		_, _ = fmt.Fprintf(w, "> **Sem tarefas verificadas.** Todas as tarefas estão em `draft`: gold e oráculo independente ainda não foram confirmados. Nenhum veredito é emitido.\n\n")
 	}
-	fmt.Fprintf(w, "## Braços\n\n")
-	fmt.Fprintln(w, "| Braço | Tarefas | Execuções | Censuradas | Resolução | TTFE usado (ms) | Δ TTFE vs OFF (ms, IC 95%) | Δ % | Tool calls até gold | Rounds até gold | Fidelidade contrato | Ineficiência de loop | Tokens da tarefa | Δ tokens |")
-	fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+	_, _ = fmt.Fprintf(w, "## Braços\n\n")
+	_, _ = fmt.Fprintln(w, "| Braço | Tarefas | Execuções | Censuradas | Resolução | TTFE usado (ms) | Δ TTFE vs OFF (ms, IC 95%) | Δ % | Tool calls até gold | Rounds até gold | Fidelidade contrato | Ineficiência de loop | Tokens da tarefa | Δ tokens |")
+	_, _ = fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 	for _, a := range rep.Arms {
 		delta, rel, dburden := "—", "—", "—"
 		if a.Arm != "OFF" && a.PairedTasks > 0 {
@@ -482,19 +482,19 @@ func (rep Report) WriteMarkdown(w io.Writer, source string) {
 			rel = fmt.Sprintf("%+.1f%%", a.TTFERel)
 			dburden = fmt.Sprintf("%+.0f", a.BurdenDelta)
 		}
-		fmt.Fprintf(w, "| %s | %d | %d | %d | %.1f%% | %.0f | %s | %s | %s | %s | %s | %s | %.0f | %s |\n",
+		_, _ = fmt.Fprintf(w, "| %s | %d | %d | %d | %.1f%% | %.0f | %s | %s | %s | %s | %s | %s | %.0f | %s |\n",
 			a.Arm, a.Tasks, a.Runs, a.Censored, 100*a.Resolution, a.TTFEMean, delta, rel,
 			optional(a.Tools), optional(a.Rounds), optional(a.Fidelity), optional(a.Loop), a.Burden, dburden)
 	}
-	fmt.Fprintf(w, "\nCensuradas: execuções em que a evidência correta nunca apareceu; entram no TTFE com o tempo de parede (cota inferior), nunca como zero.\n\n")
-	fmt.Fprintf(w, "## Veredito por tarefa (braço contra OFF)\n\n")
-	fmt.Fprintln(w, "| Tarefa | Braço | Oráculo | Pares | Δ TTFE ms [IC 95%] | Δ resolução [IC 95%] | Veredito | Motivo |")
-	fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|")
+	_, _ = fmt.Fprintf(w, "\nCensuradas: execuções em que a evidência correta nunca apareceu; entram no TTFE com o tempo de parede (cota inferior), nunca como zero.\n\n")
+	_, _ = fmt.Fprintf(w, "## Veredito por tarefa (braço contra OFF)\n\n")
+	_, _ = fmt.Fprintln(w, "| Tarefa | Braço | Oráculo | Pares | Δ TTFE ms [IC 95%] | Δ resolução [IC 95%] | Veredito | Motivo |")
+	_, _ = fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|")
 	for _, v := range rep.Verdicts {
-		fmt.Fprintf(w, "| %s | %s | %s | %d | %+.0f [%+.0f, %+.0f] | %+.2f [%+.2f, %+.2f] | %s | %s |\n",
+		_, _ = fmt.Fprintf(w, "| %s | %s | %s | %d | %+.0f [%+.0f, %+.0f] | %+.2f [%+.2f, %+.2f] | %s | %s |\n",
 			v.Task, v.Arm, v.Oracle, v.Pairs, v.DeltaTTFE, v.TTFELo, v.TTFEHi, v.DeltaRes, v.ResLo, v.ResHi, v.Verdict, v.Reason)
 	}
-	fmt.Fprintf(w, "\nRegra fixada antes das execuções: `%s` exige oráculo verificado, ao menos %d pares, IC 95%% do Δ TTFE abaixo de zero e IC 95%% do Δ resolução não negativo. `%s` exige IC 95%% do Δ TTFE acima de zero ou do Δ resolução abaixo de zero. Os pares são por repetição: com %d repetições, o IC só exclui zero quando todas as diferenças têm o mesmo sinal.\n",
+	_, _ = fmt.Fprintf(w, "\nRegra fixada antes das execuções: `%s` exige oráculo verificado, ao menos %d pares, IC 95%% do Δ TTFE abaixo de zero e IC 95%% do Δ resolução não negativo. `%s` exige IC 95%% do Δ TTFE acima de zero ou do Δ resolução abaixo de zero. Os pares são por repetição: com %d repetições, o IC só exclui zero quando todas as diferenças têm o mesmo sinal.\n",
 		Helped, MinPairs, Hurt, MinPairs)
 }
 

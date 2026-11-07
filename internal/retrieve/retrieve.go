@@ -721,14 +721,23 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 	// When the prompt names an identifier that exists, partial word matches are noise:
 	// keep the exact symbols, their structural neighbours, and anything matching every concept.
 	hasExact := false
+	hasNonGenerated := false
 	for _, c := range cands {
 		if c.exact {
 			hasExact = true
 		}
+		if !repo.IsGenerated(c.hit.Path, nil) && (c.exact || c.coverage > 0) {
+			hasNonGenerated = true
+		}
 	}
 	var pool []*candidate
 	for _, c := range cands {
-		if hasExact && !c.exact && !c.neighbor && c.coverage < 1 {
+		if hasNonGenerated && repo.IsGenerated(c.hit.Path, nil) {
+			c.suppressed = true
+			c.reason = "dropped: generated file"
+			continue
+		}
+		if hasExact && !c.exact && !c.neighbor && len(c.rels) == 0 && c.coverage < 1 {
 			c.suppressed = true
 			c.reason = "dropped: partial word match next to an exact identifier"
 			continue

@@ -17,6 +17,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/brief"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/install"
+	"github.com/dedeusgui/sidecar/internal/lsp"
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/repo"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
@@ -95,6 +96,12 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 		return ExplainReport{}, err
 	}
 	opts.Root = root
+	if opts.LSPTrusted == nil {
+		opts.LSPTrusted = lsp.Trusted
+	}
+	if opts.LSPServer == nil {
+		opts.LSPServer = lspServerForFile
+	}
 	res, err := retrieve.Search(ctx, ix.Store(), prompt, opts)
 	if err != nil {
 		return ExplainReport{}, err

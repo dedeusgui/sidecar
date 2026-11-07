@@ -18,6 +18,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
 	"github.com/dedeusgui/sidecar/internal/index"
+	"github.com/dedeusgui/sidecar/internal/lsp"
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/repo"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
@@ -207,8 +208,27 @@ func hookRetrieveOptions(root, statePath string) retrieve.Options {
 	if os.Getenv("SIDECAR_ENGINE") == "v2" {
 		o.EngineVersion = "v2"
 		o.Seen = brief.SeenFor(statePath)
+		o.LSPTrusted = lsp.Trusted
+		o.LSPServer = lspServerForFile
 	}
 	return o
+}
+
+func lspServerForFile(_ context.Context, root, relPath string) string {
+	lang, _ := repo.LanguageOf(relPath)
+	if lang == "" {
+		return ""
+	}
+	if lang == "c_sharp" {
+		lang = "csharp"
+	}
+	servers, _ := lsp.Discover(root)
+	for _, s := range servers {
+		if s.LanguageID == lang && s.InstalledServerPath != "" {
+			return filepath.Base(s.InstalledServerPath)
+		}
+	}
+	return ""
 }
 
 // damagedIndexError marks a failure caused by a damaged index file; Hook quarantines that file.

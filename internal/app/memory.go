@@ -43,7 +43,7 @@ func attachDecisions(st *store.Store, root, prompt string, res *retrieve.Result,
 		if d.Status != store.DecisionValid {
 			continue
 		}
-		if !files[d.FilePath] && !(d.Symbol != "" && names[d.Symbol]) && !strings.Contains(prompt, d.SymbolOrPath) {
+		if !files[d.FilePath] && (d.Symbol == "" || !names[d.Symbol]) && !strings.Contains(prompt, d.SymbolOrPath) {
 			continue
 		}
 		hash := d.FileHash

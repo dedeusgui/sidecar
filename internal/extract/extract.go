@@ -146,8 +146,8 @@ func (g *grammar) extract(src []byte) Result {
 
 	var res Result
 	var raws []rawRef
+	lines := newLineIndex(src)
 	if g.tagger != nil {
-		lines := newLineIndex(src)
 		for _, tag := range g.tagger.TagTree(tree) {
 			name := strings.TrimSpace(tag.Name)
 			switch {
@@ -177,6 +177,7 @@ func (g *grammar) extract(src []byte) Result {
 
 	walk(tree.RootNode(), func(n *gts.Node) {
 		if sym, ok := g.constant(n, src); ok {
+			sym.Doc = lines.docAbove(sym.Line - 1)
 			res.Symbols = append(res.Symbols, sym)
 		}
 		if mod, ok := g.importModule(n, src); ok {
@@ -269,6 +270,11 @@ func (g *grammar) constant(n *gts.Node, src []byte) (Symbol, bool) {
 		name = childText(n, g.lang, "identifier", src)
 		if list := childOfType(n, g.lang, "expression_list"); list != nil && list.NamedChildCount() == 1 {
 			value = list.NamedChild(0).Text(src)
+		}
+	case "const_item": // Rust
+		name = childText(n, g.lang, "identifier", src)
+		if n.NamedChildCount() >= 2 {
+			value = n.NamedChild(n.NamedChildCount() - 1).Text(src)
 		}
 	case "assignment": // Python, module level, UPPER_CASE names
 		if p := n.Parent(); p == nil || p.Type(g.lang) != "module" || n.NamedChildCount() < 2 {
