@@ -46,7 +46,7 @@ func (s *Store) ExactSymbols(keys []string, limit int) ([]SymbolHit, error) {
 	rows, err := s.db.Query(`SELECT `+symbolColumns("s")+`
 		FROM symbols s JOIN files f ON f.id = s.file_id
 		WHERE s.key IN (`+strings.Join(marks, ",")+`) AND s.kind NOT IN ('file', 'section')
-		ORDER BY f.path, s.line LIMIT ?`, args...)
+		ORDER BY f.path, s.line, s.name, s.kind, s.id LIMIT ?`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (s *Store) FileSymbol(path string) (SymbolHit, bool, error) {
 func (s *Store) MembersOf(id int64, limit int) ([]Related, error) {
 	rows, err := s.db.Query(`SELECT `+symbolColumns("s")+`
 		FROM symbols s JOIN files f ON f.id = s.file_id
-		WHERE s.parent_id = ? ORDER BY s.line LIMIT ?`, id, limit)
+		WHERE s.parent_id = ? ORDER BY f.path, s.line, s.name, s.kind, s.id LIMIT ?`, id, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (s *Store) CalleesOf(id int64, limit int) ([]Related, error) {
 			OR EXISTS (SELECT 1 FROM imports i WHERE i.file_id = src.file_id AND i.resolved_file_id = t.file_id)
 			OR (SELECT COUNT(*) FROM symbols x WHERE x.name = r.to_name AND x.kind NOT IN ('file', 'section', 'route')) = 1)
 		GROUP BY t.id
-		ORDER BY basis, t.file_id, t.line
+		ORDER BY basis, f.path, t.line, t.name, t.kind, t.id
 		LIMIT ?`, id, limit)
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func (s *Store) CallersOf(id int64, limit int) ([]Related, error) {
 			OR EXISTS (SELECT 1 FROM imports i WHERE i.file_id = src.file_id AND i.resolved_file_id = t.file_id)
 			OR (SELECT COUNT(*) FROM symbols x WHERE x.name = t.name AND x.kind NOT IN ('file', 'section', 'route')) = 1)
 		GROUP BY src.id
-		ORDER BY basis, src.file_id, src.line
+		ORDER BY basis, f.path, src.line, src.name, src.kind, src.id
 		LIMIT ?`, id, limit)
 	if err != nil {
 		return nil, err
@@ -174,7 +174,7 @@ func (s *Store) TestFilesReferencing(name string, limit int) ([]SymbolHit, error
 		FROM refs r
 		JOIN files f ON f.id = r.file_id AND f.kind = 'test'
 		JOIN symbols s ON s.file_id = f.id AND s.kind = 'file'
-		WHERE r.to_name = ? ORDER BY f.path LIMIT ?`, name, limit)
+		WHERE r.to_name = ? ORDER BY f.path, s.line, s.name, s.kind, s.id LIMIT ?`, name, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,8 @@ func (s *Store) IntegrityCheck() (string, error) {
 // AllSymbols returns every indexed definition except per-file rows, for baselines and tests.
 func (s *Store) AllSymbols() ([]SymbolHit, error) {
 	rows, err := s.db.Query(`SELECT ` + symbolColumns("s") + `
-		FROM symbols s JOIN files f ON f.id = s.file_id WHERE s.kind <> 'file' ORDER BY s.id`)
+		FROM symbols s JOIN files f ON f.id = s.file_id WHERE s.kind <> 'file'
+		ORDER BY f.path, s.line, s.name, s.kind, s.id`)
 	if err != nil {
 		return nil, err
 	}

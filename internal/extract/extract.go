@@ -71,11 +71,16 @@ func (e *Extractor) File(lang string, src []byte) (Result, error) {
 	case "sql":
 		res.Symbols = sqlObjects(src)
 	default:
-		g, err := e.grammar(lang)
-		if err != nil {
-			return res, err
+		if lang != "" && grammars.DetectLanguageByName(lang) == nil {
+			// No grammar: conservative line rules instead of an error, so the file still yields definitions.
+			res.Symbols = ExtractFallback("", lang, src).Symbols
+		} else {
+			g, err := e.grammar(lang)
+			if err != nil {
+				return res, err
+			}
+			res = g.extract(src)
 		}
-		res = g.extract(src)
 		res.Symbols = append(res.Symbols, routes(src)...)
 	}
 	return finalize(res), nil
