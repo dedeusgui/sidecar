@@ -21,6 +21,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/repo"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
+	"github.com/dedeusgui/sidecar/internal/studio"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -51,6 +52,8 @@ func run(args []string, in io.Reader, out, errOut io.Writer) int {
 		return cmdDoctor(out, errOut)
 	case "explain":
 		return cmdExplain(rest, in, out, errOut)
+	case "studio":
+		return cmdStudio(rest, out, errOut)
 	case "observe":
 		return cmdObserve(rest, in)
 	case "memory":
@@ -533,4 +536,40 @@ func readOracleArtifact(path, keyPath string) (app.OracleArtifact, []byte, error
 		return art, nil, fmt.Errorf("oracle artifact: %w", err)
 	}
 	return art, key, nil
+}
+
+// cmdStudio writes a self-contained HTML page from structured outputs: explain --json, lab runs and scorecards,
+// replay, perf, clarification and impact reports. It reads the files given and writes one file; it starts no
+// server, makes no request and is never injected into an agent prompt.
+func cmdStudio(args []string, out, errOut io.Writer) int {
+	fs := flag.NewFlagSet("studio", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	dest := fs.String("out", "sidecar-studio.html", "HTML file to write")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() == 0 {
+		_, _ = fmt.Fprintln(errOut, "uso: sidecar studio [--out arquivo.html] entrada.json [entrada.jsonl ...]")
+		return 2
+	}
+	var inputs []studio.Input
+	for _, path := range fs.Args() {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			_, _ = fmt.Fprintln(errOut, "erro:", err)
+			return 1
+		}
+		inputs = append(inputs, studio.Input{Name: filepath.Base(path), Raw: data})
+	}
+	page, err := studio.Build(inputs)
+	if err != nil {
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	if err := os.WriteFile(*dest, page, 0o644); err != nil {
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	_, _ = fmt.Fprintf(out, "wrote %s (%d bytes, %d input(s))\n", *dest, len(page), len(inputs))
+	return 0
 }
