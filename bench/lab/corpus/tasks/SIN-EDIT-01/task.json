@@ -1,0 +1,59 @@
+{
+  "schema": "lab-task/1",
+  "id": "SIN-EDIT-01",
+  "split": "holdout",
+  "class": "edit",
+  "repo": "sinatra",
+  "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+  "prompt": "No helper `content_type` do Sinatra, quando eu passo `charset: nil` quero que o Content-Type saia sem o parâmetro de charset. Hoje sai um `charset=` vazio no final. Nos outros casos, o charset padrão e o charset explícito têm que continuar como estão. Mantenha a API pública e não acesse a rede. Ao terminar, descreva em poucas linhas o que mudou.",
+  "setup": [
+    [
+      "bundle",
+      "_2.5.22_",
+      "install",
+      "--path",
+      "vendor/bundle"
+    ]
+  ],
+  "setup_timeout_s": 900,
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_content_type_test.rb": "zz_oracle_content_type_test.rb"
+    },
+    "command": [
+      "bundle",
+      "exec",
+      "ruby",
+      "-Ilib",
+      "test/zz_oracle_content_type_test.rb",
+      "-v"
+    ],
+    "require_output": [
+      "ZzSinatraContentTypeCharsetOracleTest#test_nil_charset_removes_charset_parameter = [0-9.]+ s = [.FE]",
+      "[0-9]+ runs, [0-9]+ assertions"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/sinatra/base.rb",
+      "test/helpers_test.rb"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "pattern": "def content_type\\(type = nil, params = \\{\\}\\)",
+        "why": "assinatura pública de content_type preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "pattern": "settings\\.add_charset",
+        "why": "charset padrão por tipo preservado"
+      }
+    ]
+  },
+  "notes": "Holdout. Lacuna real em lib/sinatra/base.rb, método content_type (~linhas 384-412): com charset: nil o parâmetro é escrito como 'charset=' vazio (ex.: 'text/plain;charset='). Oráculo escrito do zero. Holdout selado: não rodar com --final fora da avaliação final. Setup: bundler 4 removeu --path; usa-se bundle _2.5.22_."
+}

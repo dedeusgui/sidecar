@@ -1,0 +1,12 @@
+diff --git a/lib/sinatra/base.rb b/lib/sinatra/base.rb
+index 7b26dd4..ae64875 100644
+--- a/lib/sinatra/base.rb
++++ b/lib/sinatra/base.rb
+@@ -393,6 +393,7 @@ module Sinatra
+         params[:charset] = params.delete('charset') || settings.default_encoding
+       end
+       params.delete :charset if mime_type.include? 'charset'
++      params.delete :charset if params[:charset].nil?
+       unless params.empty?
+         mime_type << ';'
+         mime_type << params.map do |key, val|

@@ -40,7 +40,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "cts_the_same_route (0.00s)\n    --- PASS: TestBenchmarkRouteHeadersDeterministic/single_matching_header_routes_to_its_middleware (0.00s)\n    --- PASS: TestBenchmarkRouteHeadersDeterministic/default_route_applies_when_no_header_matches (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.007s\nFAIL\n"
+    "detail": "cts_the_same_route (0.00s)\n    --- PASS: TestBenchmarkRouteHeadersDeterministic/single_matching_header_routes_to_its_middleware (0.00s)\n    --- PASS: TestBenchmarkRouteHeadersDeterministic/default_route_applies_when_no_header_matches (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.003s\nFAIL\n"
   },
   "reference": {
     "kind": "tests",
@@ -85,6 +85,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794162666.4960573,
+  "ts": 1794162710.5533793,
   "base_verdict": "fail"
 }

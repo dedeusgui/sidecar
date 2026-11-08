@@ -22,7 +22,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "'cherry' is ...e', 'banana'.\" == \"'cherry' is ...e', 'banana'.\"\n  \n  - 'cherry' is not one of 'Apple', 'banana'.\n  ?                         ^\n  + 'cherry' is not one of 'apple', 'banana'.\n  ?                         ^\n========================= 2 failed, 2 passed in 0.03s ==========================\n"
+    "detail": "'cherry' is ...e', 'banana'.\" == \"'cherry' is ...e', 'banana'.\"\n  \n  - 'cherry' is not one of 'Apple', 'banana'.\n  ?                         ^\n  + 'cherry' is not one of 'apple', 'banana'.\n  ?                         ^\n========================= 2 failed, 2 passed in 0.02s ==========================\n"
   },
   "reference": {
     "kind": "tests",
@@ -49,6 +49,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794162679.9419234,
+  "ts": 1794162724.566989,
   "base_verdict": "fail"
 }

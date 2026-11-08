@@ -22,7 +22,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "a'] == ['Apple', 'banana']\n  \n  At index 0 diff: 'apple' != 'Apple'\n  \n  Full diff: (-: missing in left side, +: extra in left side)\n    [\n  -     'Apple',\n  ?      ^\n  +     'apple',\n  ?      ^\n        'banana',\n    ]\n========================= 3 failed, 2 passed in 0.04s ==========================\n"
+    "detail": "a'] == ['Apple', 'banana']\n  \n  At index 0 diff: 'apple' != 'Apple'\n  \n  Full diff: (-: missing in left side, +: extra in left side)\n    [\n  -     'Apple',\n  ?      ^\n  +     'apple',\n  ?      ^\n        'banana',\n    ]\n========================= 3 failed, 2 passed in 0.03s ==========================\n"
   },
   "reference": {
     "kind": "tests",
@@ -49,6 +49,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794162564.599046,
+  "ts": 1794162777.2121923,
   "base_verdict": "fail"
 }
