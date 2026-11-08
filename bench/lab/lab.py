@@ -453,7 +453,7 @@ class ScriptedAgent:
         return {"wall_s": round(time.perf_counter() - t0, 3), "result": text, "cost_usd": 0.0, "tokens_in": 0,
                 "tokens_out": 0, "tool_calls": 0, "turns": 1, "served_models": ["scripted"], "exit": 0,
                 "timed_out": False, "hook_delivered": None, "injected_chars": 0, "incomparable_reasons": [],
-                "stream_error": False, "first_edit_s": None}
+                "stream_error": False, "first_edit_s": None, "tool_events": []}
 
 
 def deny_flags(paths):
@@ -518,9 +518,73 @@ class ClaudeAgent:
                     "exit": code, "timed_out": to, "hook_delivered": parsed["hook_delivered"] if arm["engine"] else None,
                     "injected_chars": len(parsed["hook_context"]), "incomparable_reasons": reasons,
                     "stream_error": parsed["is_error"] is True or parsed["subtype"] not in (None, "success"),
-                    "hook_names": parsed["hook_names"], "first_edit_s": None}
+                    "hook_names": parsed["hook_names"], "first_edit_s": None,
+                    "tool_events": tool_events(out)}
         finally:
             shutil.rmtree(cfg, ignore_errors=True)
+
+
+# --------------------------------------------------------------------------- tool traces (R6)
+
+TEST_CMD = re.compile(r"^\s*(go test|pytest|python3? -m pytest|npm (run )?test|node --test|yarn test|bundle exec|ruby -[IiT]|cargo test|mvn |gradle |phpunit|vendor/bin/phpunit)")
+SEARCH_CMD = re.compile(r"^\s*(grep|rg|find|ag|ack|git grep)\b")
+READ_CMD = re.compile(r"^\s*(cat|head|tail|sed -n|less|nl)\b")
+
+
+def tool_events(stream_text):
+    """Reduz o stream-json do Claude Code a eventos {kind,key,err} (mapeamento aproximado e documentado):
+    Read->read, Grep/Glob->search, Edit/Write/MultiEdit/NotebookEdit->edit, Bash->test|search|read|other por prefixo.
+    Falhas vêm do tool_result com is_error. Só o que o stream mostra: evento ausente é 'não observado'."""
+    events, pending = [], {}
+    for line in stream_text.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        msg = d.get("message") or {}
+        for block in msg.get("content") or []:
+            if not isinstance(block, dict):
+                continue
+            if d.get("type") == "assistant" and block.get("type") == "tool_use":
+                name, inp = block.get("name", ""), block.get("input") or {}
+                ev = None
+                if name == "Read":
+                    ev = {"kind": "read", "key": inp.get("file_path", "")}
+                elif name in ("Grep", "Glob"):
+                    ev = {"kind": "search", "key": " ".join(str(inp.get(k, "")) for k in ("pattern", "path", "glob") if inp.get(k))}
+                elif name in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+                    ev = {"kind": "edit", "key": inp.get("file_path", "")}
+                elif name == "Bash":
+                    cmd = inp.get("command", "")
+                    kind = "test" if TEST_CMD.match(cmd) else "search" if SEARCH_CMD.match(cmd) else "read" if READ_CMD.match(cmd) else "other"
+                    ev = {"kind": kind, "key": cmd if kind != "test" else "test"}
+                if ev is not None:
+                    events.append(ev)
+                    pending[block.get("id")] = ev
+            elif d.get("type") == "user" and block.get("type") == "tool_result" and block.get("is_error"):
+                content = block.get("content")
+                text = content if isinstance(content, str) else " ".join(c.get("text", "") for c in content or [] if isinstance(c, dict))
+                first = (text or "").strip().splitlines()[0].lower() if (text or "").strip() else "error"
+                events.append({"kind": "other", "key": "err", "err": re.sub(r"\d+", "#", first)[:200]})
+    return events
+
+
+def progress_report(sidecar, events):
+    """Classifica os eventos com o MESMO código do observador (sidecar progress). None se indisponível."""
+    if not sidecar or not events:
+        return None
+    payload = "\n".join(json.dumps(e) for e in events) + "\n"
+    code, out, err, to = run([sidecar, "progress"], input_text=payload, timeout=30)
+    if code != 0 or to:
+        return None
+    try:
+        r = json.loads(out)
+    except ValueError:
+        return None
+    return {k: r.get(k) for k in ("events", "labels", "redundant", "exploratory", "novelty_ratio", "stagnant_windows", "longest_stagnation")} | {"shadow_decisions": len(r.get("shadow_decisions") or [])}
 
 
 # --------------------------------------------------------------------------- runner
@@ -585,7 +649,7 @@ def execute_one(agent, task, tdir, arm, rep, args, home):
         except Exception as e:  # falha do agente é registrada, não escondida
             r = {"wall_s": None, "result": "", "cost_usd": None, "tokens_in": None, "tokens_out": None, "tool_calls": None,
                  "turns": None, "served_models": None, "exit": -1, "timed_out": False, "hook_delivered": None,
-                 "injected_chars": None, "incomparable_reasons": [], "stream_error": True, "first_edit_s": None}
+                 "injected_chars": None, "incomparable_reasons": [], "stream_error": True, "first_edit_s": None, "tool_events": []}
             err = f"{type(e).__name__}: {e}"
         t0 = time.perf_counter()
         orc = run_oracle(task, tdir, work, answer_text=r["result"])
@@ -598,6 +662,7 @@ def execute_one(agent, task, tdir, arm, rep, args, home):
             "comparable": comparable, "agent_error": err, "oracle": {k: orc[k] for k in
                 ("tests", "scope_ok", "outside_scope", "invariants", "changed", "isolation", "detail")},
             "oracle_s": round(time.perf_counter() - t0, 2), "task_sha256": sha256_file(tdir / "task.json"),
+            "tool_events": r.get("tool_events", []), "progress": progress_report(args.sidecar if args else None, r.get("tool_events", [])),
             **{k: r[k] for k in ("wall_s", "cost_usd", "tokens_in", "tokens_out", "tool_calls", "turns",
                "served_models", "exit", "timed_out", "hook_delivered", "injected_chars", "incomparable_reasons",
                "stream_error", "first_edit_s")},
@@ -717,6 +782,10 @@ def summarize(rows):
         "injected_chars_mean": round(statistics.mean([r["injected_chars"] or 0 for r in ok]), 1) if ok else None,
         "models_served": sorted({m for r in rows for m in (r["served_models"] or [])}),
         "cost_unknown_runs": sum(1 for r in ok if r["cost_usd"] is None),
+        "progress_runs": sum(1 for r in ok if r.get("progress")),
+        "redundant_calls_mean": round(statistics.mean([r["progress"]["redundant"] for r in ok if r.get("progress")]), 2)
+        if any(r.get("progress") for r in ok) else None,
+        "stagnant_runs": sum(1 for r in ok if r.get("progress") and r["progress"]["stagnant_windows"] > 0),
     }
 
 
@@ -768,11 +837,11 @@ def render_md(rep):
         if ev == "offline_retrieval":
             L += ["```json", json.dumps({k: v for k, v in sec.items()}, ensure_ascii=False, indent=1)[:4000], "```", ""]
             continue
-        L += ["| braço | exec. | comparáveis | pass | taxa | ocultos ok | escopo (não-teste) | invariantes | custo/correta | p50 s/correta | tool calls | injetado |",
-              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+        L += ["| braço | exec. | comparáveis | pass | taxa | ocultos ok | escopo (não-teste) | invariantes | custo/correta | p50 s/correta | tool calls | redundantes | injetado |",
+              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
         for a, s in sec["arms"].items():
             L.append(f"| {a} | {s['runs']} | {s['comparable']} | {s['passed']} | {s['pass_rate']} | {s['hidden_tests_passed']} | {s['scope_violations']} ({s['scope_violations_non_test']}) | "
-                     f"{s['invariant_violations']} | {s['cost_per_success']} | {s['wall_per_success_p50']} | {s['tool_calls_mean']} | {s['injected_chars_mean']} |")
+                     f"{s['invariant_violations']} | {s['cost_per_success']} | {s['wall_per_success_p50']} | {s['tool_calls_mean']} | {s['redundant_calls_mean']} | {s['injected_chars_mean']} |")
         L.append("")
         for a, p in sec["paired_vs_OFF"].items():
             L.append(f"- {a} vs OFF: {p['pairs']} pares, Δpass {p['d_pass_mean']} IC95 {p['d_pass_ci95']}, Δcusto {p['d_cost_mean']} → **{p['conclusion']}**")
