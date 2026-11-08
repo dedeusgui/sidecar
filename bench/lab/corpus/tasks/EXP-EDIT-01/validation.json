@@ -22,7 +22,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "st: EDIT01 callback com caracteres filtrados continua sendo sanitizado\nok 3 - EDIT01 callback com caracteres filtrados continua sendo sanitizado\n  ---\n  duration_ms: 2.541609\n  type: 'test'\n  ...\n1..3\n# tests 3\n# suites 0\n# pass 2\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 141.091329\n"
+    "detail": "est: EDIT01 callback com caracteres filtrados continua sendo sanitizado\nok 3 - EDIT01 callback com caracteres filtrados continua sendo sanitizado\n  ---\n  duration_ms: 1.519955\n  type: 'test'\n  ...\n1..3\n# tests 3\n# suites 0\n# pass 2\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 96.201224\n"
   },
   "reference": {
     "kind": "tests",
@@ -49,6 +49,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794163232.3286133,
+  "ts": 1794163517.4579134,
   "base_verdict": "fail"
 }
