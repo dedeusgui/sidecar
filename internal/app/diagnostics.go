@@ -134,7 +134,7 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 		Fingerprint:   res.Trace.Fingerprint,
 		TimingsMS:     map[string]float64{},
 		Candidates:    res.Trace.Candidates,
-		Context:       brief.Render(res, nil),
+		Context:       renderContext(res, opts),
 	}
 	for k, d := range res.Trace.Timings {
 		rep.TimingsMS[k] = ms(d)
@@ -433,3 +433,13 @@ func Status(root string) (map[string]any, error) {
 
 // SupportedAgents lists agent names for help text.
 func SupportedAgents() []string { return []string{string(adapter.Claude), string(adapter.Codex)} }
+
+// renderContext mirrors what the hook would inject: the Task Evidence Brief when the feature is on and
+// applies, otherwise the standard block.
+func renderContext(res retrieve.Result, opts retrieve.Options) string {
+	if opts.EngineVersion == "v2" && retrieve.FeatureEnabled("brief") {
+		text, _ := brief.RenderTask(res, nil)
+		return text
+	}
+	return brief.Render(res, nil)
+}

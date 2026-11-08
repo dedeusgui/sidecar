@@ -225,6 +225,14 @@ class RunnerTests(LabCase):
         self.assertEqual({firsts.count(a) for a in ("OFF", "V1", "V2")}, {3})
         self.assertEqual(len(o1), 27)
 
+    def test_feature_arms_set_sidecar_features(self):
+        arms = lab.parse_arms("OFF,V2,V2+brief,V2+adaptive+brief")
+        self.assertEqual(arms[2]["env"], {"SIDECAR_FEATURES": "brief"})
+        self.assertEqual(arms[3]["env"], {"SIDECAR_FEATURES": "adaptive,brief"})
+        self.assertEqual(arms[3]["engine"], "v2")
+        with self.assertRaises(lab.LabError):
+            lab.parse_arms("V2+nope")
+
     def test_unknown_arm_and_alias_model_rejected(self):
         with self.assertRaises(lab.LabError):
             lab.parse_arms("OFF,V9")

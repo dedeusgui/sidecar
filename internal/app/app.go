@@ -86,7 +86,7 @@ func Hook(opts HookOptions) (exit int) {
 		_, _ = opts.Stdout.Write(adapter.Format(opts.Agent, ""))
 		return 0
 	}
-	if skipPrompt(in.Prompt) {
+	if skipPrompt(in.Prompt) && !awaitingAnswer(opts, in) {
 		rec["status"] = "skipped"
 		// Antigravity and Codex expect a JSON object even when there is nothing to add.
 		_, _ = opts.Stdout.Write(adapter.Format(opts.Agent, ""))
@@ -181,6 +181,11 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 			rec["decision_error"] = err.Error() // fail open: the prompt keeps its code evidence
 		}
 		rec["decisions"] = n
+		if retrieve.FeatureEnabled("groom") {
+			if err := applyGroom(ix.Store(), root, statePath, opts.Agent, in.SessionID, in.Prompt, &res, time.Now(), rec); err != nil {
+				rec["groom_error"] = err.Error()
+			}
+		}
 		if retrieve.FeatureEnabled("impact") {
 			if err := applyImpact(ctx, ix.Store(), root, &res, rec); err != nil {
 				rec["impact_error"] = err.Error() // fail open
@@ -189,7 +194,15 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	}
 
 	t = time.Now()
-	block, used := brief.RenderSession(res, statePath)
+	var block string
+	var used []string
+	if ropts.EngineVersion == "v2" && retrieve.FeatureEnabled("brief") {
+		var briefed bool
+		block, used, briefed = brief.RenderTaskSession(res, statePath)
+		rec["task_brief"] = briefed
+	} else {
+		block, used = brief.RenderSession(res, statePath)
+	}
 	if in.SessionID != "" {
 		recordEvidence(root, opts.Agent, in.SessionID, used)
 	}

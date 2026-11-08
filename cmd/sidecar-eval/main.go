@@ -44,7 +44,10 @@ type caseSpec struct {
 	ExpectConflict bool     `json:"expect_conflict,omitempty"` // a CONFLICT_CANDIDATE note reaches the output
 	ExpectContract string   `json:"expect_contract,omitempty"` // a contract finding with this status exists
 	MustNot        []string `json:"must_not,omitempty"`        // these paths must not appear in the top 10
-	SeenRerun      bool     `json:"seen_rerun,omitempty"`      // a second pass with the first pass's evidence must not repeat gold
+	SeenRerun      bool     `json:"seen_rerun,omitempty"`
+	// Clarification benchmark (--groom): the label is set by reading the repository before running anything.
+	ExpectAsk   *bool  `json:"expect_ask,omitempty"`   // a careful engineer would interrupt the user
+	ExpectState string `json:"expect_state,omitempty"` // the primary open-decision state, when asking      // a second pass with the first pass's evidence must not repeat gold
 }
 
 type repoSpec struct {
@@ -106,6 +109,7 @@ func main() {
 	replayCheck := flag.String("replay-check", "", "verify the active tuning in this config equals the compiled defaults, then exit")
 	impactHistory := flag.String("impact-history", "", "evaluate change-impact analysis on the Git history of this repository (needs history)")
 	impactN := flag.Int("impact-commits", 40, "commits to use with --impact-history")
+	groomFlag := flag.Bool("groom", false, "clarification benchmark: run the V2 pipeline and the ask/assume policy over cases with expect_ask labels")
 	perfRuns := flag.Int("perf", 0, "measure cold/warm latency per pipeline stage with this many warm runs per case (p50/p95/p99)")
 	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
 	reportMD := flag.String("report-md", "", "write a Markdown report to this path (includes the comparison when --compare is set)")
@@ -156,6 +160,10 @@ func main() {
 		}
 	}()
 
+	if *groomFlag {
+		must(runGroomEval(cf, indexes, *outPath))
+		return
+	}
 	if *replayPath != "" {
 		must(runReplay(*replayPath, cf, indexes, *outPath))
 		return
@@ -174,6 +182,7 @@ func main() {
 		{"v2.1 (intent router)", retrieveRunWith(retrieve.Options{IntentRouting: true})},
 		{"v2 (intent + contract + packer)", retrieveRunWith(retrieve.Options{EngineVersion: "v2"})},
 		{"v2 adaptive (policy)", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Adaptive: true})},
+		{"v2 + task brief", retrieveRunRender(retrieve.Options{EngineVersion: "v2"}, true)},
 		{"v2 sem intent", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoIntent: true}})},
 		{"v2 sem contract", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoContract: true}})},
 		{"v2 sem packer", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoPacker: true}})},
@@ -221,7 +230,11 @@ func retrieveRun(ab retrieve.Ablation) runner {
 }
 
 // retrieveRunWith runs the retrieval pipeline with the given options.
-func retrieveRunWith(opts retrieve.Options) runner {
+func retrieveRunWith(opts retrieve.Options) runner { return retrieveRunRender(opts, false) }
+
+// retrieveRunRender is retrieveRunWith that can render the Task Evidence Brief instead of the standard
+// block, so the token cost of the brief is measured on the same retrieval.
+func retrieveRunRender(opts retrieve.Options, taskBrief bool) runner {
 	return func(ix *index.Index, prompt string, seen ctxbuild.Seen) (callResult, error) {
 		t := time.Now()
 		o := opts
@@ -250,7 +263,11 @@ func retrieveRunWith(opts retrieve.Options) runner {
 		for _, f := range res.Trace.Contracts {
 			contracts = append(contracts, string(f.Status))
 		}
-		return callResult{hits: hits, tokens: ctxbuild.EstimateTokens(brief.Render(res, nil)),
+		rendered := brief.Render(res, nil)
+		if taskBrief {
+			rendered, _ = brief.RenderTask(res, nil)
+		}
+		return callResult{hits: hits, tokens: ctxbuild.EstimateTokens(rendered),
 			latencyMS: float64(time.Since(t).Microseconds()) / 1000,
 			notes:     notes, contracts: contracts, keys: keys, cands: res.Trace.Candidates[:min(len(res.Trace.Candidates), 10)]}, nil
 	}
