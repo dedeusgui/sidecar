@@ -107,8 +107,11 @@ func TestInstallAndUninstallObserveTools(t *testing.T) {
 
 	// Each handler is one manifest entry, so uninstall can remove exactly what was added.
 	m, err := readManifest(env.Manifest)
-	if err != nil || len(m.Entries) != 6 {
-		t.Fatalf("manifest entries = %d, %v; want 6", len(m.Entries), err)
+	if err != nil || len(m.Entries) != 7 {
+		t.Fatalf("manifest entries = %d, %v; want 7 (claude prompt + PreToolUse + PostToolUse + PreCompact, antigravity prompt + two tool hooks)", len(m.Entries), err)
+	}
+	if n := countEvent(t, env.ClaudeSettings, "claude", "PreCompact", oursFor("claude", "PreCompact")); n != 1 {
+		t.Fatalf("claude PreCompact observer = %d, want 1 (compaction resets what the agent has seen)", n)
 	}
 
 	// Installing again changes nothing: no duplicate handlers and no duplicate entries.
@@ -118,7 +121,7 @@ func TestInstallAndUninstallObserveTools(t *testing.T) {
 	if n := countEvent(t, env.ClaudeSettings, "claude", "PreToolUse", oursFor("claude", "PreToolUse")); n != 1 {
 		t.Fatalf("second install duplicated the observer: %d", n)
 	}
-	if m, _ := readManifest(env.Manifest); len(m.Entries) != 6 {
+	if m, _ := readManifest(env.Manifest); len(m.Entries) != 7 {
 		t.Fatalf("second install changed the manifest: %d entries", len(m.Entries))
 	}
 
