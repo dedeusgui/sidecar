@@ -188,6 +188,33 @@
       "headline": "0 erros de console, 0 requisições de rede, sem rolagem horizontal; payload hostil exibido como texto",
       "status": "referência",
       "caveat": "sem linha do tempo por sessão"
+    },
+    {
+      "id": "B15-lab-two-turn",
+      "level": "agentic",
+      "question": "As notas de impacto (R5) e de pergunta (R4) mudam o resultado com um usuário simulado na segunda volta?",
+      "data": "6 tarefas completas × 5 braços × 1 repetição = 30 execuções (rodada interrompida por limite de uso); protocolo de duas voltas; claude-haiku-5-5; US$ 0,61",
+      "command": "python3 bench/lab/lab.py run --turns 2 --arms OFF,V2,V2+brief,V2+impact,V2+groom",
+      "artifacts": [
+        "bench/results/lab-two-turn-2026-11-08",
+        "docs/benchmarks-2026-11-08.md"
+      ],
+      "headline": "inconclusivo (N=6): nota de impacto entregue em 3/6 execuções e de pergunta em 2/6; falso positivo real do R4 (verbo negado) corrigido",
+      "status": "parcial; não é referência",
+      "caveat": "6 tarefas; usuário simulado; rodada interrompida; sem holdout"
+    },
+    {
+      "id": "B16-corpus-v2",
+      "level": "infra",
+      "question": "As 12 tarefas difíceis novas têm oráculo satisfazível e não vacuoso?",
+      "data": "12 tarefas (chi, click, express, sinatra; 4 dev, 4 validation, 4 holdout selado); reexecutadas por mim, não só pelos autores",
+      "command": "python3 bench/lab/lab.py validate-task <ID>",
+      "artifacts": [
+        "bench/lab/corpus/manifest.json"
+      ],
+      "headline": "12/12: o oráculo falha na base e passa com o patch de referência; manifesto com 32 tarefas validadas",
+      "status": "referência de infraestrutura",
+      "caveat": "dificuldade projetada, nunca medida com agente; autoria por subagentes"
     }
   ],
   "improvement_leads": [
@@ -316,6 +343,28 @@
       "hypothesis_v3": "Política seletiva por classe de tarefa e especificidade, medida por tarefa com repetições suficientes",
       "confirm_with": "B12 com ≥ 5 repetições nas tarefas que dividem os braços",
       "priority": "alta"
+    },
+    {
+      "id": "L13",
+      "source": [
+        "B15",
+        "B08"
+      ],
+      "problem": "O R4 não detecta pedido vago de estilo (CLK-AMB-01) e pode tratar verbo negado como edição (corrigido)",
+      "hypothesis_v3": "Derivar alternativas do próprio repositório (formas existentes de apresentar/validar) antes de perguntar; tratar cláusulas proibidas como leitura",
+      "confirm_with": "B08 ampliado + corpus com ≥ 5 tarefas ambíguas detectáveis",
+      "priority": "média"
+    },
+    {
+      "id": "L14",
+      "source": [
+        "B15",
+        "B16"
+      ],
+      "problem": "A rodada de duas voltas e o holdout final ficaram incompletos por limite de uso; o corpus v2 nunca foi rodado com agente",
+      "hypothesis_v3": "Cachear dependências por tarefa (npm/bundle; venv não copia) e rodar a rodada completa e o holdout uma única vez",
+      "confirm_with": "B15 com ≥ 15 tarefas e ≥ 3 repetições; holdout com --final",
+      "priority": "alta (fecha lacunas de medição)"
     }
   ]
 }

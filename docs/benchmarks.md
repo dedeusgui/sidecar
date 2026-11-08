@@ -26,6 +26,8 @@ Gerado de `bench/registry.json` (2026-11-08) por `python3 bench/consolidate.py`.
 | B12-lab-bench-clean | agentic | Qual o efeito de V1, V2 e dos componentes (adaptive, brief) em aprovação, tool calls, tokens, custo e tempo? | sem melhora comprovada: V2+brief vs OFF aprovação +8,6%, tool calls −4,8%, tokens −8,8%, custo −4,0% (todos IC95 cruzam zero); testes ocultos 225/225 em todos os braços (teto); 5 de 63 comparações "significativas" ≈ acaso | referência (agentic) para eficiência; não mede capacidade | um modelo, 15 tarefas, 3 reps; teto de capacidade; tempo de parede contaminado por CPU; R4/R5/R6 não exercidos |
 | B13-install-e2e | infra | Instalar, disparar hooks reais e desinstalar preserva a configuração do usuário? | hooks e statusLine de terceiros preservados; UserPromptSubmit/PreToolUse/PostToolUse disparam; settings idêntico após uninstall | referência | PreCompact, Codex, Antigravity, upgrade e Windows/macOS não verificados |
 | B14-studio-browser | infra | O Studio renderiza dados reais sem erro e sem executar conteúdo hostil? | 0 erros de console, 0 requisições de rede, sem rolagem horizontal; payload hostil exibido como texto | referência | sem linha do tempo por sessão |
+| B15-lab-two-turn | agentic | As notas de impacto (R5) e de pergunta (R4) mudam o resultado com um usuário simulado na segunda volta? | inconclusivo (N=6): nota de impacto entregue em 3/6 execuções e de pergunta em 2/6; falso positivo real do R4 (verbo negado) corrigido | parcial; não é referência | 6 tarefas; usuário simulado; rodada interrompida; sem holdout |
+| B16-corpus-v2 | infra | As 12 tarefas difíceis novas têm oráculo satisfazível e não vacuoso? | 12/12: o oráculo falha na base e passa com o patch de referência; manifesto com 32 tarefas validadas | referência de infraestrutura | dificuldade projetada, nunca medida com agente; autoria por subagentes |
 
 ### Dados e comandos
 
@@ -85,6 +87,14 @@ artefatos: `bench/results/r7-install-e2e-2026-11-08.md`
 comando: `ver docs/studio.md`  
 artefatos: `docs/studio.md`
 
+**B15-lab-two-turn** — dados: 6 tarefas completas × 5 braços × 1 repetição = 30 execuções (rodada interrompida por limite de uso); protocolo de duas voltas; claude-haiku-5-5; US$ 0,61  
+comando: `python3 bench/lab/lab.py run --turns 2 --arms OFF,V2,V2+brief,V2+impact,V2+groom`  
+artefatos: `bench/results/lab-two-turn-2026-11-08`, `docs/benchmarks-2026-11-08.md`
+
+**B16-corpus-v2** — dados: 12 tarefas (chi, click, express, sinatra; 4 dev, 4 validation, 4 holdout selado); reexecutadas por mim, não só pelos autores  
+comando: `python3 bench/lab/lab.py validate-task <ID>`  
+artefatos: `bench/lab/corpus/manifest.json`
+
 ## Pistas de melhoria (insumos do V3)
 
 Cada pista aponta o benchmark que a sustenta e o que mediria a confirmação. São hipóteses, não decisões.
@@ -103,3 +113,5 @@ Cada pista aponta o benchmark que a sustenta e o que mediria a confirmação. S�
 | L10 | B12, B03 | No prompt negativo de express, V1/V2 injetaram contexto em 12/12 execuções (886–1103 chars) mesmo sendo conversa sem relação | Portão de abstenção por tipo de pedido (conversacional/sem alvo no repositório) antes de qualquer injeção | B03/B04 e um braço negativo em B12 com mais tarefas negativas | alta |
 | L11 | B12 | Testes ocultos passaram em 225/225 execuções: o corpus não discrimina capacidade (8 de 15 tarefas resolvidas por todos) | Corpus v2 com tarefas mais difíceis e mais por classe; reservar o holdout para ele | B12 repetido com o corpus v2: algum braço deve falhar teste oculto | alta (infra de medição) |
 | L12 | B12 | Efeito do contexto é heterogêneo por tarefa nos dois sentidos (ajuda CHI-CC-01, prejudica CHI-DBG-01 e CLK-CC-01) | Política seletiva por classe de tarefa e especificidade, medida por tarefa com repetições suficientes | B12 com ≥ 5 repetições nas tarefas que dividem os braços | alta |
+| L13 | B15, B08 | O R4 não detecta pedido vago de estilo (CLK-AMB-01) e pode tratar verbo negado como edição (corrigido) | Derivar alternativas do próprio repositório (formas existentes de apresentar/validar) antes de perguntar; tratar cláusulas proibidas como leitura | B08 ampliado + corpus com ≥ 5 tarefas ambíguas detectáveis | média |
+| L14 | B15, B16 | A rodada de duas voltas e o holdout final ficaram incompletos por limite de uso; o corpus v2 nunca foi rodado com agente | Cachear dependências por tarefa (npm/bundle; venv não copia) e rodar a rodada completa e o holdout uma única vez | B15 com ≥ 15 tarefas e ≥ 3 repetições; holdout com --final | alta (fecha lacunas de medição) |

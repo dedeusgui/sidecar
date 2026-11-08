@@ -40,3 +40,22 @@ func TestPolicyNeverSkipsContractsForAnEditRequest(t *testing.T) {
 		t.Error("a pure lookup keeps the saving")
 	}
 }
+
+func TestForbiddenEditVerbsMakeAPromptReadOnly(t *testing.T) {
+	readOnly := []string{
+		"No middleware de throttle do chi, qual arquivo monta o header Retry-After? Só preciso da localização. Não altere nada no repositório.",
+		"Where is the retry header built? Don't change anything, I only need the location.",
+		"explique o fluxo sem modificar o código",
+	}
+	for _, p := range readOnly {
+		if IsEditRequest(p) {
+			t.Errorf("%q forbids editing and must read as read-only", p)
+		}
+	}
+	edits := []string{"Altere o MaxRetries para 5, mas não mexa na documentação", "Change the TTL and do not touch the tests", "corrija o erro; não precisa explicar"}
+	for _, p := range edits {
+		if !IsEditRequest(p) {
+			t.Errorf("%q asks for an edit (only a different action is forbidden)", p)
+		}
+	}
+}
