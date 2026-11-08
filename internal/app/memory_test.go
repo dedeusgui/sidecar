@@ -133,7 +133,7 @@ func TestMemoryRejectsUnknownSensitiveAndEmptyInput(t *testing.T) {
 func TestMemoryAddRefusesToIndexHomeDirectory(t *testing.T) {
 	setupHome(t)
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	_, err := MemoryAdd(home, "a.go", "x", DecisionTTL, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "not a project folder") {
 		t.Fatalf("home directory accepted: %v", err)

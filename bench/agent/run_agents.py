@@ -120,6 +120,13 @@ def sidecar_context(sidecar, home, workdir, prompt, engine=None):
     return ctx, ms
 
 
+def validate_model(agent, model):
+    """Claude Code aliases ('haiku') were observed serving a different model (claude-sonnet-5-5, about
+    20x the cost of claude-haiku-5-5). Only explicit IDs are accepted for Claude."""
+    if agent == "claude" and not model.startswith("claude-"):
+        raise ValueError(f"claude:{model}: use o ID explícito (ex.: claude-haiku-5-5); o alias '{model}' pode ser servido por outro modelo")
+
+
 def hook_settings(sidecar, agent, event):
     return {event: [{"hooks": [{"type": "command", "command": f"{sidecar} hook --agent {agent}"}]}]}
 
@@ -159,7 +166,8 @@ def walk(o):
 
 def parse_output(agent, stdout):
     """Extrai texto final, tokens, custo e chamadas de ferramenta, tolerando mudanças de esquema."""
-    res = {"text": stdout, "tokens_in": None, "tokens_out": None, "cost_usd": None, "tool_calls": None, "turns": None}
+    res = {"text": stdout, "tokens_in": None, "tokens_out": None, "cost_usd": None, "tool_calls": None, "turns": None,
+           "served_models": None}
     docs = []
     for line in stdout.splitlines():
         line = line.strip()
@@ -213,6 +221,10 @@ def parse_output(agent, stdout):
                     saw_usage = True
     if saw_usage:
         res["tokens_in"], res["tokens_out"] = tin, tout
+    for d in docs:
+        usage = d.get("modelUsage")
+        if isinstance(usage, dict) and usage:
+            res["served_models"] = sorted(usage)
     if agent == "claude" and tools == 0:
         for d in docs:
             if isinstance(d.get("tool_calls"), int):
@@ -336,7 +348,8 @@ def run_one(args, repos, case, agent, model, arm, rep, home):
             "hook_fired": hook_fired, "wall_s": round(wall, 2), "sidecar_ms": round(ctx_ms, 1), "injected_chars": len(ctx),
             "exit": code, "timed_out": timed_out, "files": files, "edited_files": bool(dirty),
             "tokens_in": parsed["tokens_in"], "tokens_out": parsed["tokens_out"], "cost_usd": parsed["cost_usd"],
-            "tool_calls": parsed["tool_calls"], "turns": parsed["turns"], **judge(case, files),
+            "tool_calls": parsed["tool_calls"], "turns": parsed["turns"], "served_models": parsed["served_models"],
+            **judge(case, files),
             **attention(case, files, ctx, work),
         }
         if code != 0 or timed_out or dirty:
@@ -395,12 +408,25 @@ def paired_runs(rows):
     return pairs, len(groups) - len(pairs)
 
 
+TRANSPORT_TEXT = {
+    "real_hook": "hook real do cliente (UserPromptSubmit registrado por `--settings`; entrega conferida no stream)",
+    "prompt_prefix": "prefixo de prompt (o runner chama `sidecar hook` e prefixa o contexto ao prompt; não é o hook do cliente)",
+    "none": "sem contexto (braço OFF)",
+}
+
+
 def report(path, md):
-    rows = [json.loads(l) for l in pathlib.Path(path).read_text().splitlines() if l.strip()]
+    all_rows = [json.loads(l) for l in pathlib.Path(path).read_text().splitlines() if l.strip()]
+    # Execuções com contaminação ou modelo servido diferente do solicitado ficam no arquivo bruto, mas não nas médias.
+    rows = [r for r in all_rows if r.get("comparable", True) is not False]
+    incomparable = len(all_rows) - len(rows)
+    transports = sorted({r.get("transport", "?") for r in all_rows})
+    described = "; ".join(f"{t}: {TRANSPORT_TEXT.get(t, 'desconhecido')}" for t in transports)
     lines = ["# Benchmark de agentes reais: Sidecar ON × OFF", "",
-             f"Fonte: `{path}` · execuções: {len(rows)}. O oráculo é o gold de arquivo do manifesto (o agente não o vê). "
-             "Tokens, custo e chamadas vêm do próprio cliente e podem faltar (`n/d`). ON injeta o contexto do binário "
-             "`sidecar hook` por prefixo de prompt quando há contexto; não usa o hook instalado do cliente.", ""]
+             f"Fonte: `{path}` · execuções: {len(all_rows)} · comparáveis: {len(rows)} · "
+             f"não comparáveis (fora das médias): {incomparable}. O oráculo é o gold de arquivo do manifesto (o agente não o vê). "
+             "Tokens, custo e chamadas vêm do próprio cliente e podem faltar (`n/d`). "
+             f"Transporte do braço ON neste arquivo — {described}.", ""]
     keys = sorted({(r["agent"], r["model"]) for r in rows})
     lines += ["## Resumo por agente", "",
               "| Agente / modelo | Braço | N | Sucesso | Hit@1 | Tempo médio (s) | Tokens in | Tokens out | Custo médio (US$) | Tool calls | Resposta malformada | Editou arquivo |",
@@ -474,7 +500,7 @@ def report(path, md):
               "- Tarefa de localização somente leitura; não mede edição de código nem testes.",
               "- Poucos casos por categoria e repetições: sem amostra adequada não há conclusão.",
               "- Os prompts de voz do manifesto compartilham um molde de preenchimento; não são transcrições independentes.",
-              "- Tempo de parede inclui a latência do modelo e variação de rede; ON inclui o tempo do `sidecar hook` (campo `sidecar_ms`).",
+              "- Tempo de parede inclui a latência do modelo e variação de rede. No prefixo, o tempo do hook entra no tempo de parede (`sidecar_ms`). No hook real o hook roda dentro do cliente e não é separável; `hook_probe_ms` é a mediana do mesmo payload medida fora do agente.",
               "- Preços e versões dos clientes mudam; registre-os junto do relatório."]
     pathlib.Path(md).write_text("\n".join(lines) + "\n")
     print(f"wrote {md}")
@@ -501,7 +527,7 @@ def main():
     ap.add_argument("--manifest")
     ap.add_argument("--sidecar", default=os.path.expanduser("~/.local/bin/sidecar"))
     ap.add_argument("--engine", choices=("v1", "v2"), default="v2", help="engine Sidecar dos benchmarks (padrão: v2)")
-    ap.add_argument("--agents", nargs="+", default=["claude:haiku", "codex:gpt-6-luna"])
+    ap.add_argument("--agents", nargs="+", default=["claude:claude-haiku-5-5", "codex:gpt-6-luna"])
     ap.add_argument("--categories", nargs="*", default=["direct", "messy_pt", "voice_mode", "negative"])
     ap.add_argument("--per-category", type=int, default=2)
     ap.add_argument("--reps", type=int, default=1)
@@ -530,6 +556,11 @@ def main():
     except (ValueError, KeyError) as exc:
         sys.exit(str(exc))
     specs = [a.split(":", 1) for a in args.agents]
+    try:
+        for a, m in specs:
+            validate_model(a, m)
+    except ValueError as exc:
+        ap.error(str(exc))
     for a, _ in specs:
         if not shutil.which(a):
             sys.exit(f"cliente '{a}' não encontrado no PATH")

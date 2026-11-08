@@ -37,7 +37,10 @@ Arquivo: `bench/agent/run_agents.py` (Python stdlib). Gasta dinheiro; sem `--yes
 - Modos: Claude `-p --output-format json --permission-mode plan --disallowedTools Edit Write NotebookEdit --max-budget-usd`, com settings globais excluídos; Codex `exec --json --ephemeral --ignore-user-config -s read-only`. Antigravity está bloqueado até qualificar isolamento.
 - Saídas: `run-metadata.json`, `runs.jsonl` e `agent-benchmark.md`; `raw/` é opcional com `--save-raw` e pode conter dados sensíveis. O bootstrap agrupa repetições por tarefa e requer pelo menos três tarefas pareadas.
 
-**Modelos econômicos usados nos exemplos** (verifique com `agy models`, `codex` config e `claude --model`): Claude `haiku`, Codex `gpt-6-luna`, Antigravity `gemini-3.8-flash-low`. O nome "Codex Mini" não existe nesta instalação.
+**Modelos econômicos usados nos exemplos** (verifique com `agy models`, `codex` config e `claude --model`): Claude `claude-haiku-5-5` (ID explícito), Codex `gpt-6-luna`, Antigravity `gemini-3.8-flash-low`. O nome "Codex Mini" não existe nesta instalação.
+
+> [!WARNING]
+> **Alias `haiku` não é Haiku (verificado em 2026-11-08).** Com `claude -p --model haiku` o `modelUsage` reportou `claude-sonnet-5-5`, e o custo de uma chamada trivial foi US$ 0,163. Com `claude-haiku-5-5` o custo foi US$ 0,0083. `run_agents.py` agora recusa aliases de Claude e registra `served_models`. **Os números de Claude das seções 3 e 6 foram gerados com o alias e não são de Haiku.**
 
 **Comandos**
 ```bash
@@ -55,7 +58,7 @@ python3 bench/agent/run_agents.py --report /tmp/agent-bench/runs.jsonl --report-
 ```
 
 **Smoke executado (1 caso `R01-1`, ON e OFF)**
-- Claude Haiku: OFF 12,7 s, 74.579 tokens de entrada (com cache), US$ 0,129; ON 14,8 s, 76.768 tokens, US$ 0,133; ambos acertaram em 2 turnos; hook ~47 ms. O OFF pode ter sido contaminado por hooks globais; não é comparação válida.
+- Claude (alias `haiku`, servido por Sonnet): OFF 12,7 s, 74.579 tokens de entrada (com cache), US$ 0,129; ON 14,8 s, 76.768 tokens, US$ 0,133; ambos acertaram em 2 turnos; hook ~47 ms. O OFF pode ter sido contaminado por hooks globais; não é comparação válida.
 - Codex e Antigravity: ver seção 6.
 
 ## 4. Próximos passos, em ordem
@@ -86,6 +89,8 @@ python3 bench/agent/run_agents.py --report /tmp/agent-bench/runs.jsonl --report-
 | Codex `gpt-6-luna` | ON | 12,1 | 40.756 | 1 | sim |
 | Antigravity `gemini-3.8-flash-low` | OFF | 34,8 | 91.783 | n/d | sim |
 | Antigravity `gemini-3.8-flash-low` | ON | 16,1 | 31.211 | n/d | sim |
+
+**Atualização 2026-11-08:** piloto E2E com hook real (`bench/agentic/real_hook_pilot.py`, Claude Code, `claude-haiku-5-5`, 5 casos × 2 repetições × 2 braços) está em [agent-pilot-2026-11-08.md](agent-pilot-2026-11-08.md). O hook real foi disparado e sua resposta contendo `additionalContext` foi verificada no stream de eventos. Não é prova de ganho: os casos são poucos, escritos pelo mesmo autor e ambos os braços acertaram quase tudo.
 
 Com uma amostra por braço não há conclusão (variância de rede/modelo é grande); serve para validar o runner.
 

@@ -1,6 +1,8 @@
 # Roadmap consolidado — Sidecar V2, produto completo
 
-**Atualização:** 2026-11-06 · **Estado:** plano de implementação, NÃO prova de funcionalidades concluídas.
+**Atualização de direção:** 2026-11-08. **Fonte operacional prioritária a partir do PR #6:** [roadmap-next-iterations.md](roadmap-next-iterations.md) — rodadas R1–R7 para avaliação de qualidade de patch, retrieval adaptativo, Task Evidence Brief, Task Grooming, impacto/verificação, sessões e Studio. O histórico abaixo (rodadas A–E/W0–W10) permanece para rastreabilidade; seus status datados não devem ser lidos como estado atual sem consultar Git e os relatórios de avaliação.
+
+**Última consolidação detalhada das rodadas históricas:** 2026-11-06. **Estado:** arquitetura e plano de implementação, NÃO prova de funcionalidades concluídas.
 **Fonte arquitetural:** [product-v2.md](product-v2.md) · **Reuso e licenças:** [reference-implementations.md](reference-implementations.md) · **Medição:** [evaluation-plan.md](evaluation-plan.md).
 
 ## 0. Direção irrevogável do produto
@@ -83,6 +85,13 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 
 **Estado (2026-11-06, rodadas C1–C5 e D5 parcial):** implementados com testes unitários executados e `go test -race` nos pacotes concorrentes. Não implementado ou não verificado, e portanto **não** concluído: (1) nenhum hook de `PreToolUse`/`PostToolUse` é instalado por padrão, `sidecar observe` existe mas precisa de E2E por cliente e medição de custo antes de ser ligado; (2) `PreCompact` é aceito por `sidecar observe` (zera a deduplicação da sessão), mas nenhum instalador registra esse evento ainda; (3) Claude Code e Codex não documentam campo de falha em `PostToolUse` (resultado `unknown`), então `repeated_error` só dispara com Antigravity; (4) C4 é apenas a política passiva (`InjectionAllowed`), sem injeção por evento de ferramenta; (5) `invocationNum` = 0 como primeira chamada do turno é assumido, não verificado; (6) os upstreams Claude-Mem e Beads **não foram lidos** e nenhum SHA foi registrado, exigência do AGENTS.md ainda aberta; (7) D5 sem E2E com o Antigravity CLI real.
 
+**Estado em 2026-11-08 (feedback corrigido; piloto E2E com hook real executado; laboratório parcial):**
+- **Feedback (C, correção):** `oracle_status` tri-state; `task_completed` não é mais oráculo; níveis forte/médio/fraco com fatores 1,0 e 0,5, e só esses dois alteram o ranking; rastro sem leitura não penaliza enganoso; migração v5→v6 com registros antigos fracos. Testes de regressão e `-race` verdes. Detalhes em [agent-feedback.md](agent-feedback.md).
+- **Runner:** alias `haiku` do Claude Code foi servido por `claude-sonnet-5-5` (custo cerca de 20× maior). Aliases são recusados e o modelo servido é registrado. Números antigos de "Haiku" em [handoff-agent-benchmark.md](handoff-agent-benchmark.md) não são de Haiku.
+- **Piloto E2E com hook real** ([agent-pilot-2026-11-08.md](agent-pilot-2026-11-08.md)): Claude Code 2.1.319, `claude-haiku-5-5`, 20 execuções, US$ 0,11. Entrega do `additionalContext` verificada no stream. Sucesso OFF 9/10 e ON 10/10, amostra pequena e não conclusiva. Falha de abstenção achada: contexto entregue em caso sem evidência. Auditoria em [eval-audit-2026-11-08.md](eval-audit-2026-11-08.md).
+- **Rodada 2 (PR #6, 2026-11-08):** CI Windows corrigido por causa comprovada; abstenção V2 com FP 39% → 16% nos negativos difíceis dev+validation e perda de 1 positivo interno (documentada); integridade do feedback com apresentação e artefato de oráculo; isolamento validado com canário; relatórios e diagnóstico por classes. Detalhes e pendências em [eval-round2-2026-11-08.md](eval-round2-2026-11-08.md).
+- **Pendente:** isolamento de configurações globais ainda sem prova de plugins embutidos, replay com grade, corpus novo, ROI e latência (`--real-hooks` segue bloqueado); corpus externo com oráculo independente; replay offline e tuning; ROI do feedback com agente; abstenção para termos genéricos; `evidence_presented`.
+
 - **C1 — SessionObserver passivo:** normalizar eventos suportados de Claude, Codex e Antigravity CLI por adapter; IDs opacos, retenção curta, redaction, distinção `unobserved` vs zero; modo OFF possui instrumentação igual no benchmark.
 - **C2 — LoopDiagnostics:** detectar repetição de buscas/leituras sem novidade e mudanças de stage observáveis; testar falso alarme em loops legítimos; não interferir no agente nesta etapa.
 - **C3 — Continuidade/SessionSignals:** memória efêmera por sessão, hash de evidências, mudança de branch e compactação; retomar sem republicar contexto inteiro.
@@ -124,7 +133,7 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 | Área | Testes de aceite mínimos | Status |
 |---|---|---|
 | CLI/distribuição | build + checksums; install→reinstall→upgrade→uninstall→rollback; PATH e ownership; 3 SO | **Parcial: E2E de binário em Linux (`TestCLIEndToEndWithAllAdapters`: install com três adapters e flags, doctor, schemas de hook, observe, status e uninstall --purge restaurando configs); 3 SO, upgrade e rollback pendentes** |
-| Hooks | schema por versão, aprovação Codex, Claude real, Antigravity CLI real, no evidence/failure/safe stdout, coexistência | **Parcial** |
+| Hooks | schema por versão, aprovação Codex, Claude real, Antigravity CLI real, no evidence/failure/safe stdout, coexistência | **Parcial**; Claude Code com hook real entregue no piloto de 20 execuções (2026-11-08); Codex e Antigravity pendentes; isolamento global não provado |
 | Ranking/intenção | baselines v1, ablações, PT/EN, tie-break estável, negativas, mudanças de repo | **Parcial:** suíte v2 de 15 cenários com checks mecânicos (v2 7/15, igual a bm25 + tradução); ablações e negativos medidos; tie-break estável **não** garantido (MRR oscila); mudanças de repo não testadas |
 | Contratos | código/docs/testes de acordo, conflito explícito, falso conflito, fonte desatualizada, alteração de commit | **Pendente** |
 | SessionObserver | repetição real/legítima, concorrência, TTL, privacy, compactação, unobserved, session IDs | **Parcial: unitários; concorrência (`TestObserverConcurrentWrites`, com `-race`); compactação (`TestObserverPreCompactResetsSessionSeen`); E2E do binário com `observe` PreToolUse/PostToolUse. Custo com agente real não medido; `PreCompact` não é instalado por nenhum instalador** |
@@ -132,7 +141,7 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 | LSP/docs | handshake, Java/Go, absent, slow, untrusted, windows, cancelamento, checksum/rollback | **Parcial**: handshake, absent, slow, untrusted, erro e cancelamento de processo testados em Linux; `gopls` real só para Go; Java, Windows, macOS e checksum/rollback de instalação de LSP pendentes |
 | Desempenho | cold/warm, p50/p95/p99, overhead do processo, memória, tokens, indexação grande | **Parcial v1** |
 | Segurança | entrada não confiável, injeção de instruções, symlinks, segredos, paths e logs sem conteúdo sensível | **Parcial v1** |
-| Agentes reais | OFF/v1/v2, sucesso, TTFE utilizado, tool calls, rounds, total tokens, walltime, interferência | **Harness construído e testado com registros sintéticos; nenhuma execução (custo não autorizado)** |
+| Agentes reais | OFF/v1/v2, sucesso, TTFE utilizado, tool calls, rounds, total tokens, walltime, interferência | **Parcial: piloto E2E com hook real (Claude Code, `claude-haiku-5-5`), 20 execuções, amostra pequena e não conclusiva ([agent-pilot-2026-11-08.md](agent-pilot-2026-11-08.md)). OFF/v1/v2 e TTFE não medidos; isolamento global não provado** |
 | Concorrentes | CodeGraph e busca nativa; mesmo modelo, tarefas, permissions, ferramentas e budget | **Não executado** |
 | Publicação | versão, changelog, licença, comparações, limitações, guia rápido, rollback | **Parcial:** `THIRD_PARTY_NOTICES.md` e relatórios em `bench/results/`; versão, changelog, guia rápido e rollback pendentes |
 
@@ -153,3 +162,20 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 Cada feature só muda o default após um PR que contenha: hipótese → referência upstream e licença → diff → testes locais/CI → métricas **antes e depois** → regressões adversas → documentação → reversão. Se um experimento falhar, substituí-lo sem abrir mão da capacidade essencial correspondente do produto.
 
 **V2 pronta** significa produto **integrado, instalável, testado e auditável**, não a soma de módulos que compilaram isoladamente.
+
+
+## 7. Continuidade após o PR #6 — encaminhamento aos próximos agentes (2026-11-08)
+
+**Não abrir uma V3 nem reimplementar a V2.** Continuar a partir do código integrado e da matriz operacional em [roadmap-next-iterations.md](roadmap-next-iterations.md). O PR #6 é um marco **parcial**, não a conclusão do Evaluation Lab ou promoção automática da V2. Consultar [eval-round2-2026-11-08.md](eval-round2-2026-11-08.md) e os logs de CI antes de declarar resultados.
+
+| Rodada nova | Reutiliza a rodada antiga | Próximo resultado verificável |
+|---|---|---|
+| R1 Evaluation Lab | A4, E1–E3, W9 | Corpus externo pinado + oráculos de edição, replay, perf, A/B agentic seguro |
+| R2 Context Policy | B2–B5, W2–W4 | Ativar componentes por necessidade, abster melhor, reduzir custo sem perda de recuperação |
+| R3 Task Evidence Brief | B1–B5, W2–W4 | Contexto de tarefa conciso, contrato e fonte, hipóteses separadas de fatos |
+| R4 Task Grooming | B2–B3, C5, W3/W6 | Identificar decisões de alto impacto não resolvidas e orientar perguntas seletivas |
+| R5 Impact & Verification | B3, D2, W3/W7 | Conservar contratos relevantes, blast radius, testes e escopo de patch |
+| R6 Session Intelligence | C1–C5, W5/W6 | Detectar estagnação e testar intervenções somente com evidência nova |
+| R7 Studio e distribuição | A1–A2, D1–D5, E3–E5, W0/W7/W8/W10 | Visualização local, adapters reais, release reversível |
+
+**Gate de mudança:** cada PR novo registra baseline, evidência, hipótese, implementação mínima, ablação, benchmark relevante e rollback. O objetivo primário é **custo e tempo por tarefa correta com regressões de contrato controladas**. Menos tool calls ou maior Hit@5, isoladamente, não bastam.

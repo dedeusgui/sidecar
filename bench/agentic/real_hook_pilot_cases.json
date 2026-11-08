@@ -1,0 +1,7 @@
+[
+  {"id": "H01-weight", "category": "direct", "prompt": "onde é calculado o peso do feedback quando o oráculo não foi informado?", "relevant": [{"path": "internal/store/feedback.go"}]},
+  {"id": "H02-migration", "category": "direct", "prompt": "qual migração adiciona as colunas de proveniência do oráculo na tabela evidence_feedback?", "relevant": [{"path": "internal/store/store.go"}]},
+  {"id": "H03-trace", "category": "messy_pt", "prompt": "eh tipo onde o feedback descobre se o agente leu ou editou o arquivo na sessão", "relevant": [{"path": "internal/app/feedback.go"}]},
+  {"id": "H04-model", "category": "messy_pt", "prompt": "onde o runner descobre qual modelo o claude realmente serviu na execução", "relevant": [{"path": "bench/agent/run_agents.py"}]},
+  {"id": "N01-negative", "category": "negative", "prompt": "como faço pão de fermentação natural em casa?", "relevant": []}
+]

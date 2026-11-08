@@ -144,15 +144,22 @@ type candidate struct {
 	nameComplete bool
 	matched      []string
 	coverage     float64
-	rels         []string
-	neighbor     bool
-	seedCoverage float64
-	relBasis     []string
-	git          bool
-	reason       string
-	feedback     string // feedback_boost | feedback_penalty when post-task feedback moved its score
-	suppressed   bool   // dropped before fusion; never shown or ranked
-	score        float64
+	// directMatches and altMatches count the prompt terms matched by the symbol's own text, as the
+	// prompt's own word and through a translation. promptTerms is the number of distinct prompt
+	// terms, known or not; v2Own selects the coverage-based confidence (see ownTextConfidence).
+	directMatches int
+	altMatches    int
+	promptTerms   int
+	v2Own         bool
+	rels          []string
+	neighbor      bool
+	seedCoverage  float64
+	relBasis      []string
+	git           bool
+	reason        string
+	feedback      string // feedback_boost | feedback_penalty when post-task feedback moved its score
+	suppressed    bool   // dropped before fusion; never shown or ranked
+	score         float64
 }
 
 // Search ranks evidence for a prompt. An empty prompt or one without repository matches
@@ -245,6 +252,10 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	res.Trace.Exact = len(exactHits)
 	for _, c := range cands {
 		scoreOwnText(c, concepts)
+		if v2 {
+			c.directMatches, c.altMatches = ownMatches(c.hit, terms, opts.Ablate.NoTranslation)
+			c.promptTerms, c.v2Own = len(uniqueStrings(terms)), true
+		}
 	}
 	res.Trace.Timings["exact"] = time.Since(t)
 
@@ -1151,6 +1162,12 @@ func sourceOf(c *candidate) string {
 // confidenceOf is a fixed heuristic over the evidence path, ordered by how direct the match is.
 // It is not fitted to labelled data; calibrating it needs the evaluation set.
 func confidenceOf(c *candidate) float64 {
+	if c.exact {
+		return 0.95
+	}
+	if c.v2Own && (c.literal || c.coverage > 0) {
+		return ownTextConfidence(c)
+	}
 	switch {
 	case c.exact || c.literal:
 		return 0.95
@@ -1162,6 +1179,60 @@ func confidenceOf(c *candidate) float64 {
 		return 0.3
 	}
 	return 0.2
+}
+
+// ownCoverCap bounds the prompt terms that must be matched. Voice Mode prompts have many more terms
+// than any answer needs, so the denominator stops growing at this count.
+const ownCoverCap = 4
+
+// ownAltWeight is the support of a translation-only match, relative to the prompt's own word. It
+// is 1: the denominator, not a discount, is what keeps a dictionary guess from passing alone.
+const ownAltWeight = 1.0
+
+// ownMatches counts the distinct prompt terms that the symbol's own text contains, as the prompt's
+// own word (direct) or only through a translation (alt). It reads every prompt term, including the
+// ones the concept distillation drops, so the numerator and the denominator count the same words.
+func ownMatches(h store.SymbolHit, terms []string, noTranslation bool) (direct, alt int) {
+	all := hitTerms(h)
+	for _, t := range uniqueStrings(terms) {
+		switch {
+		case all[t]:
+			direct++
+		case !noTranslation:
+			for _, en := range lexical.Translations(t) {
+				if all[en] {
+					alt++
+					break
+				}
+			}
+		}
+	}
+	return direct, alt
+}
+
+func uniqueStrings(xs []string) []string {
+	seen := make(map[string]bool, len(xs))
+	out := make([]string, 0, len(xs))
+	for _, x := range xs {
+		if !seen[x] {
+			seen[x] = true
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+// ownTextConfidence scores a candidate by how much of the prompt its own text explains, in the V2
+// pipeline. The denominator is the prompt's own terms, so a content word the repository does not
+// know counts against the match. The old coverage was taken over the repository's terms only, so
+// one known word out of four read as full coverage. A translation-only match counts half: a
+// dictionary can map a common word onto a common code word (horário to time, which matches
+// timeout). Confidence stays inside [0.3, 0.9]; only an exact identifier reaches 0.95.
+func ownTextConfidence(c *candidate) float64 {
+	support := float64(c.directMatches) + ownAltWeight*float64(c.altMatches)
+	denom := math.Min(float64(max(c.promptTerms, 1)), ownCoverCap)
+	cover := math.Min(support/denom, 1)
+	return 0.3 + 0.6*cover
 }
 
 // tokensOf estimates the metadata line that the brief renders for the item.

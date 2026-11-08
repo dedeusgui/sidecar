@@ -46,6 +46,31 @@ func makeProject(t *testing.T) string {
 	return root
 }
 
+// hookJSON encodes a hook payload with encoding/json. Paths must be escaped by the encoder: on
+// Windows they contain backslashes, and concatenating them into a JSON literal makes invalid
+// escapes such as \U, so the observer rejects the whole event.
+func hookJSON(t *testing.T, fields map[string]any) string {
+	t.Helper()
+	b, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// setUserHome points the user's home directory at dir. Go reads $HOME on Unix and %USERPROFILE%
+// on Windows, so setting only HOME leaves the home guard untested there. The check fails loudly
+// instead of letting a test pass without exercising the home directory.
+func setUserHome(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
+	got, err := os.UserHomeDir()
+	if err != nil || filepath.Clean(got) != filepath.Clean(dir) {
+		t.Fatalf("user home = %q (%v), want %q", got, err, dir)
+	}
+}
+
 func payload(t *testing.T, cwd, prompt, session string) string {
 	t.Helper()
 	b, _ := json.Marshal(map[string]string{
@@ -191,11 +216,7 @@ func TestUnsafeRootIsNotIndexed(t *testing.T) {
 func TestHookRejectsRepositoryRootAtUserHome(t *testing.T) {
 	setupHome(t)
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	if actual, err := os.UserHomeDir(); err != nil || filepath.Clean(actual) != filepath.Clean(home) {
-		t.Skipf("cannot override user home on this platform: %q, %v", actual, err)
-	}
+	setUserHome(t, home)
 	// A nested cwd does not make it safe to index a Git worktree rooted at HOME.
 	if err := os.MkdirAll(filepath.Join(home, ".git"), 0o700); err != nil {
 		t.Fatal(err)

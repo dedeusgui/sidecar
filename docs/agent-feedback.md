@@ -71,7 +71,7 @@ Valores para `context_helpfulness`: `helpful`, `neutral`, `harmful`, `unknown`; 
 1. Opt-in claro; não obrigar comentário a cada resposta do agente real, pois consome tokens e pode atrasar sua tarefa.
 2. Não inserir pergunta avaliativa apenas no braço ON antes do fim da tarefa: isso contamina A/B. Se usado, mesmo protocolo de pós-tarefa em ambos os braços, com `unknown/not_applicable` quando OFF.
 3. Não confiar cegamente em `helpful` ou `task_completed`; verificar automaticamente com gold/testes e revisões cegas.
-4. Não ajustar pesos durante a mesma execução. A reconciliação implementada (seção abaixo) grava o feedback ao fim da tarefa e o aplica só a consultas futuras do mesmo worktree, com pesos fixos (não aprendidos) e limite de ±0,25. **Decisão em aberto:** ela aplica o feedback no ranking mesmo quando o oráculo é só autorrelato (`oracle_passed` ausente). Até existir oráculo verificado por teste ou build, trate o efeito como hipótese e avalie com `Ablation.NoFeedback` (existe na API; `sidecar-eval` ainda não expõe esse braço).
+4. Não ajustar pesos durante a mesma execução. A reconciliação (seção abaixo, schema v6) grava o feedback ao fim da tarefa e o aplica só a consultas futuras do mesmo worktree, com pesos fixos (não aprendidos) e limite de ±0,25. **Atualizado (2026-11-08):** `task_completed` não é mais oráculo; sem `oracle_status` o oráculo é `unknown` e não contribui. Feedback sem edição e sem oráculo independente é `weak` e não altera o ranking.
 5. Nunca misturar dados de prompts privados de usuários comuns com corpus público de benchmark sem consentimento.
 
 ## Feedback forte vs fraco
@@ -84,44 +84,73 @@ Valores para `context_helpfulness`: `helpful`, `neutral`, `harmful`, `unknown`; 
 
 Observação ≠ causalidade. Comparação causal de utilidade exige A/B com estado equivalente.
 
-## Reconciliação determinística do feedback (implementada)
+## Reconciliação determinística do feedback (implementada, schema v6)
 
-`sidecar feedback record|list|purge` grava um registro por item de evidência citado no relatório, na tabela `evidence_feedback` (schema v5 do índice). Não há LLM, rede nem aprendizado: a fórmula é fixa e reproduzível.
+`sidecar feedback record|list|purge` grava um registro por item de evidência citado no relatório, na tabela `evidence_feedback` (schema v6 do índice). Não há LLM, rede nem aprendizado: a fórmula é fixa e reproduzível.
 
-**Sinais e pesos** (`store.ComputeReconciledWeight`):
+**Sinais separados.** O relatório não mistura afirmação do agente com resultado de teste:
 
-| Sinal | Peso | Fonte | Valores |
-|---|---|---|---|
-| `S_agent` | 0,20 | autorrelato, escalado pela confiança (`high` 1,0 · `medium` 0,7 · `low` 0,4) | +confiança se útil; −confiança se enganoso |
-| `S_trace` | 0,35 | `SessionObserver`: o agente leu ou editou o arquivo? | útil: +1 confirmado, −0,5 contradito, 0 sem rastro. Enganoso: −1 se o rastro não confirma uso, −0,25 se leu e mesmo assim marcou |
-| `S_oracle` | 0,45 | resultado da tarefa (`oracle_passed`; padrão = `task_completed`) | útil: +1 passou, −0,5 falhou. Enganoso: −1 se falhou ou exigiu nova busca, −0,6 caso contrário |
+| Campo (JSON) | Significado |
+|---|---|
+| `task_completed` → `agent_reported_completion` | o agente afirma que terminou. **Nunca** é oráculo. |
+| `oracle_status` (`oracle_passed` é aceito como atalho) | `passed`, `failed` ou `unknown`. `unknown` não contribui com peso. Valores contraditórios são recusados. |
+| `oracle_provenance` → `feedback_provenance` | quem executou o oráculo: `harness` (execução independente), `human` (pessoa), `agent_report` (autorrelato) ou `none` (sem oráculo). Padrão: `agent_report` quando o oráculo é conhecido. |
+| `trace_corroborated` | rastro do `SessionObserver`: `+2` arquivo **editado** na sessão, `+1` **lido**, `0` sem rastro, `-1` sessão com ferramentas e arquivo nunca tocado. |
+| `evidence_used` | `confirmed` (editado: associação objetiva com o patch), `inferred` (lido), `unknown` (sem observação ou sem interação). Nenhum dos três prova que a evidência causou a mudança. |
+| `polarity` → `feedback_label` | `helpful` (+1) ou `misleading` (−1). |
+| `feedback_confidence` (tier) | `strong`, `medium` ou `weak`, abaixo. |
 
-- Anti-viés: se o item é útil, mas o rastro mostra que o arquivo nunca foi lido ou editado, `S_agent` vale `0,25 ×`. Elogio sem rastro não eleva o peso.
-- `raw = 0,20·S_agent + 0,35·S_trace + 0,45·S_oracle` ∈ [−1, +1]
-- `delta = clamp(0,25 · raw, −0,25, +0,25)`
+**Níveis de confiança (tiers)**, na hierarquia do [plano de avaliação](evaluation-plan.md):
+- **Forte:** oráculo com resultado conhecido de execução independente (`harness`) ou verificado por pessoa (`human`).
+- **Médio:** o arquivo da evidência foi editado na sessão observada. É associação objetiva com o patch, corroborada pelo rastro.
+- **Fraco:** autorrelato sem edição, citação, abertura de arquivo ou uso inferido. Fica armazenado para diagnóstico e **não altera o ranking**.
 
-**Agregação por alvo.** O alvo é `path#símbolo`, ou `path` quando não há símbolo. Os registros válidos do alvo, do mais novo para o mais antigo, somam `delta_n · 0,85^n`. O total é limitado a ±0,25 e vira o multiplicador `1 + total`, que fica em [0,75; 1,25].
+Só registros fortes e médios entram em `FeedbackMultipliers`. Fator de aplicação: forte 1,0 e médio 0,5. Feedback fraco não cria ajuste global sozinho.
+
+**Pesos** (`store.ComputeReconciledWeight`; coeficientes inalterados, a lógica dos sinais mudou):
+
+| Sinal | Peso | Valores |
+|---|---|---|
+| `S_agent` | 0,20 | autorrelato × confiança (`high` 1,0 · `medium` 0,7 · `low` 0,4). Elogio de arquivo não tocado vale 0,25× |
+| `S_trace` | 0,35 | útil: +1 editado, +0,5 lido, 0 sem observação. Enganoso: −0,25 se o agente leu e mesmo assim marcou; **0 caso contrário** |
+| `S_oracle` | 0,45 | oráculo `unknown` = 0. Útil: +1 passou, −0,5 falhou. Enganoso: −1 se falhou ou exigiu nova busca, −0,6 se passou |
+
+- `raw = 0,20·S_agent + 0,35·S_trace + 0,45·S_oracle`; `delta = clamp(0,25 · raw, −0,25, +0,25)`.
+- **Mudança em relação à versão anterior (schema v5):** (a) `task_completed` era usado como oráculo quando `oracle_passed` faltava; (b) um arquivo não lido contava −1 como prova de que o item era enganoso. Ambos foram removidos.
+
+**Agregação por alvo.** O alvo é `path#símbolo`, ou `path` quando não há símbolo. Os registros válidos e aplicáveis (forte ou médio) do alvo, do mais novo para o mais antigo, somam `fator_tier · delta_n · 0,85^n`. O total é limitado a ±0,25 e vira o multiplicador `1 + total`, em [0,75; 1,25].
 
 **Invalidação automática por hash.** Cada registro guarda o `file_hash` que o índice tinha no momento do registro. Ele só vale enquanto o arquivo continua indexado e o hash é igual ao atual, ou se foi registrado sem hash. Arquivo alterado e reindexado, ou removido, deixa o registro `stale`, e ele deixa de valer já na consulta seguinte. `purge` apaga os obsoletos; `purge --all` apaga todos do worktree.
 
+**Migração v5 → v6.** Registros anteriores mantêm seus valores, mas recebem `feedback_confidence = weak`, proveniência `legacy` e `oracle_status = unknown`. Como o oráculo antigo era o autorrelato de conclusão, eles ficam guardados para diagnóstico e deixam de afetar o ranking. Coberto por `TestMigrationFromV5KeepsLegacyFeedbackWeak`.
+
 **Aplicação no ranking.** Só com `SIDECAR_ENGINE=v2`. O multiplicador escala o score RRF do item antes da ordenação. Feedback de símbolo não rebaixa vizinhos do mesmo arquivo; feedback de arquivo vale para os símbolos sem feedback próprio. O trace marca `feedback_boost` (> 1,01) ou `feedback_penalty` (< 0,99).
-
-**Rastro da sessão** (`trace_corroborated`). `+1` se o estado do observador registra leitura ou edição do arquivo; `−1` se a sessão tem leituras, edições ou buscas e nenhuma tocou o arquivo; `0` sem rastro (estado ausente, expirado ou de outro HEAD). Limites conhecidos: leituras são zeradas a cada edição, então um arquivo lido antes da última edição e não editado conta como `−1`; um commit durante a tarefa muda o HEAD e zera o rastro.
-
-**Limite principal: o oráculo é autorrelato por padrão.** Sem `oracle_passed` explícito, o peso de 0,45 usa `task_completed`, que o próprio agente informou. Até o resultado de teste ou build ser informado por quem o executou, o oráculo não é independente. A fórmula só ordena evidências; ela não prova ganho de tempo, qualidade ou custo.
 
 **CLI**
 ```bash
-sidecar feedback record --helpful ID [--misleading ID] --reason wrong_file --confidence high --completed=true --additional-search=false
+sidecar feedback record --helpful ID [--misleading ID] --reason wrong_file --confidence high \
+    --completed=true --oracle passed --oracle-provenance harness --additional-search=false
 sidecar feedback record < relatorio.json        # relatório JSON com schema_version 1, sem flags de ID
 sidecar feedback list --json
 sidecar feedback purge [--all]
 ```
-- `--completed` padrão é `false`; `--confidence` padrão é `medium`; `--reason` padrão é `other`.
-- Valores aceitos: `reason_code` ∈ `exact_match`, `wrong_file`, `stale_context`, `missing_caller`, `noisy_neighbor`, `other`. `context_helpfulness` ∈ `helpful`, `neutral`, `harmful`, `unknown`. `confidence` ∈ `high`, `medium`, `low`. Outros valores são recusados, e nada é gravado.
+- `--completed` é só a afirmação do agente. Para registrar um resultado de oráculo use `--oracle passed|failed`; o padrão é `unknown`.
+- `--oracle-provenance` padrão é `agent_report`. **Limite:** o CLI não verifica a proveniência declarada; `harness` e `human` são responsabilidade de quem chama. Um relatório enviado pelo próprio agente deve usar `agent_report`.
+- Valores aceitos: `reason_code` ∈ `exact_match`, `wrong_file`, `stale_context`, `missing_caller`, `noisy_neighbor`, `other`. `context_helpfulness` ∈ `helpful`, `neutral`, `harmful`, `unknown`. `confidence` ∈ `high`, `medium`, `low`. `oracle_status` ∈ `passed`, `failed`, `unknown`. Outros valores são recusados, e nada é gravado.
 - IDs de evidência são os de `sidecar explain --json` (`evidence[].id`). O stdin é limitado a 64 KiB.
 
-**Cobertura.** Testes unitários em `internal/store/feedback_test.go`, `internal/retrieve/feedback_retrieve_test.go`, `internal/app/feedback_test.go` e `cmd/sidecar/feedback_test.go`. **Não há execução E2E com agente real.** Esta reconciliação está não comprovada quanto a tempo, qualidade ou custo.
+**Cobertura.** Testes em `internal/store/feedback_test.go` (pesos com valores exatos, níveis, padrões mais fracos, aplicação por nível, migração v5→v6), `internal/retrieve/feedback_retrieve_test.go` (feedback fraco não reordena), `internal/app/feedback_test.go` e `internal/app/feedback_oracle_test.go` (autorrelato de conclusão não é oráculo, proveniência e edição definem o nível, validação) e `cmd/sidecar/feedback_test.go`. **Não há medição de ROI com agente real.** Não existe ainda experimento que compare tarefas com e sem feedback histórico.
+
+**Integridade (2026-11-08, schema v7).** Duas lacunas foram fechadas:
+
+- **Apresentação.** O hook grava no estado do observador os pares caminho e símbolo que injetou, em hash. Um ID de feedback só conta como apresentado se a sessão tem esse par. Evidência não apresentada fica `weak`, mesmo com oráculo independente ou arquivo editado. Coluna `evidence_presented`.
+- **Proveniência do oráculo.** `harness` e `human` só entram com um **artefato de oráculo**: JSON gravado pelo harness, com HMAC-SHA256 sobre `schema, run_id, session_id, task_id, commit, oracle_sha256, status`, assinado com uma chave que fica fora do workspace do agente (`--harness-key`, mínimo de 16 bytes). O artefato precisa verificar, pertencer à sessão do relatório e apontar para o HEAD do worktree. Um relatório que declara `harness` ou `human` é recusado antes de qualquer escrita. Colunas `oracle_run_id`, `oracle_commit` e `oracle_sha256` guardam a identidade da execução.
+- **Recusas antes de gravar.** ID fora do índice, símbolo que o arquivo não tem, mesmo ID como útil e enganoso. Nada é gravado nesses casos.
+- **Níveis.** Forte exige apresentação e oráculo independente com resultado conhecido. Médio exige apresentação e edição na sessão. Teste final reprovado relatado pelo próprio agente não torna o registro forte.
+
+Limite: a chave do harness é responsabilidade de quem executa o harness. Se o agente puder ler a chave, o HMAC não prova nada. Isso é uma garantia de controle local, não criptografia de identidade.
+
+**Ainda não implementado:** `evidence_retrieved` e `evidence_selected`, que exigem registrar candidatos e seleção no pacote de contexto; hoje só há `presented`. O braço `NoFeedback` no `sidecar-eval` também continua pendente.
 
 ## Experimento inicial
 

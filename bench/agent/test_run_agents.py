@@ -286,3 +286,44 @@ class IsolationTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ModelIdentityTests(unittest.TestCase):
+    def test_served_model_is_read_from_model_usage(self):
+        out = json.dumps({"type": "result", "result": '{"files": []}', "total_cost_usd": 0.01,
+                          "modelUsage": {"claude-haiku-5-5": {"inputTokens": 2, "outputTokens": 66}}})
+        self.assertEqual(runner.parse_output("claude", out)["served_models"], ["claude-haiku-5-5"])
+
+    def test_claude_alias_is_rejected_and_explicit_id_accepted(self):
+        with self.assertRaises(ValueError):
+            runner.validate_model("claude", "haiku")
+        runner.validate_model("claude", "claude-haiku-5-5")
+        runner.validate_model("codex", "gpt-6-luna")  # other clients keep their own names
+
+
+class ReportTransportTests(unittest.TestCase):
+    def test_report_describes_real_hook_and_excludes_incomparable_runs(self):
+        rows = [
+            {"agent": "claude", "model": "claude-haiku-5-5", "arm": "OFF", "rep": 0, "case": "a", "category": "direct",
+             "transport": "none", "wall_s": 1.0, "tokens_in": 10, "tokens_out": 1, "cost_usd": 0.01, "tool_calls": 1,
+             "success": True, "hit_at_1": True, "hit_at_5": True, "malformed": False, "edited_files": False,
+             "repo": "r", "comparable": True},
+            {"agent": "claude", "model": "claude-haiku-5-5", "arm": "ON", "rep": 0, "case": "a", "category": "direct",
+             "transport": "real_hook", "wall_s": 1.0, "tokens_in": 10, "tokens_out": 1, "cost_usd": 0.01, "tool_calls": 1,
+             "success": True, "hit_at_1": True, "hit_at_5": True, "malformed": False, "edited_files": False,
+             "repo": "r", "comparable": True, "hook_fired": True},
+            {"agent": "claude", "model": "claude-haiku-5-5", "arm": "ON", "rep": 1, "case": "b", "category": "direct",
+             "transport": "real_hook", "wall_s": 1.0, "tokens_in": 10, "tokens_out": 1, "cost_usd": 0.01, "tool_calls": 1,
+             "success": False, "hit_at_1": False, "hit_at_5": False, "malformed": False, "edited_files": False,
+             "repo": "r", "comparable": False, "incomparable_reasons": ["plugins não embutidos carregados: superpowers"]},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            src = pathlib.Path(tmp, "runs.jsonl")
+            src.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+            out = pathlib.Path(tmp, "report.md")
+            runner.report(str(src), str(out))
+            text = out.read_text()
+        self.assertIn("comparáveis: 2", text)
+        self.assertIn("não comparáveis (fora das médias): 1", text)
+        self.assertIn("hook real do cliente", text)
+        self.assertNotIn("prefixo de prompt", text)  # no prefix run in this file, so the header must not claim one

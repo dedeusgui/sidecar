@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"math"
 	"path/filepath"
 	"testing"
@@ -20,32 +21,48 @@ func TestParseEvidenceID(t *testing.T) {
 	}
 }
 
+func near(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
+
+// Each expected value is the fixed formula worked out by hand: raw = 0.20·S_agent + 0.35·S_trace +
+// 0.45·S_oracle, delta = 0.25·raw, clamped to ±0.25.
 func TestComputeReconciledWeightSignals(t *testing.T) {
-	// Helpful, read by the agent, task passed: the strongest positive case.
-	if w := ComputeReconciledWeight(1, "high", 1, true, false); w <= 0.18 {
-		t.Fatalf("corroborated helpful weight = %v, want > 0.18", w)
+	cases := []struct {
+		label                  string
+		polarity               int
+		trace, oracle          int
+		additionalSearchNeeded bool
+		want                   float64
+	}{
+		// raw = 0.2·1 + 0.35·1 + 0.45·1 = 1.0 → clamped to the bound.
+		{"helpful, edited, oracle passed", 1, TraceEdited, 1, false, 0.25},
+		// raw = 0.2·0.25 + 0.35·0 + 0.45·1: an unobserved claim is discounted, the passed oracle still counts.
+		{"helpful, untouched, oracle passed", 1, TraceUntouched, 1, false, 0.125},
+		// raw = 0.2·1 + 0.35·0.5 + 0.45·0: a read is weak, and an unknown oracle adds nothing.
+		{"helpful, read, oracle unknown", 1, TraceRead, 0, false, 0.09375},
+		// raw = 0.2·(−1) + 0.35·(−0.25) + 0.45·(−1): flagged after reading, and the oracle failed.
+		{"misleading, read and edited, oracle failed", -1, TraceEdited, -1, true, -0.184375},
+		// Not reading a misleading item is not evidence against the flag: the trace adds nothing.
+		{"misleading, untouched", -1, TraceUntouched, 0, false, -0.05},
+		{"misleading, no trace", -1, TraceNotObserved, 0, false, -0.05},
 	}
-	// Helpful but the trace says the file was never read: praise is discounted, not removed.
-	discounted := ComputeReconciledWeight(1, "high", -1, true, false)
-	if want := 0.08125; math.Abs(discounted-want) > 1e-9 {
-		t.Fatalf("contradicted helpful weight = %v, want %v", discounted, want)
+	for _, c := range cases {
+		if got := ComputeReconciledWeight(c.polarity, "high", c.trace, c.oracle, c.additionalSearchNeeded); !near(got, c.want) {
+			t.Errorf("%s: weight = %v, want %v", c.label, got, c.want)
+		}
 	}
-	if corroborated := ComputeReconciledWeight(1, "high", 1, true, false); discounted >= corroborated {
-		t.Fatalf("contradicted weight %v not below corroborated %v", discounted, corroborated)
-	}
-	// Misleading, and the agent needed another search: a clear negative.
-	if w := ComputeReconciledWeight(-1, "medium", 0, true, true); w >= -0.15 {
-		t.Fatalf("misleading weight = %v, want < -0.15", w)
+	// An unknown oracle must not score like a failure: the completion claim is never the oracle.
+	if unknown, failed := ComputeReconciledWeight(1, "high", TraceEdited, 0, false), ComputeReconciledWeight(1, "high", TraceEdited, -1, false); unknown <= failed {
+		t.Fatalf("unknown oracle (%v) scored no better than a failed one (%v)", unknown, failed)
 	}
 	// Every combination stays inside the bound.
 	for _, pol := range []int{1, -1} {
 		for _, conf := range []string{"high", "medium", "low", "other"} {
-			for _, tr := range []int{-1, 0, 1} {
-				for _, ok := range []bool{false, true} {
+			for _, tr := range []int{TraceUntouched, TraceNotObserved, TraceRead, TraceEdited} {
+				for _, oracle := range []int{-1, 0, 1} {
 					for _, more := range []bool{false, true} {
-						w := ComputeReconciledWeight(pol, conf, tr, ok, more)
+						w := ComputeReconciledWeight(pol, conf, tr, oracle, more)
 						if w < -feedbackMaxDelta || w > feedbackMaxDelta {
-							t.Fatalf("weight %v out of bounds for %v", w, []any{pol, conf, tr, ok, more})
+							t.Fatalf("weight %v out of bounds for %v", w, []any{pol, conf, tr, oracle, more})
 						}
 					}
 				}
@@ -54,20 +71,64 @@ func TestComputeReconciledWeightSignals(t *testing.T) {
 	}
 }
 
-func TestFeedbackLifecycleAndInvalidation(t *testing.T) {
+// Tiers: only an independent oracle with a known outcome is strong; an edit in the session makes it
+// medium; a self-report alone is weak.
+func TestClassifyFeedbackTiers(t *testing.T) {
+	cases := []struct {
+		name       string
+		oracle     int
+		provenance string
+		presented  bool
+		trace      int
+		want       string
+	}{
+		{"independent pass on delivered evidence", 1, ProvenanceHarness, true, TraceNotObserved, TierStrong},
+		{"human failure on delivered evidence", -1, ProvenanceHuman, true, TraceUntouched, TierStrong},
+		{"independent oracle on evidence never delivered", 1, ProvenanceHarness, false, TraceEdited, TierWeak},
+		{"no outcome from a harness is not strong", 0, ProvenanceHarness, true, TraceEdited, TierMedium},
+		{"self-reported pass without edit", 1, ProvenanceAgentReport, true, TraceNotObserved, TierWeak},
+		{"self-reported pass with an edit of delivered evidence", 1, ProvenanceAgentReport, true, TraceEdited, TierMedium},
+		{"edit of evidence never delivered", 1, ProvenanceAgentReport, false, TraceEdited, TierWeak},
+		{"opening a file is not use", 0, ProvenanceNone, true, TraceRead, TierWeak},
+		{"rows from before v6", 1, ProvenanceLegacy, true, TraceRead, TierWeak},
+	}
+	for _, c := range cases {
+		if got := ClassifyFeedback(c.oracle, c.provenance, c.presented, c.trace); got != c.want {
+			t.Errorf("%s: ClassifyFeedback = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestEvidenceUseFromTrace(t *testing.T) {
+	want := map[int]string{TraceUntouched: EvidenceUnknown, TraceNotObserved: EvidenceUnknown, TraceRead: EvidenceInferred, TraceEdited: EvidenceConfirmed}
+	for trace, use := range want {
+		if got := EvidenceUse(trace); got != use {
+			t.Errorf("EvidenceUse(%d) = %q, want %q", trace, got, use)
+		}
+	}
+}
+
+func openFeedbackStore(t *testing.T, files ...FileRecord) *Store {
+	t.Helper()
 	s, err := Open(filepath.Join(t.TempDir(), "index.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = s.Close() }()
-	const wt = "/repo"
-	for _, f := range []FileRecord{{Path: "a.go", Hash: "h1"}, {Path: "b.go", Hash: "h2"}, {Path: "c.go", Hash: "h3"}} {
+	t.Cleanup(func() { _ = s.Close() })
+	for _, f := range files {
 		if err := s.ReplaceFile(f, nil, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
+	return s
+}
+
+func TestFeedbackLifecycleAndInvalidation(t *testing.T) {
+	s := openFeedbackStore(t, FileRecord{Path: "a.go", Hash: "h1"}, FileRecord{Path: "b.go", Hash: "h2"}, FileRecord{Path: "c.go", Hash: "h3"})
+	const wt = "/repo"
 	insert := func(rec FeedbackRecord) {
 		t.Helper()
+		rec.Tier = TierStrong // this test is about lifecycle; tier scaling has its own test
 		if _, err := s.InsertFeedback(rec); err != nil {
 			t.Fatal(err)
 		}
@@ -126,5 +187,101 @@ func TestFeedbackLifecycleAndInvalidation(t *testing.T) {
 	}
 	if n, err := s.PurgeFeedback(wt, true); err != nil || n != 3 {
 		t.Fatalf("PurgeFeedback(all) = %d (%v), want 3", n, err)
+	}
+}
+
+// Strong feedback applies in full, medium at half the factor, and weak feedback never applies.
+func TestFeedbackTiersScaleMultipliers(t *testing.T) {
+	s := openFeedbackStore(t, FileRecord{Path: "a.go", Hash: "h1"}, FileRecord{Path: "b.go", Hash: "h2"}, FileRecord{Path: "c.go", Hash: "h3"})
+	const wt = "/repo"
+	add := func(path, symbol, hash, tier string, weight float64) {
+		t.Helper()
+		if _, err := s.InsertFeedback(FeedbackRecord{Worktree: wt, EvidenceID: path, FilePath: path, Symbol: symbol,
+			FileHash: hash, Polarity: -1, ReconciledWeight: weight, Tier: tier, CreatedAt: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	add("a.go", "Alpha", "h1", TierStrong, -0.2) // 1 + (-0.2)
+	add("b.go", "Beta", "h2", TierMedium, -0.2)  // 1 + 0.5 · (-0.2)
+	add("c.go", "", "h3", TierWeak, -0.2)        // self-report only: not applied
+	mults, err := s.FeedbackMultipliers(wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !near(mults["a.go#Alpha"], 0.8) || !near(mults["b.go#Beta"], 0.9) {
+		t.Fatalf("multipliers = %v, want strong 0.8 and medium 0.9", mults)
+	}
+	if _, ok := mults["c.go"]; ok {
+		t.Fatalf("weak feedback changed the ranking: %v", mults)
+	}
+}
+
+// A report that leaves its fields empty is stored as the weakest record, so no caller can strengthen
+// a record by omission.
+func TestInsertFeedbackDefaultsToWeakest(t *testing.T) {
+	s := openFeedbackStore(t, FileRecord{Path: "a.go", Hash: "h1"})
+	if _, err := s.InsertFeedback(FeedbackRecord{Worktree: "/repo", EvidenceID: "a.go#Alpha", FilePath: "a.go", Symbol: "Alpha", FileHash: "h1", Polarity: 1, ReconciledWeight: 0.2, CreatedAt: 1}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := s.ListFeedback("/repo")
+	if err != nil || len(list) != 1 {
+		t.Fatalf("ListFeedback = %d (%v), want 1", len(list), err)
+	}
+	r := list[0]
+	if r.OracleStatus != OracleUnknown || r.Provenance != ProvenanceNone || r.EvidenceUsed != EvidenceUnknown || r.Tier != TierWeak {
+		t.Fatalf("defaults = oracle %q, provenance %q, used %q, tier %q; want unknown, none, unknown, weak",
+			r.OracleStatus, r.Provenance, r.EvidenceUsed, r.Tier)
+	}
+	if mults, _ := s.FeedbackMultipliers("/repo"); len(mults) != 0 {
+		t.Fatalf("weak default changed the ranking: %v", mults)
+	}
+}
+
+// A database at schema v5 keeps its rows through the v6 migration. Those rows carried the agent's
+// completion claim as their oracle, so they become weak and stop affecting the ranking.
+func TestMigrationFromV5KeepsLegacyFeedbackWeak(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "index.db")
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for v := 0; v < 5; v++ {
+		for _, stmt := range migrations[v] {
+			if _, err := db.Exec(stmt); err != nil {
+				t.Fatalf("v%d: %v", v, err)
+			}
+		}
+	}
+	if _, err := db.Exec(`PRAGMA user_version = 5`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO files (path, hash) VALUES ('a.go', 'h1')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO evidence_feedback (worktree, session_id, evidence_id, file_path, symbol, file_hash,
+		polarity, reason_code, agent_confidence, trace_corroborated, oracle_passed, reconciled_weight, created_at)
+		VALUES ('/repo', 's1', 'a.go#Alpha', 'a.go', 'Alpha', 'h1', 1, 'wrong_file', 'high', 1, 1, 0.2, 1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := Open(path)
+	if err != nil {
+		t.Fatalf("migrate v5 -> v6: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	list, err := s.ListFeedback("/repo")
+	if err != nil || len(list) != 1 {
+		t.Fatalf("ListFeedback = %d (%v), want the legacy row", len(list), err)
+	}
+	r := list[0]
+	if r.Tier != TierWeak || r.Provenance != ProvenanceLegacy || r.OracleStatus != OracleUnknown || r.AgentCompleted {
+		t.Fatalf("legacy row = tier %q, provenance %q, oracle %q, completed %v; want weak, legacy, unknown, false",
+			r.Tier, r.Provenance, r.OracleStatus, r.AgentCompleted)
+	}
+	if mults, _ := s.FeedbackMultipliers("/repo"); len(mults) != 0 {
+		t.Fatalf("legacy feedback still changes the ranking: %v", mults)
 	}
 }

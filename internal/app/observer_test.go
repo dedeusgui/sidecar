@@ -160,8 +160,10 @@ func TestInjectionPolicyIsPassiveForToolsAndFirstAntigravityCall(t *testing.T) {
 func TestObserveRecordsHashesOnlyAndStaysSilent(t *testing.T) {
 	setupHome(t)
 	root := makeProject(t)
-	payload := `{"session_id":"s9","cwd":"` + root + `","tool_name":"Read","tool_input":{"file_path":"` +
-		filepath.Join(root, "queue", "limits.go") + `"},"tool_use_id":"secret-call-id"}`
+	payload := hookJSON(t, map[string]any{
+		"session_id": "s9", "cwd": root, "tool_name": "Read", "tool_use_id": "secret-call-id",
+		"tool_input": map[string]any{"file_path": filepath.Join(root, "queue", "limits.go")},
+	})
 	if code := Observe(adapter.Claude, "PreToolUse", strings.NewReader(payload)); code != 0 {
 		t.Fatalf("exit = %d", code)
 	}
@@ -213,7 +215,10 @@ func TestRecordEvidenceCountsWhatWasSentAsHashes(t *testing.T) {
 func TestAntigravityLaterInvocationGetsNoContext(t *testing.T) {
 	setupHome(t)
 	root := makeProject(t)
-	input := `{"conversationId":"c1","workspacePaths":["` + root + `"],"lastUserInput":"o MAX_ACTIVE_TICKETS limita a fila?","invocationNum":1}`
+	input := hookJSON(t, map[string]any{
+		"conversationId": "c1", "workspacePaths": []string{root},
+		"lastUserInput": "o MAX_ACTIVE_TICKETS limita a fila?", "invocationNum": 1,
+	})
 	var spawned []string
 	out, _ := runHook(t, adapter.Antigravity, input, &spawned)
 	if out != "{}" {
@@ -234,7 +239,10 @@ func TestObserverConcurrentWrites(t *testing.T) {
 	root := makeProject(t)
 	target := filepath.Join(root, "queue", "limits.go")
 	event := func(session string) string {
-		return `{"session_id":"` + session + `","cwd":"` + root + `","tool_name":"Read","tool_input":{"file_path":"` + target + `"}}`
+		return hookJSON(t, map[string]any{
+			"session_id": session, "cwd": root, "tool_name": "Read",
+			"tool_input": map[string]any{"file_path": target},
+		})
 	}
 	const n = 16
 	var wg sync.WaitGroup
@@ -279,7 +287,7 @@ func TestObserverPreCompactResetsSessionSeen(t *testing.T) {
 		t.Fatalf("evidence repeated within the session; the premise of this test does not hold: %q", out)
 	}
 
-	compact := `{"session_id":"c1","cwd":"` + root + `","hook_event_name":"PreCompact"}`
+	compact := hookJSON(t, map[string]any{"session_id": "c1", "cwd": root, "hook_event_name": "PreCompact"})
 	if code := Observe(adapter.Claude, "PreCompact", strings.NewReader(compact)); code != 0 {
 		t.Fatalf("exit = %d", code)
 	}
@@ -289,5 +297,22 @@ func TestObserverPreCompactResetsSessionSeen(t *testing.T) {
 	s := brief.LoadSignals(paths.ObserverState(root, "claude", "c1"), worktreeVersion(root), time.Now())
 	if s.Compactions != 1 {
 		t.Fatalf("compactions = %d, want 1", s.Compactions)
+	}
+}
+
+// A Windows path survives a hook payload encoded with encoding/json: it parses back to the same
+// cwd and file, on every platform, without touching the filesystem.
+func TestHookPayloadKeepsWindowsPathsIntact(t *testing.T) {
+	cwd := `C:\Users\runneradmin\AppData\Local\Temp\TestObserve\001`
+	in := hookJSON(t, map[string]any{
+		"session_id": "s1", "cwd": cwd, "tool_name": "Read",
+		"tool_input": map[string]any{"file_path": cwd + `\queue\limits.go`},
+	})
+	call, err := adapter.ParseTool(adapter.Claude, "PreToolUse", strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("payload rejected: %v", err)
+	}
+	if call.CWD != cwd {
+		t.Fatalf("cwd = %q, want %q", call.CWD, cwd)
 	}
 }

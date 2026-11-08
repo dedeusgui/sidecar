@@ -1,0 +1,35 @@
+{
+  "description": "Negativos difíceis: prompts sem evidência no repositório, com vocabulário genérico que também aparece em código (natural, estado, time, value, record, image, order, cancel, route). Splits: dev (diagnóstico e desenho), validation (escolha entre variantes), holdout (CONGELADO: não usar para selecionar parâmetros). Não existe gold; qualquer evidência entregue é falso positivo.",
+  "splits": {
+    "dev": [
+      "como faço pão de fermentação natural em casa?",
+      "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "me indica um filme de comédia leve pra assistir hoje",
+      "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "how do I change the oil filter on a 2010 honda civic?",
+      "what time does the store open on sundays near downtown?",
+      "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "qual o melhor horário para plantar tomate na primavera?",
+      "como cuidar de uma planta suculenta que está murchando?",
+      "meu filho está com febre, quando devo levar ao pronto socorro?"
+    ],
+    "validation": [
+      "como faço para mudar o estado da minha conta de luz?",
+      "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "quais são os melhores tênis para correr na chuva?",
+      "como escrevo uma carta de apresentação para um estágio?",
+      "I want to know the natural history of octopuses in the wild",
+      "what is a good value for a first home down payment?",
+      "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "a temperatura ideal para assar frango com batata no forno?"
+    ],
+    "holdout": [
+      "quais são as regras de um jogo de xadrez para iniciantes?",
+      "o que é o sistema de tarifas do metrô de Nova York?",
+      "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "how do I write a cover letter that stands out for a designer role?",
+      "meu cachorro não quer comer ração nova, o que faço?",
+      "qual é a diferença entre um cartório e um tabelionato?"
+    ]
+  }
+}

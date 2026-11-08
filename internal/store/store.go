@@ -17,7 +17,7 @@ import (
 
 // SchemaVersion is bumped whenever the on-disk layout changes. Databases with a
 // newer version are refused; older ones are migrated in place.
-const SchemaVersion = 5
+const SchemaVersion = 7
 
 // ErrSchemaTooNew reports an index written by a newer Sidecar build.
 var ErrSchemaTooNew = errors.New("index schema is newer than this sidecar build")
@@ -809,6 +809,23 @@ var migrations = [][]string{
 			created_at INTEGER NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS evidence_feedback_lookup ON evidence_feedback(worktree, file_path, symbol)`,
+	},
+	{ // v5 -> v6: oracle status, provenance and tier separate from the agent's completion claim.
+		// Rows written before this version keep their values but get the weakest defaults: their
+		// oracle was the agent's own completion, so they are stored for diagnosis and never applied.
+		`ALTER TABLE evidence_feedback ADD COLUMN agent_completed INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE evidence_feedback ADD COLUMN oracle_status TEXT NOT NULL DEFAULT 'unknown'`,
+		`ALTER TABLE evidence_feedback ADD COLUMN feedback_provenance TEXT NOT NULL DEFAULT 'legacy'`,
+		`ALTER TABLE evidence_feedback ADD COLUMN evidence_used TEXT NOT NULL DEFAULT 'unknown'`,
+		`ALTER TABLE evidence_feedback ADD COLUMN feedback_confidence TEXT NOT NULL DEFAULT 'weak'`,
+	},
+	{ // v6 -> v7: attribution to delivered evidence and the verifiable identity of the oracle run.
+		// Rows from before this version were never checked against the delivered evidence, so they
+		// keep evidence_presented = 0 and stay weak.
+		`ALTER TABLE evidence_feedback ADD COLUMN evidence_presented INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE evidence_feedback ADD COLUMN oracle_run_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE evidence_feedback ADD COLUMN oracle_commit TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE evidence_feedback ADD COLUMN oracle_sha256 TEXT NOT NULL DEFAULT ''`,
 	},
 }
 
