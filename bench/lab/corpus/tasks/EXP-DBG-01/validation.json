@@ -16,7 +16,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "type: 'test'\n  ...\n# Subtest: DBG01 links com array de valores continua funcionando\nok 4 - DBG01 links com array de valores continua funcionando\n  ---\n  duration_ms: 1.171955\n  type: 'test'\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 2\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 117.884604\n"
+    "detail": "type: 'test'\n  ...\n# Subtest: DBG01 links com array de valores continua funcionando\nok 4 - DBG01 links com array de valores continua funcionando\n  ---\n  duration_ms: 0.829391\n  type: 'test'\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 2\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 105.999422\n"
   },
   "reference": {
     "kind": "tests",
@@ -37,6 +37,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794163266.9519243,
+  "ts": 1794163489.4775841,
   "base_verdict": "fail"
 }
