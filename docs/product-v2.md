@@ -1,6 +1,6 @@
 # Sidecar V2 — especificação do produto completo
 
-**Estado:** arquitetura-alvo e contrato de implementação; **nenhum dos módulos novos está implementado por este documento**. Data: 2026-11-06.
+**Estado:** contrato arquitetural V2 estabelecido em 2026-11-06; este documento **não é inventário atualizado de features entregues**. Para o estado de implementação do PR #6 e as próximas etapas, consultar [eval-round2-2026-11-08.md](eval-round2-2026-11-08.md) e [roadmap-next-iterations.md](roadmap-next-iterations.md) (R1–R7). Última atualização de navegação: 2026-11-08.
 **Usuário prioritário:** desenvolvedor com Claude Code, Codex e Antigravity CLI, frequentemente usando modelos econômicos, em diferentes repositórios, com pouco orçamento de tokens e tempo.
 
 ## North star
