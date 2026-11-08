@@ -1,0 +1,30 @@
+diff --git a/src/click/shell_completion.py b/src/click/shell_completion.py
+index 9cf2314..5257dab 100644
+--- a/src/click/shell_completion.py
++++ b/src/click/shell_completion.py
+@@ -675,17 +675,18 @@ def _is_incomplete_option(ctx: Context, args: list[str], param: Parameter) -> bo
+     if param.is_flag or param.count:
+         return False
+ 
+-    last_option = None
+-
++    # The parser consumes ``nargs`` values after the option name, whatever they
++    # look like, so a value that starts with the option character is not a name.
++    # Only a spelling of this option within the last ``nargs`` args means that
++    # the option still needs values.
+     for index, arg in enumerate(reversed(args)):
+-        if index + 1 > param.nargs:
++        if index >= param.nargs:
+             break
+ 
+-        if _start_of_option(ctx, arg):
+-            last_option = arg
+-            break
++        if arg in param.opts:
++            return True
+ 
+-    return last_option is not None and last_option in param.opts
++    return False
+ 
+ 
+ def _resolve_context(

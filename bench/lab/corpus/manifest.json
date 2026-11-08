@@ -69,6 +69,36 @@
       "validated": true
     },
     {
+      "id": "CHI-H1",
+      "split": "development",
+      "class": "debug",
+      "repo": "chi",
+      "task_sha256": "6527034ad119b720b3c8e844a0d8dc884557033d66c986f6be10c831b5ac0e17",
+      "oracle_sha256": "4cac290aab4137c30b0a419ff681cf6cad049fe87f862d5284fe3ac3262ba472",
+      "reference_sha256": "4e8cdfa22c931a9bc63da5b0b7bae3d02e5b4961964bf8f6bdacb97c99e5390d",
+      "validated": true
+    },
+    {
+      "id": "CHI-H2",
+      "split": "validation",
+      "class": "edit",
+      "repo": "chi",
+      "task_sha256": "96e46288aa3e207f99a165d30654785c392834be95eda28e56fd43398f27ebf1",
+      "oracle_sha256": "843d19169e7bd0e546d9d55cd442ce438a3e2e8bb7b3afa2e4fbd37b31bc6acc",
+      "reference_sha256": "90e96d0f297656a698b29a4c2f3f508b455c9672a7766f81ae825003001afeb6",
+      "validated": true
+    },
+    {
+      "id": "CHI-H3",
+      "split": "holdout",
+      "class": "edit",
+      "repo": "chi",
+      "task_sha256": "2ba4e397201c643cbbbb8c04187dbca7a4d427bf81490353328f94bed3f29a35",
+      "oracle_sha256": "45e6b8074735bf90b06e187f9c147403484f117551d7a7ddf0c21b91f1de9776",
+      "reference_sha256": "f02151b8b21cc15b0b94883ccb8cd829167862c615ba7a4dadfc1dd3f0cf7cb2",
+      "validated": true
+    },
+    {
       "id": "CHI-LOC-01",
       "split": "development",
       "class": "locate",
@@ -149,6 +179,36 @@
       "validated": true
     },
     {
+      "id": "CLK-H1",
+      "split": "development",
+      "class": "debug",
+      "repo": "click",
+      "task_sha256": "b6427eae53bebdd359e1309ee79c8c91e9665cb3c8de4d5436175be4821fc89f",
+      "oracle_sha256": "411d0b06cafd0e4c38eb86fbef228623eb20afd59d24583328c805a225935a5f",
+      "reference_sha256": "05e3e38b19e35b3a6af353b216baa255d1091195307dd02e49f26043c53d8a6d",
+      "validated": true
+    },
+    {
+      "id": "CLK-H2",
+      "split": "validation",
+      "class": "edit",
+      "repo": "click",
+      "task_sha256": "09aa55b8d4f0dbc58b0ff583550a06e91edca91cd064ed5a6690cc9bf9dbf03f",
+      "oracle_sha256": "a210f19f5a8a15cd7e47f6477901bef4be58e06f201e8591ec38a6aace1bde9c",
+      "reference_sha256": "8146d5632b8a44b26a318193923355ece023f09a413db2ca65d933ab1859250a",
+      "validated": true
+    },
+    {
+      "id": "CLK-H3",
+      "split": "holdout",
+      "class": "edit",
+      "repo": "click",
+      "task_sha256": "f7aacdc9939603b4cc5857d39e30a551e0cbcbf579a1b4d9f6ae96e12620883e",
+      "oracle_sha256": "19cf4673cabd476c9d2a80d363efd722d9b59b1f6873c5af2553d2ee6166e127",
+      "reference_sha256": "8f6f216bcc7e58de72dda60970efd6dd3f175276f1076b11e4de22e6e6f3f701",
+      "validated": true
+    },
+    {
       "id": "CLK-LOC-01",
       "split": "validation",
       "class": "locate",
@@ -199,6 +259,36 @@
       "validated": true
     },
     {
+      "id": "EXP-H1",
+      "split": "development",
+      "class": "debug",
+      "repo": "express",
+      "task_sha256": "33bf09f5a7c4bf2432c794d6062809c678b22be90fbaf557244dfba222195a3a",
+      "oracle_sha256": "813894f313e57b688892b529447423e9d854ebf97fbb7eefe4a09c1aec95f65d",
+      "reference_sha256": "66b9dcc465a4722db7c0e3f2b5e36d13a7655b996eb4a09d6ed74a19d2622987",
+      "validated": true
+    },
+    {
+      "id": "EXP-H2",
+      "split": "validation",
+      "class": "edit",
+      "repo": "express",
+      "task_sha256": "7cd6c274f5dd23fc60e2dd3985b4a09fd15626e60ee1b5e9bfa2ab6ffe771ba9",
+      "oracle_sha256": "287c4c65c0ecbeb4093f35ba872f2b41839602aed0fb73e6be6a68eefaf96f10",
+      "reference_sha256": "2a9c0b9fb951c5a6bc08605c911b441dbd6780f33b7a31e1be678f0b315ea4eb",
+      "validated": true
+    },
+    {
+      "id": "EXP-H3",
+      "split": "holdout",
+      "class": "contract-change",
+      "repo": "express",
+      "task_sha256": "28fcacf12027ad1ff49fd2fa8ff8c84caf56d9e66456978711716fe342264c99",
+      "oracle_sha256": "ee26a7c027330ff4428da4b53f3635fba3b7d9eabaea6c9617272b27cd1fd63b",
+      "reference_sha256": "0defb0c6c60ef411275327cf60d262ee5bdfc4a5dddb9eb0ed4c71d0ee384d14",
+      "validated": true
+    },
+    {
       "id": "EXP-NEG-01",
       "split": "validation",
       "class": "negative",
@@ -237,23 +327,53 @@
       "oracle_sha256": "c7839cd6b649835885defe6a5da1be80c181dfa8dea6a863075430b79e71ff25",
       "reference_sha256": "16e5c3f7cf2abd08451b2e3f5b691834db94143d4132dbfbb24d1a9c12a71ca6",
       "validated": true
+    },
+    {
+      "id": "SIN-H1",
+      "split": "development",
+      "class": "debug",
+      "repo": "sinatra",
+      "task_sha256": "e5ed594c9b68df822d8fece746c18c3a6d72d33567b56ccaa487f1609947804c",
+      "oracle_sha256": "6bad9cfcd0cb988979aa58c1b315c71a740099534f94d8225f086ca1bb167a04",
+      "reference_sha256": "66695b2681637d83df9c038f52239597f1cbef597666c062378b886b1c0067be",
+      "validated": true
+    },
+    {
+      "id": "SIN-H2",
+      "split": "validation",
+      "class": "contract-change",
+      "repo": "sinatra",
+      "task_sha256": "ea9e1a9f9277f8d9478d493c0bc43cbbd89dc3df63d2632ecd707deb9e30b4d2",
+      "oracle_sha256": "6fa71c48b44eef3a6b8c0cd6b36ba401c53d30669101eb36d50068bfb886d6c4",
+      "reference_sha256": "017bd47bc0c52744ca4681607e0257bc20df29775f71a1fa1a8052ace09cedfa",
+      "validated": true
+    },
+    {
+      "id": "SIN-H3",
+      "split": "holdout",
+      "class": "edit",
+      "repo": "sinatra",
+      "task_sha256": "15d3fecd1e7e376ce40d646e9365711b7985693b10675a628e0a21941454d4d3",
+      "oracle_sha256": "183bdccfeaa2c475a7aebf056cbf787e80244f20b60849260db43a4c8111bf1a",
+      "reference_sha256": "d5e7d3380a26b1c64443078d3b7a7410810be7961dd7c8577f93bd53ce50dab2",
+      "validated": true
     }
   ],
   "counts": {
-    "development": 8,
-    "validation": 7,
-    "holdout": 5
+    "development": 12,
+    "validation": 11,
+    "holdout": 9
   },
   "classes": {
     "locate": 2,
-    "debug": 4,
-    "edit": 4,
+    "debug": 8,
+    "edit": 10,
     "multi-file": 2,
-    "contract-change": 4,
+    "contract-change": 6,
     "negative": 2,
     "ambiguous": 1,
     "voice": 1
   },
-  "holdout_prompts_sha256": "33067134b792ce12a084443bc736895880ed52df28156ce9961e883325d4c1b3",
+  "holdout_prompts_sha256": "034c62d1305407787e35dca22c0da77c89f5637834b26aa64a97cd1a33248190",
   "note": "holdout selado: use --final; acessos ficam em holdout_ledger.jsonl"
 }

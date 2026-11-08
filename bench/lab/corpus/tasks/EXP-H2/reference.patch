@@ -1,0 +1,20 @@
+diff --git a/lib/request.js b/lib/request.js
+index c050633..ce71798 100644
+--- a/lib/request.js
++++ b/lib/request.js
+@@ -308,10 +308,12 @@ defineGetter(req, 'protocol', function protocol(){
+   //       single value, but this is to be safe.
+   var header = this.get('X-Forwarded-Proto') || proto
+   var index = header.indexOf(',')
++  var value = index !== -1
++    ? header.substring(0, index)
++    : header
+ 
+-  return index !== -1
+-    ? header.substring(0, index).trim()
+-    : header.trim()
++  // URL schemes are case-insensitive; report them in lowercase
++  return value.trim().toLowerCase()
+ });
+ 
+ /**

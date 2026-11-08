@@ -1,0 +1,16 @@
+diff --git a/lib/utils.js b/lib/utils.js
+index 4f21e7e..0bc7aee 100644
+--- a/lib/utils.js
++++ b/lib/utils.js
+@@ -210,6 +210,11 @@ exports.compileTrust = function(val) {
+       .map(function (v) { return v.trim() })
+   }
+ 
++  if (Array.isArray(val)) {
++    // ignore empty entries, e.g. from a trailing comma or an empty setting
++    val = val.filter(function (v) { return typeof v !== 'string' || v.trim() !== '' })
++  }
++
+   return proxyaddr.compile(val || []);
+ }
+ 

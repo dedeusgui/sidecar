@@ -1,0 +1,64 @@
+{
+  "schema": "lab-task/1",
+  "id": "EXP-H1",
+  "split": "development",
+  "class": "debug",
+  "repo": "express",
+  "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+  "prompt": "Quando configuro a lista de proxies confiáveis do Express com `app.set('trust proxy', ...)`, algumas entradas vazias quebram a aplicação: se a string vier vazia ou só com espaços, ou tiver vírgula sobrando como em 'loopback,', a chamada lança `invalid IP address`. Descobre por que isso acontece e corrige. Entradas vazias devem ser simplesmente ignoradas, e isso vale também quando a lista vem como array. String vazia deve equivaler a não confiar em nenhum proxy, como `false`. Um nome inválido de verdade, como 'nao-e-ip', tem que continuar lançando erro. `true`, número, função, array e as strings com IP ou CIDR continuam funcionando igual, e a API pública não muda. Ao final, me explica em duas frases qual era a causa.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_exp_h1.js": "trust_proxy_oracle_test.js"
+    },
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "test/zz_oracle_exp_h1.js"
+    ],
+    "require_output": [
+      "(?m)^(ok|not ok) \\d+ - H1 string vazia ou so espacos nao confia em proxy",
+      "(?m)^(ok|not ok) \\d+ - H1 virgulas sobrando sao ignoradas na string",
+      "(?m)^(ok|not ok) \\d+ - H1 array com entrada vazia continua funcionando",
+      "(?m)^(ok|not ok) \\d+ - H1 espacos ao redor das entradas sao aparados",
+      "(?m)^(ok|not ok) \\d+ - H1 entrada invalida continua lancando erro",
+      "(?m)^(ok|not ok) \\d+ - H1 tipos ja suportados continuam iguais"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/utils.js",
+      "test/**"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/utils.js",
+        "pattern": "exports\\.compileTrust = function\\(val\\)",
+        "why": "API interna de compilação preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/utils.js",
+        "pattern": "proxyaddr\\.compile\\(val \\|\\| \\[\\]\\)",
+        "why": "compilação por proxy-addr preservada"
+      }
+    ]
+  },
+  "setup": [
+    [
+      "npm",
+      "install",
+      "--no-audit",
+      "--no-fund"
+    ]
+  ],
+  "setup_timeout_s": 600,
+  "notes": "Defeito real: lib/utils.js:194-214 (commit fixado), compileTrust. O ramo de string faz split e trim, então '' vira [''] e ', ' vira ['', '']; o filtro de entradas vazias existe só no caminho de string e 'val || []' nunca vê lista vazia. Verificado antes do oráculo: compileTrust('') lança 'invalid IP address: '. Arrays com '' também lançam. Teste oculto escrito para este projeto, sem copiar test/. Origem do oráculo: trust proxy documentado em application.js (app.set).",
+  "setup_env": {
+    "NODE_EXTRA_CA_CERTS": "/root/.ccr/ca-bundle.crt",
+    "SSL_CERT_FILE": "/root/.ccr/ca-bundle.crt"
+  }
+}

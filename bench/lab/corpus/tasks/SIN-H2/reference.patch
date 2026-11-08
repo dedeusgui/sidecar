@@ -1,0 +1,53 @@
+diff --git a/sinatra-contrib/lib/sinatra/link_header.rb b/sinatra-contrib/lib/sinatra/link_header.rb
+index a6e7b7b..83a6da0 100644
+--- a/sinatra-contrib/lib/sinatra/link_header.rb
++++ b/sinatra-contrib/lib/sinatra/link_header.rb
+@@ -119,12 +119,46 @@ module Sinatra
+       yield if block_given?
+       return '' unless response.include? 'Link'
+ 
+-      response['Link'].split(",").map do |line|
+-        url, *opts = line.split(';').map(&:strip)
++      split_outside_quotes(response['Link'], ',').map do |line|
++        url, *opts = split_outside_quotes(line, ';')
+         "<link href=\"#{url[1..-2]}\" #{opts.join ' '} />"
+       end.join
+     end
+ 
++    private
++
++    # Splits a Link header value at +delimiter+, ignoring delimiters inside
++    # <...> (URI references) and inside quoted strings (with \ escapes).
++    def split_outside_quotes(text, delimiter)
++      parts = []
++      current = +''
++      in_angle = in_quotes = escaped = false
++      text.each_char do |char|
++        if in_quotes
++          if escaped
++            escaped = false
++          elsif char == '\\'
++            escaped = true
++          elsif char == '"'
++            in_quotes = false
++          end
++        elsif in_angle
++          in_angle = false if char == '>'
++        elsif char == '<'
++          in_angle = true
++        elsif char == '"'
++          in_quotes = true
++        elsif char == delimiter
++          parts << current.strip
++          current = +''
++          next
++        end
++        current << char
++      end
++      parts << current.strip
++      parts.reject(&:empty?)
++    end
++
+     def self.registered(_base)
+       puts "WARNING: #{self} is a helpers module, not an extension."
+     end

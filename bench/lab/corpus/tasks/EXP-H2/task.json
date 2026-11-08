@@ -1,0 +1,71 @@
+{
+  "schema": "lab-task/1",
+  "id": "EXP-H2",
+  "split": "validation",
+  "class": "edit",
+  "repo": "express",
+  "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+  "prompt": "Com `app.set('trust proxy', true)`, o `req.protocol` do Express segue o cabeçalho X-Forwarded-Proto que o proxy manda. Hoje, se o proxy manda 'HTTPS' em maiúsculas ou uma lista como 'Https, http', o `req.protocol` sai exatamente assim e o `req.secure` dá false. Quero que o protocolo saia sempre em minúsculas, porque esquemas de URL não diferenciam maiúsculas. Quando o proxy não é confiável, o cabeçalho continua sendo ignorado. Sem o cabeçalho, ou com ele vazio, vale o protocolo do socket. Valores que já estão em minúsculas não mudam, e a API pública não muda. Ao terminar, me diga o que mudou.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_exp_h2.js": "protocol_case_oracle_test.js"
+    },
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "test/zz_oracle_exp_h2.js"
+    ],
+    "require_output": [
+      "(?m)^(ok|not ok) \\d+ - H2 X-Forwarded-Proto em maiusculas sai em minusculas",
+      "(?m)^(ok|not ok) \\d+ - H2 lista com maiusculas usa o primeiro valor em minusculas",
+      "(?m)^(ok|not ok) \\d+ - H2 espacos ao redor do valor sao removidos",
+      "(?m)^(ok|not ok) \\d+ - H2 cabecalho ignorado quando o proxy nao e confiavel",
+      "(?m)^(ok|not ok) \\d+ - H2 sem cabecalho usa o protocolo do socket",
+      "(?m)^(ok|not ok) \\d+ - H2 valor ja minusculo continua igual",
+      "(?m)^(ok|not ok) \\d+ - H2 secure acompanha o protocolo normalizado"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/request.js",
+      "test/**"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "pattern": "defineGetter\\(req, 'protocol', function protocol\\(\\)",
+        "why": "getter req.protocol preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "pattern": "defineGetter\\(req, 'secure', function secure\\(\\)",
+        "why": "getter req.secure preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "pattern": "X-Forwarded-Proto",
+        "why": "cabeçalho lido do mesmo jeito"
+      }
+    ]
+  },
+  "setup": [
+    [
+      "npm",
+      "install",
+      "--no-audit",
+      "--no-fund"
+    ]
+  ],
+  "setup_timeout_s": 600,
+  "notes": "Defeito/lacuna real: lib/request.js:301-316 (commit fixado), getter req.protocol. O valor de X-Forwarded-Proto é devolvido sem normalização (header.trim() apenas), então 'HTTPS' ou 'Https, http' ficam sem minúsculas e req.secure dá false. Verificado por requisição antes de escrever o oráculo. Lowercase é a forma canônica de esquema (RFC 3986, seção 3.1). Teste oculto escrito para este projeto; a lista com maiúscula no primeiro item apanha quem normaliza só um ramo.",
+  "setup_env": {
+    "NODE_EXTRA_CA_CERTS": "/root/.ccr/ca-bundle.crt",
+    "SSL_CERT_FILE": "/root/.ccr/ca-bundle.crt"
+  }
+}

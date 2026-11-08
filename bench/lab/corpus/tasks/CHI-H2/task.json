@@ -1,0 +1,49 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-H2",
+  "split": "validation",
+  "class": "edit",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "No chi, o middleware AllowContentType compara a lista de Content-Type só de forma exata. Quero que ele aceite também entradas no formato tipo/* (por exemplo image/*), que aceitam qualquer subtipo daquele tipo: image/png, image/jpeg, image/svg+xml etc. Regras: a comparação continua sem diferença de maiúsculas e minúsculas, ignora parâmetros como charset e espaços em volta (inclusive nas entradas). Entradas exatas funcionam como antes e não viram curinga: application/json não aceita application/json-patch+json. image/* não aceita image (sem barra), imagex/png, nem image/ com subtipo vazio, nem outro tipo principal. Requisição sem corpo continua passando sem checar o tipo; com corpo e tipo não permitido, continua respondendo 415 sem chamar o próximo handler. Mantenha a assinatura pública. Não acesse a rede. Ao terminar, descreva brevemente o que fez.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "middleware/zz_oracle_content_type_wildcard_test.go": "content_type_wildcard_oracle_test.go"
+    },
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./middleware",
+      "-run",
+      "^TestBenchmarkAllowContentTypeWildcard$"
+    ],
+    "require_output": [
+      "--- PASS: TestBenchmarkAllowContentTypeWildcard|--- FAIL: TestBenchmarkAllowContentTypeWildcard"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "middleware/content_type.go",
+      "middleware/content_type*_test.go"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/content_type.go",
+        "pattern": "func AllowContentType\\(contentTypes \\.\\.\\.string\\) func\\(http.Handler\\) http.Handler",
+        "why": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/content_type.go",
+        "pattern": "http.StatusUnsupportedMediaType",
+        "why": "resposta 415 preservada"
+      }
+    ]
+  },
+  "notes": "Validação (split validation, não usado para ajuste de ranking). Origem: middleware/content_type.go linhas 20-41 (AllowContentType compara Content-Type exato após strings.Cut(';') e ToLower/TrimSpace). Não há curinga hoje; a regra de curinga é especificação do enunciado (tipo/* sem barra no tipo principal, subtipo não vazio), não defeito. Oráculo cobre caso feliz, normalização, falsos positivos (prefixo, subtipo vazio, tipo sem barra) e corpo vazio. Sem reference de outro pacote."
+}

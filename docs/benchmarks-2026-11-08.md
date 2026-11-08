@@ -115,3 +115,24 @@ for off in 0 1 2; do python3 bench/lab/lab.py run --agent claude --model claude-
 python3 bench/lab/lab.py report /tmp/lab-bench-r*/runs.jsonl --md scorecard.md --json scorecard.json
 python3 bench/lab/analyze.py /tmp/lab-bench-r*/runs.jsonl --md analysis.md
 ```
+
+## 8. Adendo: protocolo de duas voltas (R4/R5), resultado **parcial**
+
+Para exercitar R4 (pergunta) e R5 (nota de impacto), que precisam de um próximo prompt, o lab ganhou um protocolo de duas voltas: a segunda volta é a fala de um usuário simulado, **definida pela tarefa e igual para todos os braços** (tarefa ambígua: a resposta combinada; demais: uma revisão genérica). Artefatos: [lab-two-turn-2026-11-08](../bench/results/lab-two-turn-2026-11-08/).
+
+**A rodada foi interrompida por limite de uso**: 30 execuções, 6 tarefas completas (CHI-DBG-01, CHI-EDIT-01, CHI-LOC-01, CHI-MF-01, CLK-DBG-01, SIN-DBG-01) × 5 braços × 1 repetição, todas comparáveis, US$ 0,61. Com 6 tarefas **tudo é inconclusivo**; vale como observação, não como estimativa.
+
+| braço | aprovação | tool calls | tokens (mil) | custo US$ |
+|---|---:|---:|---:|---:|
+| OFF | 5/6 | 13,3 | 376 | 0,0198 |
+| V2 | 5/6 | 12,3 | 358 | 0,0202 |
+| V2+brief | 5/6 | 14,2 | 417 | 0,0212 |
+| V2+impact | 4/6 | 13,5 | 438 | 0,0200 |
+| V2+groom | 5/6 | 13,0 | 442 | 0,0206 |
+
+O que se observou:
+- **R5 (impacto):** a nota apareceu na segunda volta em 3 de 6 execuções `V2+impact` (CHI-DBG-01, CLK-DBG-01, CHI-MF-01), 329 a 391 caracteres. É a primeira vez que a nota foi entregue a um agente real. Sem diferença de aprovação; tool calls menores em duas dessas tarefas e maiores em uma. **Efeito não mensurável com N=6.**
+- **R4 (pergunta):** a nota disparou em 2 de 6 execuções `V2+groom`: CLK-DBG-01 e CHI-LOC-01. O segundo caso era uma pergunta de localização com "Não altere nada no repositório", e o detector tratou "altere" como pedido de edição: **falso positivo real, corrigido** (`IsEditRequest` agora reconhece verbo proibido por negação; teste de regressão). Essa execução reprovou, mas o `V2+impact` também reprovou a mesma tarefa sem receber nenhuma nota, então a variação do agente não pode ser atribuída à nota. Na única tarefa ambígua real (CLK-AMB-01), medida num teste anterior, a nota **não** disparou (pedido vago de estilo, sem alternativas deriváveis do repositório).
+- **Custo de duas voltas:** a segunda volta mais que dobra custo e tempo por execução; as comparações de custo entre braços não mudam de leitura.
+
+**Não executado por limite de uso:** o restante da rodada (9 tarefas) e a **avaliação final única no holdout** (selado, ledger vazio). O corpus v2 foi validado, mas **nunca rodado com agente**: não há evidência de que seja mais difícil que o v1.

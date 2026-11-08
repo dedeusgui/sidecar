@@ -1,0 +1,1610 @@
+{
+  "schema": "lab-scorecard/1",
+  "sections": {
+    "agentic": {
+      "arms": {
+        "OFF": {
+          "runs": 6,
+          "comparable": 6,
+          "excluded": 0,
+          "passed": 5,
+          "pass_rate": 0.833,
+          "hidden_tests_passed": 6,
+          "scope_violations": 1,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 0,
+          "infra_errors": 0,
+          "cost_total": 0.119,
+          "cost_per_success": 0.0238,
+          "wall_per_success_p50": 33.98,
+          "wall_p95": 127.38,
+          "tool_calls_mean": 13.33,
+          "injected_chars_mean": 0,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0,
+          "progress_runs": 6,
+          "redundant_calls_mean": 1.5,
+          "stagnant_runs": 0
+        },
+        "V2": {
+          "runs": 6,
+          "comparable": 6,
+          "excluded": 0,
+          "passed": 5,
+          "pass_rate": 0.833,
+          "hidden_tests_passed": 6,
+          "scope_violations": 1,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 0,
+          "infra_errors": 0,
+          "cost_total": 0.1211,
+          "cost_per_success": 0.0242,
+          "wall_per_success_p50": 40.71,
+          "wall_p95": 137.94,
+          "tool_calls_mean": 12.33,
+          "injected_chars_mean": 1831.5,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0,
+          "progress_runs": 6,
+          "redundant_calls_mean": 0.83,
+          "stagnant_runs": 0
+        },
+        "V2+brief": {
+          "runs": 6,
+          "comparable": 6,
+          "excluded": 0,
+          "passed": 5,
+          "pass_rate": 0.833,
+          "hidden_tests_passed": 6,
+          "scope_violations": 0,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 1,
+          "infra_errors": 0,
+          "cost_total": 0.1271,
+          "cost_per_success": 0.0254,
+          "wall_per_success_p50": 37.61,
+          "wall_p95": 158.12,
+          "tool_calls_mean": 14.17,
+          "injected_chars_mean": 1754.3,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0,
+          "progress_runs": 6,
+          "redundant_calls_mean": 1.33,
+          "stagnant_runs": 0
+        },
+        "V2+groom": {
+          "runs": 6,
+          "comparable": 6,
+          "excluded": 0,
+          "passed": 5,
+          "pass_rate": 0.833,
+          "hidden_tests_passed": 5,
+          "scope_violations": 0,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 0,
+          "infra_errors": 0,
+          "cost_total": 0.1236,
+          "cost_per_success": 0.0247,
+          "wall_per_success_p50": 44.78,
+          "wall_p95": 135.2,
+          "tool_calls_mean": 13,
+          "injected_chars_mean": 2003,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0,
+          "progress_runs": 6,
+          "redundant_calls_mean": 0.83,
+          "stagnant_runs": 1
+        },
+        "V2+impact": {
+          "runs": 6,
+          "comparable": 6,
+          "excluded": 0,
+          "passed": 4,
+          "pass_rate": 0.667,
+          "hidden_tests_passed": 5,
+          "scope_violations": 0,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 1,
+          "infra_errors": 0,
+          "cost_total": 0.1201,
+          "cost_per_success": 0.03,
+          "wall_per_success_p50": 38.94,
+          "wall_p95": 144.59,
+          "tool_calls_mean": 13.5,
+          "injected_chars_mean": 2014.7,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0,
+          "progress_runs": 6,
+          "redundant_calls_mean": 0.67,
+          "stagnant_runs": 0
+        }
+      },
+      "by_split": {
+        "development": {
+          "OFF": {
+            "runs": 5,
+            "comparable": 5,
+            "excluded": 0,
+            "passed": 5,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 5,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0713,
+            "cost_per_success": 0.0143,
+            "wall_per_success_p50": 33.98,
+            "wall_p95": 66.13,
+            "tool_calls_mean": 10.8,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 5,
+            "redundant_calls_mean": 1.2,
+            "stagnant_runs": 0
+          },
+          "V2": {
+            "runs": 5,
+            "comparable": 5,
+            "excluded": 0,
+            "passed": 5,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 5,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0841,
+            "cost_per_success": 0.0168,
+            "wall_per_success_p50": 40.71,
+            "wall_p95": 63.5,
+            "tool_calls_mean": 10.8,
+            "injected_chars_mean": 1776.2,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 5,
+            "redundant_calls_mean": 0.8,
+            "stagnant_runs": 0
+          },
+          "V2+brief": {
+            "runs": 5,
+            "comparable": 5,
+            "excluded": 0,
+            "passed": 5,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 5,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0782,
+            "cost_per_success": 0.0156,
+            "wall_per_success_p50": 37.61,
+            "wall_p95": 77.02,
+            "tool_calls_mean": 10.8,
+            "injected_chars_mean": 1741.4,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 5,
+            "redundant_calls_mean": 1.2,
+            "stagnant_runs": 0
+          },
+          "V2+groom": {
+            "runs": 5,
+            "comparable": 5,
+            "excluded": 0,
+            "passed": 4,
+            "pass_rate": 0.8,
+            "hidden_tests_passed": 4,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0827,
+            "cost_per_success": 0.0207,
+            "wall_per_success_p50": 28.07,
+            "wall_p95": 76.36,
+            "tool_calls_mean": 10.4,
+            "injected_chars_mean": 1982,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 5,
+            "redundant_calls_mean": 0.2,
+            "stagnant_runs": 0
+          },
+          "V2+impact": {
+            "runs": 5,
+            "comparable": 5,
+            "excluded": 0,
+            "passed": 4,
+            "pass_rate": 0.8,
+            "hidden_tests_passed": 4,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0752,
+            "cost_per_success": 0.0188,
+            "wall_per_success_p50": 38.94,
+            "wall_p95": 53.04,
+            "tool_calls_mean": 10.2,
+            "injected_chars_mean": 1930.2,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 5,
+            "redundant_calls_mean": 0.4,
+            "stagnant_runs": 0
+          }
+        },
+        "validation": {
+          "OFF": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0477,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 127.38,
+            "tool_calls_mean": 26,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 3,
+            "stagnant_runs": 0
+          },
+          "V2": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.037,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 137.94,
+            "tool_calls_mean": 20,
+            "injected_chars_mean": 2108,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 1,
+            "stagnant_runs": 0
+          },
+          "V2+brief": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 1,
+            "infra_errors": 0,
+            "cost_total": 0.0489,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 158.12,
+            "tool_calls_mean": 31,
+            "injected_chars_mean": 1819,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 2,
+            "stagnant_runs": 0
+          },
+          "V2+groom": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0409,
+            "cost_per_success": 0.0409,
+            "wall_per_success_p50": 135.2,
+            "wall_p95": 135.2,
+            "tool_calls_mean": 26,
+            "injected_chars_mean": 2108,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 4,
+            "stagnant_runs": 1
+          },
+          "V2+impact": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 1,
+            "infra_errors": 0,
+            "cost_total": 0.045,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 144.59,
+            "tool_calls_mean": 30,
+            "injected_chars_mean": 2437,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 2,
+            "stagnant_runs": 0
+          }
+        }
+      },
+      "by_class": {
+        "debug": {
+          "OFF": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 3,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 3,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.053,
+            "cost_per_success": 0.0177,
+            "wall_per_success_p50": 33.98,
+            "wall_p95": 66.13,
+            "tool_calls_mean": 13.33,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 3,
+            "redundant_calls_mean": 1.67,
+            "stagnant_runs": 0
+          },
+          "V2": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 3,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 3,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0662,
+            "cost_per_success": 0.0221,
+            "wall_per_success_p50": 40.71,
+            "wall_p95": 63.5,
+            "tool_calls_mean": 14,
+            "injected_chars_mean": 2097.3,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 3,
+            "redundant_calls_mean": 1,
+            "stagnant_runs": 0
+          },
+          "V2+brief": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 3,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 3,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0581,
+            "cost_per_success": 0.0194,
+            "wall_per_success_p50": 37.61,
+            "wall_p95": 77.02,
+            "tool_calls_mean": 13.33,
+            "injected_chars_mean": 2120.7,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 3,
+            "redundant_calls_mean": 1.33,
+            "stagnant_runs": 0
+          },
+          "V2+groom": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 3,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 3,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0663,
+            "cost_per_success": 0.0221,
+            "wall_per_success_p50": 44.78,
+            "wall_p95": 76.36,
+            "tool_calls_mean": 13.67,
+            "injected_chars_mean": 2274.7,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 3,
+            "redundant_calls_mean": 0.33,
+            "stagnant_runs": 0
+          },
+          "V2+impact": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 3,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 3,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.057,
+            "cost_per_success": 0.019,
+            "wall_per_success_p50": 38.94,
+            "wall_p95": 47.41,
+            "tool_calls_mean": 12,
+            "injected_chars_mean": 2354,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 3,
+            "redundant_calls_mean": 0.33,
+            "stagnant_runs": 0
+          }
+        },
+        "edit": {
+          "OFF": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0138,
+            "cost_per_success": 0.0138,
+            "wall_per_success_p50": 52.92,
+            "wall_p95": 52.92,
+            "tool_calls_mean": 11,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0
+          },
+          "V2": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0132,
+            "cost_per_success": 0.0132,
+            "wall_per_success_p50": 53.53,
+            "wall_p95": 53.53,
+            "tool_calls_mean": 10,
+            "injected_chars_mean": 408,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 1,
+            "stagnant_runs": 0
+          },
+          "V2+brief": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0135,
+            "cost_per_success": 0.0135,
+            "wall_per_success_p50": 54.64,
+            "wall_p95": 54.64,
+            "tool_calls_mean": 10,
+            "injected_chars_mean": 517,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0
+          },
+          "V2+groom": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0109,
+            "cost_per_success": 0.0109,
+            "wall_per_success_p50": 25.98,
+            "wall_p95": 25.98,
+            "tool_calls_mean": 9,
+            "injected_chars_mean": 408,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0
+          },
+          "V2+impact": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0121,
+            "cost_per_success": 0.0121,
+            "wall_per_success_p50": 53.04,
+            "wall_p95": 53.04,
+            "tool_calls_mean": 12,
+            "injected_chars_mean": 408,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0
+          }
+        },
+        "locate": {
+          "OFF": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0045,
+            "cost_per_success": 0.0045,
+            "wall_per_success_p50": 8.01,
+            "wall_p95": 8.01,
+            "tool_calls_mean": 3,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 1,
+            "stagnant_runs": 0
+          },
+          "V2": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0046,
+            "cost_per_success": 0.0046,
+            "wall_per_success_p50": 7.87,
+            "wall_p95": 7.87,
+            "tool_calls_mean": 2,
+            "injected_chars_mean": 2181,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0
+          },
+          "V2+brief": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0066,
+            "cost_per_success": 0.0066,
+            "wall_per_success_p50": 10.64,
+            "wall_p95": 10.64,
+            "tool_calls_mean": 4,
+            "injected_chars_mean": 1828,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 2,
+            "stagnant_runs": 0
+          },
+          "V2+groom": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 0,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0055,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 12.4,
+            "tool_calls_mean": 2,
+            "injected_chars_mean": 2678,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0
+          },
+          "V2+impact": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 0,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0062,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 10.67,
+            "tool_calls_mean": 3,
+            "injected_chars_mean": 2181,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 1,
+            "stagnant_runs": 0
+          }
+        },
+        "multi-file": {
+          "OFF": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0477,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 127.38,
+            "tool_calls_mean": 26,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 3,
+            "stagnant_runs": 0
+          },
+          "V2": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.037,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 137.94,
+            "tool_calls_mean": 20,
+            "injected_chars_mean": 2108,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 1,
+            "stagnant_runs": 0
+          },
+          "V2+brief": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 1,
+            "infra_errors": 0,
+            "cost_total": 0.0489,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 158.12,
+            "tool_calls_mean": 31,
+            "injected_chars_mean": 1819,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 2,
+            "stagnant_runs": 0
+          },
+          "V2+groom": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0409,
+            "cost_per_success": 0.0409,
+            "wall_per_success_p50": 135.2,
+            "wall_p95": 135.2,
+            "tool_calls_mean": 26,
+            "injected_chars_mean": 2108,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 4,
+            "stagnant_runs": 1
+          },
+          "V2+impact": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 1,
+            "infra_errors": 0,
+            "cost_total": 0.045,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 144.59,
+            "tool_calls_mean": 30,
+            "injected_chars_mean": 2437,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 2,
+            "stagnant_runs": 0
+          }
+        }
+      },
+      "paired_vs_OFF": {
+        "V2": {
+          "pairs": 6,
+          "d_pass_mean": 0,
+          "d_pass_ci95": [
+            0,
+            0
+          ],
+          "d_cost_mean": 0.0003,
+          "d_cost_ci95": [
+            -0.005116861666666669,
+            0.006177554999999999
+          ],
+          "conclusion": "inconclusivo"
+        },
+        "V2+brief": {
+          "pairs": 6,
+          "d_pass_mean": 0,
+          "d_pass_ci95": [
+            0,
+            0
+          ],
+          "d_cost_mean": 0.0013,
+          "d_cost_ci95": [
+            -0.00010913666666666846,
+            0.0030756066666666635
+          ],
+          "conclusion": "inconclusivo"
+        },
+        "V2+groom": {
+          "pairs": 6,
+          "d_pass_mean": 0,
+          "d_pass_ci95": [
+            -0.5,
+            0.5
+          ],
+          "d_cost_mean": 0.0008,
+          "d_cost_ci95": [
+            -0.0032232883333333357,
+            0.005070379999999997
+          ],
+          "conclusion": "inconclusivo"
+        },
+        "V2+impact": {
+          "pairs": 6,
+          "d_pass_mean": -0.167,
+          "d_pass_ci95": [
+            -0.5,
+            0
+          ],
+          "d_cost_mean": 0.0002,
+          "d_cost_ci95": [
+            -0.0017684083333333368,
+            0.002702038333333334
+          ],
+          "conclusion": "inconclusivo"
+        }
+      },
+      "comparisons": [
+        {
+          "arm": "V2",
+          "base": "OFF",
+          "pairs": 6,
+          "tasks": 6,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 0.8333,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 1.0,
+              "n_tasks": 6,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 13.3333,
+              "arm": 12.3333,
+              "n_tasks": 6,
+              "delta_pct": -7.5,
+              "ci95_pct": [
+                -20.3,
+                6.1
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 376171.5,
+              "arm": 357974.1667,
+              "n_tasks": 6,
+              "delta_pct": -4.8,
+              "ci95_pct": [
+                -24.0,
+                23.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0198,
+              "arm": 0.0202,
+              "n_tasks": 6,
+              "delta_pct": 1.8,
+              "ci95_pct": [
+                -17.4,
+                34.3
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 52.4,
+              "arm": 54.76,
+              "n_tasks": 6,
+              "delta_pct": 4.5,
+              "ci95_pct": [
+                -2.6,
+                10.2
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": {
+              "label": "chamadas redundantes",
+              "base": 1.5,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": -44.4,
+              "ci95_pct": [
+                -83.3,
+                75.0
+              ],
+              "reading": "inconclusivo"
+            }
+          }
+        },
+        {
+          "arm": "V2+brief",
+          "base": "OFF",
+          "pairs": 6,
+          "tasks": 6,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 0.8333,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 1.0,
+              "n_tasks": 6,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 13.3333,
+              "arm": 14.1667,
+              "n_tasks": 6,
+              "delta_pct": 6.2,
+              "ci95_pct": [
+                -4.2,
+                16.5
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 376171.5,
+              "arm": 417323.1667,
+              "n_tasks": 6,
+              "delta_pct": 10.9,
+              "ci95_pct": [
+                -3.3,
+                31.6
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0198,
+              "arm": 0.0212,
+              "n_tasks": 6,
+              "delta_pct": 6.8,
+              "ci95_pct": [
+                0.0,
+                17.5
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 52.4,
+              "arm": 60.28,
+              "n_tasks": 6,
+              "delta_pct": 15.0,
+              "ci95_pct": [
+                2.3,
+                21.8
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": {
+              "label": "chamadas redundantes",
+              "base": 1.5,
+              "arm": 1.3333,
+              "n_tasks": 6,
+              "delta_pct": -11.1,
+              "ci95_pct": [
+                -50.0,
+                80.0
+              ],
+              "reading": "inconclusivo"
+            }
+          }
+        },
+        {
+          "arm": "V2+groom",
+          "base": "OFF",
+          "pairs": 6,
+          "tasks": 6,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 0.8333,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                -50.0,
+                100.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": -16.7,
+              "ci95_pct": [
+                -50.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 13.3333,
+              "arm": 13,
+              "n_tasks": 6,
+              "delta_pct": -2.5,
+              "ci95_pct": [
+                -14.1,
+                6.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 376171.5,
+              "arm": 441901.5,
+              "n_tasks": 6,
+              "delta_pct": 17.5,
+              "ci95_pct": [
+                -8.0,
+                42.4
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0198,
+              "arm": 0.0206,
+              "n_tasks": 6,
+              "delta_pct": 3.9,
+              "ci95_pct": [
+                -13.3,
+                29.3
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 52.4,
+              "arm": 53.7983,
+              "n_tasks": 6,
+              "delta_pct": 2.7,
+              "ci95_pct": [
+                -22.5,
+                23.5
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": {
+              "label": "chamadas redundantes",
+              "base": 1.5,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": -44.4,
+              "ci95_pct": [
+                -100.0,
+                9.1
+              ],
+              "reading": "inconclusivo"
+            }
+          }
+        },
+        {
+          "arm": "V2+impact",
+          "base": "OFF",
+          "pairs": 6,
+          "tasks": 6,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 0.8333,
+              "arm": 0.6667,
+              "n_tasks": 6,
+              "delta_pct": -20.0,
+              "ci95_pct": [
+                -60.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": -16.7,
+              "ci95_pct": [
+                -50.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 13.3333,
+              "arm": 13.5,
+              "n_tasks": 6,
+              "delta_pct": 1.2,
+              "ci95_pct": [
+                -15.8,
+                14.4
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 376171.5,
+              "arm": 437881.5,
+              "n_tasks": 6,
+              "delta_pct": 16.4,
+              "ci95_pct": [
+                2.1,
+                27.2
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0198,
+              "arm": 0.02,
+              "n_tasks": 6,
+              "delta_pct": 1.0,
+              "ci95_pct": [
+                -7.7,
+                15.7
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 52.4,
+              "arm": 53.3767,
+              "n_tasks": 6,
+              "delta_pct": 1.9,
+              "ci95_pct": [
+                -22.1,
+                20.7
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": {
+              "label": "chamadas redundantes",
+              "base": 1.5,
+              "arm": 0.6667,
+              "n_tasks": 6,
+              "delta_pct": -55.6,
+              "ci95_pct": [
+                -90.9,
+                -14.3
+              ],
+              "reading": "inconclusivo"
+            }
+          }
+        },
+        {
+          "arm": "V2+brief",
+          "base": "V2",
+          "pairs": 6,
+          "tasks": 6,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 0.8333,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 1.0,
+              "n_tasks": 6,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 12.3333,
+              "arm": 14.1667,
+              "n_tasks": 6,
+              "delta_pct": 14.9,
+              "ci95_pct": [
+                -7.1,
+                44.4
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 357974.1667,
+              "arm": 417323.1667,
+              "n_tasks": 6,
+              "delta_pct": 16.6,
+              "ci95_pct": [
+                2.9,
+                37.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0202,
+              "arm": 0.0212,
+              "n_tasks": 6,
+              "delta_pct": 4.9,
+              "ci95_pct": [
+                -14.3,
+                25.7
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 54.76,
+              "arm": 60.28,
+              "n_tasks": 6,
+              "delta_pct": 10.1,
+              "ci95_pct": [
+                -1.9,
+                16.8
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": {
+              "label": "chamadas redundantes",
+              "base": 0.8333,
+              "arm": 1.3333,
+              "n_tasks": 6,
+              "delta_pct": 60.0,
+              "ci95_pct": [
+                -28.6,
+                400.0
+              ],
+              "reading": "inconclusivo"
+            }
+          }
+        },
+        {
+          "arm": "V2+groom",
+          "base": "V2",
+          "pairs": 6,
+          "tasks": 6,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 0.8333,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                -50.0,
+                100.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": -16.7,
+              "ci95_pct": [
+                -50.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 12.3333,
+              "arm": 13,
+              "n_tasks": 6,
+              "delta_pct": 5.4,
+              "ci95_pct": [
+                -7.5,
+                20.2
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 357974.1667,
+              "arm": 441901.5,
+              "n_tasks": 6,
+              "delta_pct": 23.4,
+              "ci95_pct": [
+                4.3,
+                41.9
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0202,
+              "arm": 0.0206,
+              "n_tasks": 6,
+              "delta_pct": 2.1,
+              "ci95_pct": [
+                -8.9,
+                11.8
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 54.76,
+              "arm": 53.7983,
+              "n_tasks": 6,
+              "delta_pct": -1.8,
+              "ci95_pct": [
+                -23.5,
+                19.8
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": {
+              "label": "chamadas redundantes",
+              "base": 0.8333,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                -100.0,
+                240.0
+              ],
+              "reading": "inconclusivo"
+            }
+          }
+        },
+        {
+          "arm": "V2+impact",
+          "base": "V2",
+          "pairs": 6,
+          "tasks": 6,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 0.8333,
+              "arm": 0.6667,
+              "n_tasks": 6,
+              "delta_pct": -20.0,
+              "ci95_pct": [
+                -60.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 0.8333,
+              "n_tasks": 6,
+              "delta_pct": -16.7,
+              "ci95_pct": [
+                -50.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 12.3333,
+              "arm": 13.5,
+              "n_tasks": 6,
+              "delta_pct": 9.5,
+              "ci95_pct": [
+                -19.6,
+                40.7
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 357974.1667,
+              "arm": 437881.5,
+              "n_tasks": 6,
+              "delta_pct": 22.3,
+              "ci95_pct": [
+                -12.7,
+                60.9
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0202,
+              "arm": 0.02,
+              "n_tasks": 6,
+              "delta_pct": -0.8,
+              "ci95_pct": [
+                -24.7,
+                19.8
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 54.76,
+              "arm": 53.3767,
+              "n_tasks": 6,
+              "delta_pct": -2.5,
+              "ci95_pct": [
+                -21.6,
+                10.6
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": {
+              "label": "chamadas redundantes",
+              "base": 0.8333,
+              "arm": 0.6667,
+              "n_tasks": 6,
+              "delta_pct": -20.0,
+              "ci95_pct": [
+                -83.3,
+                150.0
+              ],
+              "reading": "inconclusivo"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "limits": [
+    "N pequeno é descritivo; sem significância não há ganho comprovado.",
+    "Execuções com evidence=simulated validam a infraestrutura, não o produto.",
+    "Retrieval offline não é resultado de desenvolvimento; ver seção offline separadamente.",
+    "Custo ausente (None) não é zero; cost_per_success só aparece quando todas as execuções comparáveis têm custo."
+  ]
+}

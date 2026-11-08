@@ -1,0 +1,31 @@
+--- a/middleware/content_type.go
++++ b/middleware/content_type.go
+@@ -19,8 +19,14 @@
+ // with a 415 Unsupported Media Type status.
+ func AllowContentType(contentTypes ...string) func(http.Handler) http.Handler {
+ 	allowedContentTypes := make(map[string]struct{}, len(contentTypes))
++	allowedTopLevel := make(map[string]struct{})
+ 	for _, ctype := range contentTypes {
+-		allowedContentTypes[strings.TrimSpace(strings.ToLower(ctype))] = struct{}{}
++		ctype = strings.TrimSpace(strings.ToLower(ctype))
++		if top, ok := strings.CutSuffix(ctype, "/*"); ok && top != "" && !strings.Contains(top, "/") {
++			allowedTopLevel[top] = struct{}{}
++			continue
++		}
++		allowedContentTypes[ctype] = struct{}{}
+ 	}
+ 
+ 	return func(next http.Handler) http.Handler {
+@@ -38,6 +44,12 @@
+ 				next.ServeHTTP(w, r)
+ 				return
+ 			}
++			if top, sub, ok := strings.Cut(s, "/"); ok && sub != "" {
++				if _, ok := allowedTopLevel[top]; ok {
++					next.ServeHTTP(w, r)
++					return
++				}
++			}
+ 
+ 			w.WriteHeader(http.StatusUnsupportedMediaType)
+ 		})

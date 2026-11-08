@@ -1,0 +1,364 @@
+{
+  "runs": 30,
+  "arms": [
+    "OFF",
+    "V2",
+    "V2+brief",
+    "V2+groom",
+    "V2+impact"
+  ],
+  "tasks": 6,
+  "reps": 1,
+  "failure_taxonomy": {
+    "OFF": {
+      "ok": 5,
+      "escopo_so_testes_extras": 1
+    },
+    "V2": {
+      "ok": 5,
+      "escopo_so_testes_extras": 1
+    },
+    "V2+brief": {
+      "ok": 5,
+      "invariante_quebrado": 1
+    },
+    "V2+impact": {
+      "ok": 4,
+      "invariante_quebrado": 1,
+      "teste_oculto_falhou": 1
+    },
+    "V2+groom": {
+      "ok": 5,
+      "teste_oculto_falhou": 1
+    }
+  },
+  "unsolved_by_all": [],
+  "solved_by_all": [
+    "CHI-DBG-01",
+    "CHI-EDIT-01",
+    "CLK-DBG-01",
+    "SIN-DBG-01"
+  ],
+  "split_arms": [
+    {
+      "task": "CHI-LOC-01",
+      "class": "locate",
+      "rates": {
+        "OFF": 1.0,
+        "V2": 1.0,
+        "V2+brief": 1.0,
+        "V2+groom": 0.0,
+        "V2+impact": 0.0
+      }
+    },
+    {
+      "task": "CHI-MF-01",
+      "class": "multi-file",
+      "rates": {
+        "OFF": 0.0,
+        "V2": 0.0,
+        "V2+brief": 0.0,
+        "V2+groom": 1.0,
+        "V2+impact": 0.0
+      }
+    }
+  ],
+  "by_class": {
+    "debug": {
+      "OFF": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 13.333,
+        "cost_usd": 0.018,
+        "tokens": 379223
+      },
+      "V2": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 14,
+        "cost_usd": 0.022,
+        "tokens": 431273
+      },
+      "V2+brief": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 13.333,
+        "cost_usd": 0.019,
+        "tokens": 441012.333
+      },
+      "V2+groom": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 13.667,
+        "cost_usd": 0.022,
+        "tokens": 493342.667
+      },
+      "V2+impact": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 12,
+        "cost_usd": 0.019,
+        "tokens": 411626.333
+      }
+    },
+    "edit": {
+      "OFF": {
+        "n": 1,
+        "pass_rate": 1.0,
+        "tool_calls": 11,
+        "cost_usd": 0.014,
+        "tokens": 274795
+      },
+      "V2": {
+        "n": 1,
+        "pass_rate": 1.0,
+        "tool_calls": 10,
+        "cost_usd": 0.013,
+        "tokens": 250059
+      },
+      "V2+brief": {
+        "n": 1,
+        "pass_rate": 1.0,
+        "tool_calls": 10,
+        "cost_usd": 0.013,
+        "tokens": 276871
+      },
+      "V2+groom": {
+        "n": 1,
+        "pass_rate": 1.0,
+        "tool_calls": 9,
+        "cost_usd": 0.011,
+        "tokens": 232391
+      },
+      "V2+impact": {
+        "n": 1,
+        "pass_rate": 1.0,
+        "tool_calls": 12,
+        "cost_usd": 0.012,
+        "tokens": 319672
+      }
+    },
+    "locate": {
+      "OFF": {
+        "n": 1,
+        "pass_rate": 1.0,
+        "tool_calls": 3,
+        "cost_usd": 0.005,
+        "tokens": 95602
+      },
+      "V2": {
+        "n": 1,
+        "pass_rate": 1.0,
+        "tool_calls": 2,
+        "cost_usd": 0.005,
+        "tokens": 75803
+      },
+      "V2+brief": {
+        "n": 1,
+        "pass_rate": 1.0,
+        "tool_calls": 4,
+        "cost_usd": 0.007,
+        "tokens": 150914
+      },
+      "V2+groom": {
+        "n": 1,
+        "pass_rate": 0.0,
+        "tool_calls": 2,
+        "cost_usd": 0.005,
+        "tokens": 101732
+      },
+      "V2+impact": {
+        "n": 1,
+        "pass_rate": 0.0,
+        "tool_calls": 3,
+        "cost_usd": 0.006,
+        "tokens": 127572
+      }
+    },
+    "multi-file": {
+      "OFF": {
+        "n": 1,
+        "pass_rate": 0.0,
+        "tool_calls": 26,
+        "cost_usd": 0.048,
+        "tokens": 748963
+      },
+      "V2": {
+        "n": 1,
+        "pass_rate": 0.0,
+        "tool_calls": 20,
+        "cost_usd": 0.037,
+        "tokens": 528164
+      },
+      "V2+brief": {
+        "n": 1,
+        "pass_rate": 0.0,
+        "tool_calls": 31,
+        "cost_usd": 0.049,
+        "tokens": 753117
+      },
+      "V2+groom": {
+        "n": 1,
+        "pass_rate": 1.0,
+        "tool_calls": 26,
+        "cost_usd": 0.041,
+        "tokens": 837258
+      },
+      "V2+impact": {
+        "n": 1,
+        "pass_rate": 0.0,
+        "tool_calls": 30,
+        "cost_usd": 0.045,
+        "tokens": 945166
+      }
+    }
+  },
+  "hot_spots": {
+    "tarefas_mais_caras": [
+      [
+        "CHI-MF-01",
+        0.044
+      ],
+      [
+        "CHI-DBG-01",
+        0.027
+      ],
+      [
+        "SIN-DBG-01",
+        0.021
+      ],
+      [
+        "CHI-EDIT-01",
+        0.013
+      ],
+      [
+        "CLK-DBG-01",
+        0.012
+      ]
+    ],
+    "redundantes_por_braco": {
+      "OFF": 1.5,
+      "V2": 0.833,
+      "V2+brief": 1.333,
+      "V2+impact": 0.667,
+      "V2+groom": 0.833
+    },
+    "execucoes_com_estagnacao": {
+      "OFF": 0,
+      "V2": 0,
+      "V2+brief": 0,
+      "V2+groom": 1,
+      "V2+impact": 0
+    },
+    "contexto_injetado_medio_chars": {
+      "OFF": 0,
+      "V2": 1831.5,
+      "V2+brief": 1754.333,
+      "V2+groom": 2003,
+      "V2+impact": 2014.667
+    },
+    "contexto_entregue_pct": {
+      "V2": 100.0,
+      "V2+brief": 100.0,
+      "V2+groom": 100.0,
+      "V2+impact": 100.0
+    }
+  },
+  "per_task": {
+    "CHI-DBG-01": {
+      "class": "debug",
+      "split": "development",
+      "repo": "chi",
+      "pass": {
+        "OFF": "1/1",
+        "V2": "1/1",
+        "V2+brief": "1/1",
+        "V2+groom": "1/1",
+        "V2+impact": "1/1"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 593519.8,
+      "tool_calls_mean": 17.6
+    },
+    "CHI-EDIT-01": {
+      "class": "edit",
+      "split": "development",
+      "repo": "chi",
+      "pass": {
+        "OFF": "1/1",
+        "V2": "1/1",
+        "V2+brief": "1/1",
+        "V2+groom": "1/1",
+        "V2+impact": "1/1"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 270757.6,
+      "tool_calls_mean": 10.4
+    },
+    "CHI-LOC-01": {
+      "class": "locate",
+      "split": "development",
+      "repo": "chi",
+      "pass": {
+        "OFF": "1/1",
+        "V2": "1/1",
+        "V2+brief": "1/1",
+        "V2+groom": "0/1",
+        "V2+impact": "0/1"
+      },
+      "failure_kinds": {
+        "teste_oculto_falhou": 2
+      },
+      "tokens_mean": 110324.6,
+      "tool_calls_mean": 2.8
+    },
+    "CHI-MF-01": {
+      "class": "multi-file",
+      "split": "validation",
+      "repo": "chi",
+      "pass": {
+        "OFF": "0/1",
+        "V2": "0/1",
+        "V2+brief": "0/1",
+        "V2+groom": "1/1",
+        "V2+impact": "0/1"
+      },
+      "failure_kinds": {
+        "invariante_quebrado": 2,
+        "escopo_so_testes_extras": 2
+      },
+      "tokens_mean": 762533.6,
+      "tool_calls_mean": 26.6
+    },
+    "CLK-DBG-01": {
+      "class": "debug",
+      "split": "development",
+      "repo": "click",
+      "pass": {
+        "OFF": "1/1",
+        "V2": "1/1",
+        "V2+brief": "1/1",
+        "V2+groom": "1/1",
+        "V2+impact": "1/1"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 268134.2,
+      "tool_calls_mean": 9.2
+    },
+    "SIN-DBG-01": {
+      "class": "debug",
+      "split": "development",
+      "repo": "sinatra",
+      "pass": {
+        "OFF": "1/1",
+        "V2": "1/1",
+        "V2+brief": "1/1",
+        "V2+groom": "1/1",
+        "V2+impact": "1/1"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 432232.4,
+      "tool_calls_mean": 13
+    }
+  }
+}

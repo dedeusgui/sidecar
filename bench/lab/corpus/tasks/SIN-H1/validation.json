@@ -1,0 +1,54 @@
+{
+  "id": "SIN-H1",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/indifferent_hash.rb",
+        "ok": true,
+        "detail": "classe pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/indifferent_hash.rb",
+        "ok": true,
+        "detail": "conversão símbolo→string preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "non_symbol_keys_in_mapping:\nArgumentError: wrong number of arguments (given 1, expected 0)\n    lib/sinatra/indifferent_hash.rb:160:in `transform_keys'\n    test/zz_oracle_indifferent_transform_keys_test.rb:37:in `test_non_symbol_keys_in_mapping'\n\n15 runs, 3 assertions, 0 failures, 12 errors, 0 skips\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "lib/sinatra/indifferent_hash.rb"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/indifferent_hash.rb",
+        "ok": true,
+        "detail": "classe pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/indifferent_hash.rb",
+        "ok": true,
+        "detail": "conversão símbolo→string preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794176057.8815353,
+  "base_verdict": "fail"
+}

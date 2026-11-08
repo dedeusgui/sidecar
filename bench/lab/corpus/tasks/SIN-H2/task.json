@@ -1,0 +1,60 @@
+{
+  "schema": "lab-task/1",
+  "id": "SIN-H2",
+  "split": "validation",
+  "class": "contract-change",
+  "repo": "sinatra",
+  "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+  "prompt": "Uso o helper `link_headers` do sinatra-contrib no layout para montar as tags a partir do cabeçalho Link, e ele quebra quando a URL ou um parâmetro tem vírgula ou ponto e vírgula. Por exemplo, `stylesheet '/assets/a,b.css'` sai com a tag truncada, e `link '/x', title: 'x; y, z'` também. Quero que `link_headers` leia esses valores corretamente, inclusive com vários links no mesmo cabeçalho, vírgula dentro de `<...>`, e valores entre aspas com aspas escapadas. O formato das tags tem que continuar igual ao de hoje: `<link href=\"...\" parâmetros />`, com os parâmetros na mesma ordem e exatamente como estão no cabeçalho. Cabeçalhos escritos à mão com espaços extras continuam funcionando, e sem cabeçalho ou com cabeçalho vazio o resultado é string vazia. O helper `link` continua gravando o mesmo cabeçalho e retornando o mesmo HTML. Mantenha a API pública e não acesse a rede. Ao terminar, resuma a mudança em poucas linhas.",
+  "setup": [
+    [
+      "bundle",
+      "_2.5.22_",
+      "install",
+      "--path",
+      "vendor/bundle"
+    ]
+  ],
+  "setup_timeout_s": 900,
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_link_headers_test.rb": "zz_oracle_link_headers_test.rb"
+    },
+    "command": [
+      "bundle",
+      "exec",
+      "ruby",
+      "-Ilib",
+      "-Isinatra-contrib/lib",
+      "test/zz_oracle_link_headers_test.rb",
+      "-v"
+    ],
+    "require_output": [
+      "ZzSinatraLinkHeadersOracleTest#test_stylesheet_tag_keeps_current_format = [0-9.]+ s = [.FE]",
+      "[0-9]+ runs, [0-9]+ assertions"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "sinatra-contrib/lib/sinatra/link_header.rb",
+      "sinatra-contrib/spec/link_header_spec.rb"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "sinatra-contrib/lib/sinatra/link_header.rb",
+        "pattern": "def link\\(\\*urls\\)",
+        "why": "assinatura pública de link preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "sinatra-contrib/lib/sinatra/link_header.rb",
+        "pattern": "def link_headers",
+        "why": "assinatura pública de link_headers preservada"
+      }
+    ]
+  },
+  "notes": "Contrato. Defeito real no commit fixado: sinatra-contrib/lib/sinatra/link_header.rb, link_headers (linhas 118-125) faz split(',') e split(';') ingênuos. Reproduzido: stylesheet '/assets/a,b.css' gera '<link href=\"/assets/\"  />' seguido de lixo; link '/x', title: 'x; y, z' gera title truncado; '/a;b.css' também quebra. Contratos a preservar: formato da tag (método stylesheet/link, linhas 64-100) e o cabeçalho escrito por link (linha 83). Testes existentes em sinatra-contrib/spec/link_header_spec.rb. Oráculo escrito do zero (minitest, não rspec). Na base: 7 falhas e 6 passam."
+}

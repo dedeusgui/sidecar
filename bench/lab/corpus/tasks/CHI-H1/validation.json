@@ -1,0 +1,54 @@
+{
+  "id": "CHI-H1",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/url_format.go",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/url_format.go",
+        "ok": true,
+        "detail": "chave de contexto pública preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "rkURLFormatEncodedSegments/encoded_segments_in_two_params (0.00s)\n    --- PASS: TestBenchmarkURLFormatEncodedSegments/unicode_with_extension (0.00s)\n    --- PASS: TestBenchmarkURLFormatEncodedSegments/unknown_route_with_encoded_slash (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.003s\nFAIL\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "middleware/url_format.go"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/url_format.go",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/url_format.go",
+        "ok": true,
+        "detail": "chave de contexto pública preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794175898.3060837,
+  "base_verdict": "fail"
+}

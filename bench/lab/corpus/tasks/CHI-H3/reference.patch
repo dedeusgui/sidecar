@@ -1,0 +1,39 @@
+--- a/middleware/supress_notfound.go
++++ b/middleware/supress_notfound.go
+@@ -16,8 +16,11 @@
+ 	return func(next http.Handler) http.Handler {
+ 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+ 			rctx := chi.RouteContext(r.Context())
+-			match := rctx.Routes.Match(chi.NewRouteContext(), r.Method, r.URL.Path)
+-			if !match {
++			path := r.URL.Path
++			if r.URL.RawPath != "" {
++				path = r.URL.RawPath
++			}
++			if !routeExists(rctx.Routes, r.Method, path) {
+ 				router.NotFoundHandler().ServeHTTP(w, r)
+ 				return
+ 			}
+@@ -25,3 +28,22 @@
+ 		})
+ 	}
+ }
++
++// routeExists reports whether path is routed for method or for any standard
++// method. A path routed only for other methods must reach the router, which
++// answers 405 Method Not Allowed as it does without this middleware.
++func routeExists(routes chi.Routes, method, path string) bool {
++	if routes.Match(chi.NewRouteContext(), method, path) {
++		return true
++	}
++	for _, m := range []string{
++		http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut,
++		http.MethodPatch, http.MethodDelete, http.MethodConnect,
++		http.MethodOptions, http.MethodTrace,
++	} {
++		if routes.Match(chi.NewRouteContext(), m, path) {
++			return true
++		}
++	}
++	return false
++}

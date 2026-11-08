@@ -1,0 +1,59 @@
+{
+  "schema": "lab-task/1",
+  "id": "SIN-H1",
+  "split": "development",
+  "class": "debug",
+  "repo": "sinatra",
+  "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+  "prompt": "No Sinatra, o `Sinatra::IndifferentHash` (o tipo dos `params`) não aceita o mapeamento de chaves que o Hash do Ruby 3 aceita: `hash.transform_keys(a: :z)` levanta ArgumentError. Quero que `transform_keys` e `transform_keys!` aceitem esse mapeamento, com as mesmas regras de símbolo e string da classe: `:a` e `'a'` casam com a chave `a` do mapeamento, e as chaves do resultado são sempre strings. Chave sem mapeamento usa o bloco, se houver; sem bloco, mantém o nome. Os usos que só passam bloco não podem mudar, e `transform_keys` não deve alterar o receptor. Mantenha a API pública e não acesse a rede. Ao terminar, resuma a mudança em poucas linhas.",
+  "setup": [
+    [
+      "bundle",
+      "_2.5.22_",
+      "install",
+      "--path",
+      "vendor/bundle"
+    ]
+  ],
+  "setup_timeout_s": 900,
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_indifferent_transform_keys_test.rb": "zz_oracle_indifferent_transform_keys_test.rb"
+    },
+    "command": [
+      "bundle",
+      "exec",
+      "ruby",
+      "-Ilib",
+      "test/zz_oracle_indifferent_transform_keys_test.rb",
+      "-v"
+    ],
+    "require_output": [
+      "ZzSinatraIndifferentTransformKeysOracleTest#test_mapping_matches_string_and_symbol_keys = [0-9.]+ s = [.FE]",
+      "[0-9]+ runs, [0-9]+ assertions"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/sinatra/indifferent_hash.rb",
+      "test/indifferent_hash_test.rb"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/indifferent_hash.rb",
+        "pattern": "class IndifferentHash < Hash",
+        "why": "classe pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/indifferent_hash.rb",
+        "pattern": "def convert_key\\(key\\)",
+        "why": "conversão símbolo→string preservada"
+      }
+    ]
+  },
+  "notes": "Dev. Defeito real no commit fixado: lib/sinatra/indifferent_hash.rb, transform_keys (linha 160) e transform_keys! (linha 164) não aceitam o argumento de mapeamento de Hash#transform_keys (existe no Ruby >= 3.0). Reproduzido: IndifferentHash[a: 1].transform_keys(a: :z) -> ArgumentError. Oráculo escrito do zero (minitest). Na base: 12 erros e 3 testes de bloco passam. Setup: bundler 4 removeu --path; usa-se bundle _2.5.22_."
+}

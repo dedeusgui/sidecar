@@ -1,0 +1,22 @@
+diff --git a/lib/sinatra/indifferent_hash.rb b/lib/sinatra/indifferent_hash.rb
+index ad12e69..5a572c8 100644
+--- a/lib/sinatra/indifferent_hash.rb
++++ b/lib/sinatra/indifferent_hash.rb
+@@ -157,12 +157,13 @@ module Sinatra
+       super(&method(:convert_value))
+     end
+ 
+-    def transform_keys(&block)
+-      dup.transform_keys!(&block)
++    def transform_keys(*args, &block)
++      dup.transform_keys!(*args, &block)
+     end
+ 
+-    def transform_keys!
+-      super
++    def transform_keys!(*args, &block)
++      mapping = args.map { |hash| hash.to_h { |k, v| [convert_key(k), v] } }
++      super(*mapping, &block)
+       super(&method(:convert_key))
+     end
+ 

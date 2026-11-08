@@ -1,0 +1,28 @@
+diff --git a/src/click/shell_completion.py b/src/click/shell_completion.py
+index 9cf2314..6df1418 100644
+--- a/src/click/shell_completion.py
++++ b/src/click/shell_completion.py
+@@ -764,17 +764,22 @@ def _resolve_incomplete(
+     # value differently. Might keep the value joined, return the "="
+     # as a separate item, or return the split name and value. Always
+     # split and discard the "=" to make completion easier.
++    attached = False
++
+     if incomplete == "=":
+         incomplete = ""
+     elif "=" in incomplete and _start_of_option(ctx, incomplete):
+         name, _, incomplete = incomplete.partition("=")
+         args.append(name)
++        # The text after "=" is always the value of that option, even when it
++        # starts with the option character, so it is never an option name.
++        attached = True
+ 
+     # The "--" marker tells Click to stop treating values as options
+     # even if they start with the option character. If it hasn't been
+     # given and the incomplete arg looks like an option, the current
+     # command will provide option name completions.
+-    if "--" not in args and _start_of_option(ctx, incomplete):
++    if not attached and "--" not in args and _start_of_option(ctx, incomplete):
+         return ctx.command, incomplete
+ 
+     params = ctx.command.get_params(ctx)

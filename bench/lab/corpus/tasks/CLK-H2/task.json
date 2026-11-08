@@ -1,0 +1,79 @@
+{
+  "schema": "lab-task/1",
+  "id": "CLK-H2",
+  "split": "validation",
+  "class": "edit",
+  "repo": "click",
+  "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+  "prompt": "No bash, quando eu digito uma opção longa com o valor colado depois do `=`, como `--level=-`, e aperto Tab, o click me sugere nomes de opções (`--level`, `--help`...) em vez dos valores aceitos. A opção `--level` é um click.Choice com `-1`, `-2` e `x`, e a opção `--note` é repetível com click.Choice de `-a` e `b`. Depois do `=`, o que vem é sempre o valor da opção, mesmo que comece com `-`: `--level=-` deve sugerir `-1` e `-2`, e `--note=-` deve sugerir `-a`. Sem o `=`, nada muda: `--le` continua completando o nome `--level`, digitar `-` sozinho continua listando nomes de opções, e depois de `--level` com a palavra vazia continua sugerindo os valores. Não altere a API pública. Ao terminar, descreva brevemente o que fez.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "tests/test_zz_clk_h2_oracle.py": "attached_value_dash_oracle_test.py"
+    },
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "-v",
+      "tests/test_zz_clk_h2_oracle.py"
+    ],
+    "require_output": [
+      "test_attached_dash_value_completes_choice_values\\s+(PASSED|FAILED)",
+      "test_attached_dash_value_is_narrowed_by_prefix\\s+(PASSED|FAILED)",
+      "test_attached_plain_value_completes_choice_values\\s+(PASSED|FAILED)",
+      "test_attached_empty_value_offers_all_choices\\s+(PASSED|FAILED)",
+      "test_attached_dash_value_for_multiple_option\\s+(PASSED|FAILED)",
+      "test_attached_plain_value_for_multiple_option\\s+(PASSED|FAILED)",
+      "test_option_name_prefix_still_completes_names\\s+(PASSED|FAILED)",
+      "test_lone_dash_still_lists_option_names\\s+(PASSED|FAILED)",
+      "test_value_after_separate_option_still_offers_choices\\s+(PASSED|FAILED)"
+    ],
+    "timeout_s": 300
+  },
+  "setup": [
+    [
+      "python3",
+      "-m",
+      "venv",
+      ".venv"
+    ],
+    [
+      "./.venv/bin/pip",
+      "install",
+      "-q",
+      "-e",
+      ".",
+      "pytest"
+    ]
+  ],
+  "scope": {
+    "allowed_paths": [
+      "src/click/shell_completion.py",
+      "tests/test_shell_completion.py"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/shell_completion.py",
+        "pattern": "def _resolve_incomplete\\(",
+        "why": "_resolve_incomplete preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/shell_completion.py",
+        "pattern": "class BashComplete\\(ShellComplete\\):",
+        "why": "BashComplete preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/shell_completion.py",
+        "pattern": "def get_completions\\(",
+        "why": "API pública get_completions preservada"
+      }
+    ]
+  },
+  "notes": "Defeito real em src/click/shell_completion.py (commit fixado), função _resolve_incomplete (~linhas 767-777). Ao separar '--opt=valor', o código troca incomplete pelo valor e, em seguida, testa _start_of_option(incomplete) sem distinguir que o valor veio colado após '='. Assim '--level=-' devolve os nomes de opções (ctx.command) em vez dos valores do Choice. Correção de referência: marcar o caso 'attached' e pular a checagem de nome de opção. Testes escritos do zero."
+}

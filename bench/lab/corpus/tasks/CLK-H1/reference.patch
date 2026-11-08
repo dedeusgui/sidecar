@@ -1,0 +1,42 @@
+diff --git a/src/click/core.py b/src/click/core.py
+index b431725..56541cb 100644
+--- a/src/click/core.py
++++ b/src/click/core.py
+@@ -3406,11 +3406,17 @@ class Option(Parameter):
+     def get_error_hint(self, ctx: Context | None) -> str:
+         result = super().get_error_hint(ctx)
+         if self.show_envvar and self.envvar:
+-            envvars = [self.envvar] if isinstance(self.envvar, str) else self.envvar
++            # An empty name is not a variable, so it is left out of the hint.
++            envvars = (
++                [self.envvar]
++                if isinstance(self.envvar, str)
++                else [var for var in self.envvar if var]
++            )
+             # An environment variable is allowed to feature a space or a comma on all
+             # platforms, hence the quotes around each.
+             var_str = ", ".join(f"'{var}'" for var in envvars)
+-            result += f" (env var: {var_str})"
++            if var_str:
++                result += f" (env var: {var_str})"
+         return result
+ 
+     def _check_name_is_normalized(self, name: str, decls: cabc.Sequence[str]) -> None:
+@@ -3613,9 +3619,15 @@ class Option(Parameter):
+ 
+             if envvar:
+                 if isinstance(envvar, str):
+-                    extra["envvars"] = (envvar,)
++                    names = (envvar,)
+                 else:
+-                    extra["envvars"] = tuple(str(d) for d in envvar)
++                    names = tuple(str(d) for d in envvar)
++
++                # An empty name is not a variable, so it is left out of the help.
++                names = tuple(name for name in names if name)
++
++                if names:
++                    extra["envvars"] = names
+ 
+         # Temporarily enable resilient parsing to avoid type casting
+         # failing for the default. Might be possible to extend this to

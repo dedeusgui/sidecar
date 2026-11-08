@@ -1,0 +1,78 @@
+{
+  "schema": "lab-task/1",
+  "id": "CLK-H1",
+  "split": "development",
+  "class": "debug",
+  "repo": "click",
+  "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+  "prompt": "No click, quando uma opção recebe uma lista de variáveis de ambiente (envvar) e uma delas é a string vazia, o --help mostra a linha com `[env var: A, ]`, com uma vírgula sobrando, e a mensagem de erro de opção obrigatória mostra `''` como se fosse um nome de variável. Quero que nomes vazios sejam ignorados na exibição (help e mensagem de erro), sem mudar o formato quando há nomes válidos. Uma lista só com nomes vazios deve se comportar como se a opção não tivesse envvar. A leitura do valor a partir do ambiente não deve mudar. Não altere a API pública. Ao terminar, descreva brevemente o que fez.",
+  "setup": [
+    [
+      "python3",
+      "-m",
+      "venv",
+      ".venv"
+    ],
+    [
+      "./.venv/bin/pip",
+      "install",
+      "-q",
+      "-e",
+      ".",
+      "pytest"
+    ]
+  ],
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "tests/test_zz_clk_h1_oracle.py": "envvar_empty_name_oracle_test.py"
+    },
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "-v",
+      "tests/test_zz_clk_h1_oracle.py"
+    ],
+    "require_output": [
+      "test_help_drops_empty_name_at_start\\s+(PASSED|FAILED)",
+      "test_help_drops_empty_name_in_the_middle\\s+(PASSED|FAILED)",
+      "test_help_with_only_empty_names_matches_no_envvar\\s+(PASSED|FAILED)",
+      "test_help_keeps_names_when_no_entry_is_empty\\s+(PASSED|FAILED)",
+      "test_missing_error_names_only_non_empty_variables\\s+(PASSED|FAILED)",
+      "test_missing_error_keeps_format_with_named_variables\\s+(PASSED|FAILED)",
+      "test_missing_error_with_only_empty_names_matches_no_envvar\\s+(PASSED|FAILED)",
+      "test_empty_name_does_not_change_value_resolution\\s+(PASSED|FAILED)"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/click/core.py",
+      "tests/test_options.py"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/core.py",
+        "pattern": "def get_help_extra\\(self, ctx: Context\\) -> types\\.OptionHelpExtra:",
+        "why": "get_help_extra preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/core.py",
+        "pattern": "def resolve_envvar_value\\(self, ctx: Context\\) -> str \\| None:",
+        "why": "leitura do valor do ambiente preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/core.py",
+        "pattern": "envvar: str \\| cabc\\.Sequence\\[str\\] \\| None = None",
+        "why": "assinatura pública de envvar preservada"
+      }
+    ]
+  },
+  "notes": "Defeito real em src/click/core.py (commit fixado). Option.get_help_extra (~linha 3604-3618) copia self.envvar para extra['envvars'] sem filtrar entradas vazias, e Option.get_error_hint (~linha 3406-3413) junta todas as entradas. Resultado: envvar=['', 'B'] mostra '[env var: , B]' e erro \"(env var: '', 'B')\". O changelog 8.5.1/8.6 (PR 3884) promete que envvar vazio se comporta como ausente, mas só cobre [] e \"\". Resolução do valor já ignora nomes vazios (resolve_envvar_value). Testes escritos do zero para esta tarefa."
+}

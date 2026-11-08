@@ -1,0 +1,54 @@
+{
+  "id": "CHI-H3",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/supress_notfound.go",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/supress_notfound.go",
+        "ok": true,
+        "detail": "404 delegado ao NotFound configurado no roteador"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "rity/PUT_/api/items/1 (0.00s)\n    --- PASS: TestBenchmarkSupressNotFoundParity/GET_/nope (0.00s)\n    --- PASS: TestBenchmarkSupressNotFoundParity/POST_/api/nope (0.00s)\n    --- PASS: TestBenchmarkSupressNotFoundParity/GET_/only/extra (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.009s\nFAIL\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "middleware/supress_notfound.go"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/supress_notfound.go",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/supress_notfound.go",
+        "ok": true,
+        "detail": "404 delegado ao NotFound configurado no roteador"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794175904.1601777,
+  "base_verdict": "fail"
+}

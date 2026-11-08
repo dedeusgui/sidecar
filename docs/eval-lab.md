@@ -63,6 +63,10 @@ Correção (`ClaudeAgent`): regras `--disallowedTools` para `Read/Grep/Glob/Edit
 
 Outras correções da mesma revisão: timeout agora fica nas taxas como falha (antes sumia do `pass_rate` e do custo); custo desconhecido conta como o teto por execução no limite de gasto; `*` de glob não cruza `/`; `regex_absent` falha se o arquivo foi apagado; o holdout só pode ser avaliado uma vez (`--allow-repeat-final`); `validate-task` não consome o holdout porque nenhum resultado de agente é observado; `--replay` exclui o holdout (`--include-holdout` para um relatório final).
 
+## 5c. Protocolo de duas voltas e corpus v2
+
+`lab.py run --turns 2` retoma a sessão do cliente (`--resume`) e envia a fala de um usuário simulado, **definida pela tarefa e igual para todos os braços**: tarefa ambígua recebe `underspec.canned_answer`; as demais, uma revisão genérica (é nela que há edições não commitadas para a nota de impacto). A execução soma as duas voltas; qualquer volta contaminada ou sem modelo servido invalida tudo. Braços de funcionalidade: `V2+brief|adaptive|groom|impact`. O corpus v2 (12 tarefas, escopo com testes permitidos por glob, oráculos de 6 a 13 casos de borda) está validado mas **não foi medido com agente**.
+
 ## 6. Lacunas conhecidas (R1)
 
 - `--tools-allow` padrão libera só `go test`/`ls`: agentes de click/express/sinatra não conseguem rodar a suíte própria da linguagem. Igual nos três braços, mas limita a qualidade absoluta.
