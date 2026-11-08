@@ -190,3 +190,19 @@ func TestEntryLineCarriesIndexedSignatureBounded(t *testing.T) {
 		t.Fatalf("signature missing or unbounded (%d runes): %s", len([]rune(text)), text)
 	}
 }
+
+func TestTaskItemsKeepTheClarificationNote(t *testing.T) {
+	e := ev("function", "ChargeInvoice", "billing/charge.go", 10, "exact", "VERIFIED", "tested_by:billing/charge_test.go")
+	check := retrieve.Evidence{Hit: store.SymbolHit{Kind: "task_check", Name: "ambiguous"}, Section: ctxbuild.TaskCheck, Note: "Open decision: which one", ID: "groom|x"}
+	items, ok := TaskItems(retrieve.Result{Evidence: []retrieve.Evidence{e, check}})
+	if !ok {
+		t.Fatal("expected a brief")
+	}
+	var kept bool
+	for _, it := range items {
+		kept = kept || it.Section == ctxbuild.TaskCheck
+	}
+	if !kept {
+		t.Fatal("the brief must not drop the clarification note")
+	}
+}

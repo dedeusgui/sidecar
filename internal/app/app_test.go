@@ -722,3 +722,41 @@ func TestExplainCarriesIntentAndFingerprint(t *testing.T) {
 		}
 	}
 }
+
+func TestHookGroomAsksOnceRecordsAnswerAndStaysSilentOtherwise(t *testing.T) {
+	setupHome(t)
+	root := makeProject(t)
+	var spawned []string
+	t.Setenv("SIDECAR_ENGINE", "v2")
+	t.Setenv("CI", "")
+	t.Setenv("SIDECAR_ASK", "")
+	prompt := "adicione um timeout no ManualReleaseHandler"
+
+	// Without the feature the hook never questions.
+	out, _ := runHook(t, adapter.Claude, payload(t, root, prompt, "s-off"), &spawned)
+	if strings.Contains(out, "Open decision") {
+		t.Fatalf("groom is opt-in: %q", out)
+	}
+
+	t.Setenv("SIDECAR_FEATURES", "groom")
+	out, log := runHook(t, adapter.Claude, payload(t, root, prompt, "s1"), &spawned)
+	if !strings.Contains(out, "Open decision") || !strings.Contains(out, "AskUserQuestion") {
+		t.Fatalf("expected one clarification: %q\nlog: %s", out, log)
+	}
+	if strings.Contains(log, "timeout no ManualReleaseHandler") {
+		t.Fatal("prompt text was written to the diagnostic log")
+	}
+
+	// A fully specified task is never questioned.
+	out, _ = runHook(t, adapter.Claude, payload(t, root, "adicione um timeout de 30 segundos no ManualReleaseHandler", "s2"), &spawned)
+	if strings.Contains(out, "Open decision") {
+		t.Fatalf("a stated value must not trigger a question: %q", out)
+	}
+
+	// A one-letter answer is read, not skipped, and becomes a session-bound decision.
+	_, log = runHook(t, adapter.Claude, payload(t, root, "A", "s1"), &spawned)
+	if strings.Contains(log, `"status":"skipped"`) {
+		t.Fatalf("the answer was skipped as a tiny prompt: %s", log)
+	}
+	_ = log
+}

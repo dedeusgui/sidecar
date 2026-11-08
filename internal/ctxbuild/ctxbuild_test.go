@@ -82,3 +82,21 @@ func TestEstimateTokens(t *testing.T) {
 		t.Fatalf("EstimateTokens(\"\") = %d, want 0", got)
 	}
 }
+
+func TestTaskCheckItemsGetALargerLimitThanOrdinaryEvidence(t *testing.T) {
+	long := strings.Repeat("x", 500)
+	out := Build([]Item{{Section: TaskCheck, Key: "k1", Text: long}, {Section: Code, Key: "k2", Text: long}}, 2000, nil)
+	lines := strings.Split(out, "\n")
+	var check, code int
+	for i, l := range lines {
+		if l == TaskCheck && i+1 < len(lines) {
+			check = len([]rune(lines[i+1]))
+		}
+		if l == Code && i+1 < len(lines) {
+			code = len([]rune(lines[i+1]))
+		}
+	}
+	if check <= 450 || code > 310 {
+		t.Fatalf("limits not applied per section: check=%d code=%d", check, code)
+	}
+}
