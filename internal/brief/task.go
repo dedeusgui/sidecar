@@ -195,7 +195,7 @@ func TaskItems(res retrieve.Result) ([]ctxbuild.Item, bool) {
 			Text: fmt.Sprintf("[%s] %s: %s", l.Status, l.Field, l.Text)})
 	}
 	for _, it := range items(res) {
-		if it.Section == ctxbuild.Git {
+		if it.Section == ctxbuild.Git || it.Section == ctxbuild.TaskCheck {
 			out = append(out, it)
 		}
 	}
