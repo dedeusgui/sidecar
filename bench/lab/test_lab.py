@@ -289,10 +289,14 @@ class StatsTests(unittest.TestCase):
         self.assertIsNone(lab.pct([], 0.5))
         self.assertIsNone(lab.boot_ci([1, 0, 1]))  # N < 5: sem IC
 
+    def test_test_files_outside_scope_are_not_counted_as_source_violations(self):
+        r = {"oracle": {"outside_scope": ["tests/test_x.py", "middleware/a_test.go", "src/app.py", "CHANGES.md"]}}
+        self.assertEqual(lab.non_test_outside(r), ["src/app.py", "CHANGES.md"])
+
     def test_cost_per_success_requires_complete_cost_data(self):
         def row(c, ok=True):
             return {"comparable": True, "success": ok, "cost_usd": c, "wall_s": 1.0, "tool_calls": 1, "injected_chars": 0,
-                    "served_models": ["m"], "verdict": "pass", "oracle": {"scope_ok": True, "invariants": []}}
+                    "served_models": ["m"], "verdict": "pass", "oracle": {"scope_ok": True, "invariants": [], "tests": "pass", "outside_scope": []}}
         self.assertIsNone(lab.summarize([row(0.1), row(None)])["cost_per_success"])
         self.assertEqual(lab.summarize([row(0.1), row(0.3)])["cost_per_success"], 0.2)
 

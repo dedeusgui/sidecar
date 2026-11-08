@@ -652,6 +652,13 @@ def pct(xs, q):
     return s[min(len(s) - 1, math.ceil(q * len(s)) - 1)]
 
 
+TEST_PATH = re.compile(r"(^|/)(tests?|spec|__tests__)/|(_test\.go|_spec\.rb|\.test\.[jt]sx?|(^|/)test_[^/]*\.py)$")
+
+
+def non_test_outside(r):
+    return [p for p in r["oracle"]["outside_scope"] if not TEST_PATH.search(p)]
+
+
 def summarize(rows):
     ok = [r for r in rows if r["comparable"]]
     succ = [r for r in ok if r["success"]]
@@ -661,7 +668,9 @@ def summarize(rows):
     return {
         "runs": len(rows), "comparable": len(ok), "excluded": len(rows) - len(ok), "passed": len(succ),
         "pass_rate": round(len(succ) / len(ok), 3) if ok else None,
+        "hidden_tests_passed": sum(1 for r in ok if r["oracle"]["tests"] == "pass"),
         "scope_violations": sum(1 for r in ok if not r["oracle"]["scope_ok"]),
+        "scope_violations_non_test": sum(1 for r in ok if non_test_outside(r)),
         "invariant_violations": sum(1 for r in ok for i in r["oracle"]["invariants"] if not i["ok"]),
         "infra_errors": sum(1 for r in rows if r["verdict"] == "error"),
         "cost_total": round(sum(cost), 4) if cost else None,
@@ -723,10 +732,10 @@ def render_md(rep):
         if ev == "offline_retrieval":
             L += ["```json", json.dumps({k: v for k, v in sec.items()}, ensure_ascii=False, indent=1)[:4000], "```", ""]
             continue
-        L += ["| braço | exec. | comparáveis | pass | taxa | escopo | invariantes | custo/correta | p50 s/correta | tool calls | injetado |",
-              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+        L += ["| braço | exec. | comparáveis | pass | taxa | ocultos ok | escopo (não-teste) | invariantes | custo/correta | p50 s/correta | tool calls | injetado |",
+              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
         for a, s in sec["arms"].items():
-            L.append(f"| {a} | {s['runs']} | {s['comparable']} | {s['passed']} | {s['pass_rate']} | {s['scope_violations']} | "
+            L.append(f"| {a} | {s['runs']} | {s['comparable']} | {s['passed']} | {s['pass_rate']} | {s['hidden_tests_passed']} | {s['scope_violations']} ({s['scope_violations_non_test']}) | "
                      f"{s['invariant_violations']} | {s['cost_per_success']} | {s['wall_per_success_p50']} | {s['tool_calls_mean']} | {s['injected_chars_mean']} |")
         L.append("")
         for a, p in sec["paired_vs_OFF"].items():

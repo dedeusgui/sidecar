@@ -55,6 +55,7 @@ Seções **separadas** por nível de evidência (`agentic`, `simulated`, `offlin
 
 ## 6. Lacunas conhecidas (R1)
 
+- `--tools-allow` padrão libera só `go test`/`ls`: agentes de click/express/sinatra não conseguem rodar a suíte própria da linguagem. Igual nos três braços, mas limita a qualidade absoluta.
 - ROI de feedback (`OFF` / `ON-no-feedback` / `ON-historical-feedback`): o feedback é indexado por raiz do repositório; o protocolo exige workspace de caminho estável por repositório e semeadura por fase de histórico. **Não implementado**; não declarado.
 - Isolamento de rede do cliente do agente: o oráculo roda sem rede, mas o `claude` precisa de rede para a API; não há `bwrap` neste ambiente cloud, então a proteção de escrita fora do workspace depende do `acceptEdits` e de `--allowedTools` restritos, não de um sandbox de SO.
 - Amostras `cold` são poucas (uma por repositório+engine por execução do perf); aumentar exige reabrir índices.

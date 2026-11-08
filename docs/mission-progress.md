@@ -6,13 +6,13 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 
 | Entrega | Existia antes | Lacuna real | Teste de aceite | Estado |
 |---|---|---|---|---|
-| R1.1 corpus 20–30 tarefas de edição, splits, holdout novo | 1 tarefa chi (`run_edit_pilot.py`); 10 repos só de localização | corpus verificável + oráculos + splits | `lab.py validate-corpus` ok em todas | 🟡 ver §Corpus |
+| R1.1 corpus 20–30 tarefas de edição, splits, holdout novo | 1 tarefa chi (`run_edit_pilot.py`); 10 repos só de localização | corpus verificável + oráculos + splits | `lab.py validate-corpus` ok em todas | ✅ 20/20 revalidadas (§Corpus) |
 | R1.2 harness de edição isolado | piloto de 1 tarefa, Codex+bwrap | harness genérico, worktree descartável, escopo, braços balanceados | `python3 -m unittest bench.lab.test_lab` (23 testes) | ✅ (isolamento de rede do agente: ver eval-lab §6) |
 | R1.3 replay offline versionado + ablação + rollback | `compare_variants.py`, ablações em `sidecar-eval` | `Tuning`, grade, determinismo, run key, `--replay-check` | `go test ./cmd/sidecar-eval ./internal/retrieve`; replay determinístico | ✅ |
 | R1.4 perf p50/p95/p99 cold/warm por estágio | `hook_probe_ms` apenas | `--perf` por estágio | `sidecar-eval --perf` | ✅ (cold n pequeno) |
 | R1.5 ROI do feedback (3 braços) | feedback com integridade (PR #6) | arms + semeadura por raiz estável | — | ⬜ |
 | R1.6 scorecard unificado | `bench/scorecard.py` (OFF/ON) | seções por evidência, pareado, custo/correta | `lab.py report` + testes | ✅ |
-| R1.7 comparação OFF/V1/V2/componentes | OFF/ON | braços V1, V2; componentes dependem de R2–R5 | `lab.py run --arms OFF,V1,V2` | 🟡 |
+| R1.7 comparação OFF/V1/V2/componentes | OFF/ON | braços V1, V2; componentes dependem de R2–R5 | `lab.py run --arms OFF,V1,V2` | 🟡 piloto dev feito (§Piloto); componentes aguardam R2–R5 |
 | R2 Adaptive Context Engine | V2 com abstenção parcial | política por intenção, E17, termos genéricos | gates R2 | ⬜ |
 | R3 Task Evidence Brief | `ContractEvidence`, packer | brief rastreável | gate R3 | ⬜ |
 | R4 TaskUncertainty / grooming | — | detector, política, decisões, benchmark | gate R4 | ⬜ |
@@ -22,7 +22,21 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 
 ## Corpus (R1.1)
 
-Preenchido a cada integração (contagem real de `lab.py manifest`).
+`lab.py manifest` (2026-11-08): **20 tarefas** — development 8, validation 7, holdout 5; classes: locate 2, debug 4, edit 4, multi-file 2, contract-change 4, negative 2, ambiguous 1, voice 1. Repositórios: chi 7, click 6, express 4, sinatra 3. As 20 passaram em `validate-corpus` por mim (oráculo falha na base, passa com o `reference.patch`), independentemente do relato dos autores. **Abaixo do alvo de 24:** MON-* (3 tarefas) bloqueadas por ambiente; EXP-VOI-01 recusada (candidato a defeito conflita com teste existente; não se escolhe autoridade entre código e teste). Cobertura de `ambiguous` e `voice` é de 1 tarefa cada: insuficiente para concluir sobre grooming/voz (R4). Holdout: `holdout_ledger.jsonl` inexistente, nunca executado.
+
+## Piloto de desenvolvimento OFF/V1/V2 (R1, evidência agentic, Haiku)
+
+[bench/results/lab-dev1-2026-11-08](../bench/results/lab-dev1-2026-11-08/): 8 tarefas de development × 3 braços × 1 repetição = 24 execuções, `claude-haiku-5-5` (ID servido == solicitado em todas), Claude Code 2.1.319, config isolada por execução, todas comparáveis, custo medido total **US$ 0,177**. Oráculo sem rede via `unshare -rn`; sem `bwrap`.
+
+| braço | pass (oráculo + escopo + invariantes) | oráculo oculto passou | violações de escopo (em código não-teste) | custo/correta | tool calls |
+|---|---:|---:|---:|---:|---:|
+| OFF | 6/8 | 7/8 | 2 (1) | 0,0107 | 11 |
+| V1 | 5/8 | 8/8 | 3 (0) | 0,0113 | 9,5 |
+| V2 | 6/8 | 8/8 | 2 (0) | 0,0094 | 9,6 |
+
+**Leitura honesta:** N=8, 1 repetição, 1 modelo: **inconclusivo**. Diferenças pareadas V2−OFF: Δpass 0, Δcusto −US$ 0,0009 (IC95 de pass degenerado). Não é ganho comprovado.
+
+**Achado de auditoria do corpus:** 5 das 6 reprovações de OFF/V1/V2 são só de escopo — o agente adicionou arquivos de teste legítimos (`tests/test_shell_completion.py`, `tests/test_options.py`, `middleware/zz_repro_test.go`) fora de `allowed_paths`, e o oráculo oculto passou. O `scope.allowed_paths` das tarefas click é estrito demais. Não alterei vereditos nem o corpus depois de ver os resultados; o scorecard agora reporta separadamente `hidden_tests_passed` e `scope_violations_non_test`. Revisão de escopo (permitir testes) deve ser versionada como nova versão do corpus e re-medida, não aplicada retroativamente. Uma violação em código não-teste (CHANGES.md em CLK-AMB-01/OFF, junto com falha do oráculo) permanece.
 
 ## Testes realmente executados
 
@@ -33,7 +47,7 @@ Preenchido a cada integração (contagem real de `lab.py manifest`).
 
 ## Gastos de modelo
 
-US$ 0,00 nesta missão até aqui (teto de US$ 10 não consumido).
+US$ 0,177 (piloto dev R1: 24 execuções) + ~US$ 0,01 (smoke de 2 execuções). Teto de US$ 10 (adicional) quase intacto.
 
 ## Bloqueios e riscos conhecidos
 
@@ -43,4 +57,4 @@ US$ 0,00 nesta missão até aqui (teto de US$ 10 não consumido).
 
 ## Próxima ação concreta
 
-Integrar o corpus validado, abrir o PR de R1, rodar piloto OFF/V1/V2 em desenvolvimento com teto de gasto e começar R2.
+Mesclar o PR de R1 e começar R2 (política de contexto adaptativa; reproduzir falso positivo residual e E17 no replay).
