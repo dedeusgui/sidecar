@@ -1,0 +1,67 @@
+{
+  "id": "CLK-MF-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/termui.py",
+        "ok": true,
+        "detail": "API pública click.style preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/_compat.py",
+        "ok": true,
+        "detail": "strip_ansi preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/_compat.py",
+        "ok": true,
+        "detail": "regex de ANSI continua sendo a fonte única usada por _textwrap"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "ected keyword argument 'link'. Did you mean 'blink'?\nFAILED tests/test_zz_clk_mf_oracle.py::test_wrap_counts_only_visible_characters - TypeError: style() got an unexpected keyword argument 'link'. Did you mean 'blink'?\n========================= 6 failed, 1 passed in 0.03s ==========================\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "src/click/_compat.py",
+      "src/click/termui.py"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/termui.py",
+        "ok": true,
+        "detail": "API pública click.style preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/_compat.py",
+        "ok": true,
+        "detail": "strip_ansi preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/_compat.py",
+        "ok": true,
+        "detail": "regex de ANSI continua sendo a fonte única usada por _textwrap"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163445.8162494,
+  "base_verdict": "fail"
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-NEG-01",
+  "split": "holdout",
+  "class": "negative",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "Oi, tudo bem? Hoje tá um dia corrido demais kkkk. Me conta, em uma frase só, de onde vem o nome da linguagem Go. Não precisa mexer em nada no código, é só curiosidade mesmo.",
+  "oracle": {
+    "kind": "no_change"
+  },
+  "scope": {
+    "allowed_paths": [],
+    "invariants": [
+      {
+        "type": "file_unchanged",
+        "path": "go.mod",
+        "why": "módulo não deve ser alterado em conversa"
+      }
+    ]
+  },
+  "notes": "Negativo: pedido conversacional sem relação com edição. Oráculo no_change: nenhum caminho pode ser alterado. Sem reference.patch por design."
+}

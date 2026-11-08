@@ -1,0 +1,63 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-MF-01",
+  "split": "validation",
+  "class": "multi-file",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "Dois problemas nos middlewares de URL do chi. Primeiro: com PathRewrite(\"/old\", \"/new\") e uma rota GET /new/{name}, a requisição /old/x%41 dá 404, embora /old/xA funcione. Segundo: se eu registro RedirectSlashes dentro de uma subrota (r.Route(\"/api\", ...) com a.Use(RedirectSlashes)), uma requisição para /api/items/ redireciona para /items em vez de /api/items. Corrija os dois, mantendo a API pública e o comportamento dos outros casos.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "middleware/zz_oracle_url_rewrite_test.go": "url_rewrite_oracle_test.go"
+    },
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./middleware",
+      "-run",
+      "^TestBenchmarkURLRewriteEscapedAndMounted$"
+    ],
+    "require_output": [
+      "--- PASS: TestBenchmarkURLRewriteEscapedAndMounted|--- FAIL: TestBenchmarkURLRewriteEscapedAndMounted"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "middleware/path_rewrite.go",
+      "middleware/path_rewrite_test.go",
+      "middleware/strip.go",
+      "middleware/strip_test.go"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/path_rewrite.go",
+        "pattern": "func PathRewrite\\(old, new string\\) func\\(http\\.Handler\\) http\\.Handler",
+        "why": "API pública de PathRewrite preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/strip.go",
+        "pattern": "func RedirectSlashes\\(next http\\.Handler\\) http\\.Handler",
+        "why": "API pública de RedirectSlashes preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/strip.go",
+        "pattern": "func StripSlashes\\(next http\\.Handler\\) http\\.Handler",
+        "why": "API pública de StripSlashes preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/strip.go",
+        "pattern": "ReplaceAll\\(full, `\\\\`, `/`\\)|ReplaceAll\\(path, `\\\\`, `/`\\)",
+        "why": "normalização de barra invertida (anti open redirect) preservada"
+      }
+    ]
+  },
+  "notes": "Dev/validação. Origem 1: middleware/path_rewrite.go reescreve só r.URL.Path; mux.go (mx.ServeHTTP/routeHTTP, ~linha 460) usa r.URL.RawPath quando não vazio, então a reescrita é ignorada para URLs com escapes que geram RawPath (sonda: /old/x%41 -> 404, /old/xA -> 200). Origem 2: middleware/strip.go RedirectSlashes usa rctx.RoutePath, que é relativo ao ponto de montagem da subrota (sonda: /api/items/ -> Location /items). Teste de barra invertida existente (TestRedirectSlashes_PreventBackslashRelativeOpenRedirect) deve continuar passando."
+}

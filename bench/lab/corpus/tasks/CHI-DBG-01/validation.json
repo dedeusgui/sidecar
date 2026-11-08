@@ -1,0 +1,66 @@
+{
+  "id": "CHI-DBG-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/logger.go",
+        "ok": true,
+        "detail": "assinatura pública de RequestLogger preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/logger.go",
+        "ok": true,
+        "detail": "interface LogFormatter preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/logger.go",
+        "ok": true,
+        "detail": "interface LogEntry preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "00s)\n    --- PASS: TestBenchmarkLoggerRecordsClientStatus/handler_writes_body (0.00s)\n    --- PASS: TestBenchmarkLoggerRecordsClientStatus/handler_sets_201 (0.00s)\n    --- PASS: TestBenchmarkLoggerRecordsClientStatus/handler_sets_404 (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.003s\nFAIL\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "middleware/logger.go"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/logger.go",
+        "ok": true,
+        "detail": "assinatura pública de RequestLogger preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/logger.go",
+        "ok": true,
+        "detail": "interface LogFormatter preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/logger.go",
+        "ok": true,
+        "detail": "interface LogEntry preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163376.255765,
+  "base_verdict": "fail"
+}

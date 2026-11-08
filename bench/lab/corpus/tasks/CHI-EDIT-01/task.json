@@ -1,0 +1,50 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-EDIT-01",
+  "split": "development",
+  "class": "edit",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "Atualize o middleware RequestSize do chi: quando o Content-Length declarado for maior que o limite em bytes, responda HTTP 413 imediatamente, sem executar o próximo handler. Para tamanho igual ou menor, mantenha o comportamento atual. Quando o tamanho for desconhecido, preserve a limitação por leitura existente. Mantenha a API pública. Não acesse a rede. Ao terminar, descreva brevemente o que fez.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "middleware/zz_oracle_request_size_test.go": "request_size_oracle_test.go"
+    },
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./middleware",
+      "-run",
+      "^TestBenchmarkRequestSizeKnownLength$"
+    ],
+    "require_output": [
+      "--- PASS: TestBenchmarkRequestSizeKnownLength|--- FAIL: TestBenchmarkRequestSizeKnownLength"
+    ],
+    "timeout_s": 300,
+    "origin": "migrado de bench/agentic/oracles (piloto 2026-11-08)"
+  },
+  "scope": {
+    "allowed_paths": [
+      "middleware/request_size.go",
+      "middleware/request_size_test.go"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/request_size.go",
+        "pattern": "func RequestSize\\(bytes int64\\) func\\(http.Handler\\) http.Handler",
+        "why": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/request_size.go",
+        "pattern": "MaxBytesReader",
+        "why": "limite por leitura preservado"
+      }
+    ]
+  },
+  "notes": "Dev. Origem: piloto antigo; prompt ligeiramente ajustado (escopo agora é checado pelo oráculo)."
+}

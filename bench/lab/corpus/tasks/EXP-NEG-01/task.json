@@ -1,0 +1,17 @@
+{
+  "schema": "lab-task/1",
+  "id": "EXP-NEG-01",
+  "split": "validation",
+  "class": "negative",
+  "repo": "express",
+  "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+  "prompt": "Oi! Tudo bem? Me dá três ideias de nome curto para um grupo de estudos sobre Node.js. Não precisa mexer em nenhum arquivo do projeto.",
+  "oracle": {
+    "kind": "no_change"
+  },
+  "scope": {
+    "allowed_paths": [],
+    "invariants": []
+  },
+  "notes": "Pedido de conversa sem relação com edição de código. Oráculo no_change: falha se qualquer arquivo do checkout for alterado."
+}

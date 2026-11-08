@@ -1,0 +1,30 @@
+diff --git a/lib/sinatra/base.rb b/lib/sinatra/base.rb
+index 7b26dd4..cd32c03 100644
+--- a/lib/sinatra/base.rb
++++ b/lib/sinatra/base.rb
+@@ -634,7 +634,7 @@ module Sinatra
+ 
+       return unless success? || status == 304
+ 
+-      if etag_matches?(env['HTTP_IF_NONE_MATCH'], new_resource)
++      if etag_matches?(env['HTTP_IF_NONE_MATCH'], new_resource, weak: true)
+         halt(request.safe? ? 304 : 412)
+       end
+ 
+@@ -706,10 +706,14 @@ module Sinatra
+     private
+ 
+     # Helper method checking if a ETag value list includes the current ETag.
+-    def etag_matches?(list, new_resource = request.post?)
++    def etag_matches?(list, new_resource = request.post?, weak: false)
+       return !new_resource if list == '*'
+ 
+-      list.to_s.split(',').map(&:strip).include?(response['ETag'])
++      current = response['ETag']
++      current = current.delete_prefix('W/') if weak
++      list.to_s.split(',').map(&:strip).any? do |tag|
++        weak ? tag.delete_prefix('W/') == current : tag == current
++      end
+     end
+ 
+     def with_params(temp_params)

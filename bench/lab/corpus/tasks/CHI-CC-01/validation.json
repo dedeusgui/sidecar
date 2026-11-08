@@ -1,0 +1,90 @@
+{
+  "id": "CHI-CC-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "tipo público HeaderRouter preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "construtor público preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "assinatura de Route preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "assinatura de RouteDefault preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "assinatura de Handler preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "cts_the_same_route (0.00s)\n    --- PASS: TestBenchmarkRouteHeadersDeterministic/single_matching_header_routes_to_its_middleware (0.00s)\n    --- PASS: TestBenchmarkRouteHeadersDeterministic/default_route_applies_when_no_header_matches (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.004s\nFAIL\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "middleware/route_headers.go"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "tipo público HeaderRouter preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "construtor público preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "assinatura de Route preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "assinatura de RouteDefault preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "ok": true,
+        "detail": "assinatura de Handler preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163374.2410457,
+  "base_verdict": "fail"
+}

@@ -1,0 +1,67 @@
+{
+  "schema": "lab-task/1",
+  "id": "CLK-MF-01",
+  "split": "holdout",
+  "class": "multi-file",
+  "repo": "click",
+  "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+  "prompt": "Quero que click.style aceite um parâmetro link com uma URL. Quando eu passar link, o texto estilizado deve ficar dentro de um hiperlink OSC 8 de terminal: a abertura é ESC ] 8 ; ; URL ESC \\ e o fechamento é ESC ] 8 ; ; ESC \\ (ESC é \\x1b). Sem link, a saída de style não pode mudar. Quando a saída não usa cor, como echo com color=False ou click.unstyle, os marcadores do hiperlink têm de sumir e sobrar só o texto. A quebra de linha de textos com esses marcadores também precisa contar só os caracteres visíveis. Ao terminar, descreva brevemente o que fez.",
+  "setup": [
+    ["python3", "-m", "venv", ".venv"],
+    ["./.venv/bin/pip", "install", "-q", "-e", ".", "pytest"]
+  ],
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "tests/test_zz_clk_mf_oracle.py": "hyperlink_oracle_test.py"
+    },
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "-v",
+      "tests/test_zz_clk_mf_oracle.py"
+    ],
+    "require_output": [
+      "test_style_link_wraps_the_styled_text\\s+(PASSED|FAILED)",
+      "test_style_without_link_is_unchanged\\s+(PASSED|FAILED)",
+      "test_unstyle_removes_hyperlink_and_keeps_text\\s+(PASSED|FAILED)",
+      "test_unstyle_still_removes_colors_and_bel_terminated_links\\s+(PASSED|FAILED)",
+      "test_echo_without_color_drops_hyperlink\\s+(PASSED|FAILED)",
+      "test_echo_with_color_keeps_hyperlink\\s+(PASSED|FAILED)",
+      "test_wrap_counts_only_visible_characters\\s+(PASSED|FAILED)"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/click/termui.py",
+      "src/click/_compat.py",
+      "tests/test_utils/test_style.py",
+      "tests/test_compat.py"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/termui.py",
+        "pattern": "def style\\(",
+        "why": "API pública click.style preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/_compat.py",
+        "pattern": "def strip_ansi\\(",
+        "why": "strip_ansi preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/_compat.py",
+        "pattern": "_ansi_re = re\\.compile",
+        "why": "regex de ANSI continua sendo a fonte única usada por _textwrap"
+      }
+    ]
+  },
+  "notes": "Feature nova (não existe no commit fixado): click.style sem link. Tarefa multi-arquivo: termui.py (style) + _compat.py (_ansi_re, usado por strip_ansi, term_len e _textwrap). Testes escritos do zero. Split holdout: só validada aqui, nunca executada com agente."
+}

@@ -1,0 +1,39 @@
+{
+  "repos": {
+    "chi": {
+      "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+      "source": "https://github.com/go-chi/chi",
+      "license": "MIT"
+    },
+    "click": {
+      "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+      "source": "https://github.com/pallets/click",
+      "license": "BSD-3-Clause"
+    },
+    "express": {
+      "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+      "source": "https://github.com/expressjs/express",
+      "license": "MIT"
+    },
+    "monolog": {
+      "commit": "3bed304b1905fed5c30d172872f4d890cbb03c6a",
+      "source": "https://github.com/Seldaek/monolog",
+      "license": "MIT"
+    },
+    "sinatra": {
+      "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+      "source": "https://github.com/sinatra/sinatra",
+      "license": "MIT"
+    },
+    "hono": {
+      "commit": "eb754bd5ef22c63f1634a4c374a86be086f85710",
+      "source": "https://github.com/honojs/hono",
+      "license": "MIT"
+    },
+    "serde-json": {
+      "commit": "8c535a260ce561eaab4111aafc29038eb9f77ff3",
+      "source": "https://github.com/serde-rs/json",
+      "license": "MIT OR Apache-2.0"
+    }
+  }
+}

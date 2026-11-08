@@ -1,0 +1,17 @@
+{
+  "id": "EXP-NEG-01",
+  "ok": true,
+  "base": {
+    "kind": "no_change",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [],
+    "isolation": null,
+    "detail": ""
+  },
+  "reference": null,
+  "ts": 1794163544.474047,
+  "base_verdict": "pass"
+}

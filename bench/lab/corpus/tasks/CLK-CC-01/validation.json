@@ -1,0 +1,54 @@
+{
+  "id": "CLK-CC-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "ok": true,
+        "detail": "função wrap_text continua existindo"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "ok": true,
+        "detail": "nome antigo continua aceito para quem já chama"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "wrap_text() got an unexpected keyword argument 'keep_paragraphs'. Did you mean 'preserve_paragraphs'?\nFAILED tests/test_zz_clk_cc_oracle.py::test_keep_paragraphs_parameter_default_is_false - KeyError: 'keep_paragraphs'\n========================= 3 failed, 3 passed in 0.03s ==========================\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "src/click/formatting.py"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "ok": true,
+        "detail": "função wrap_text continua existindo"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "ok": true,
+        "detail": "nome antigo continua aceito para quem já chama"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163400.2573466,
+  "base_verdict": "fail"
+}

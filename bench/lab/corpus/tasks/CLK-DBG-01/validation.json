@@ -1,0 +1,54 @@
+{
+  "id": "CLK-DBG-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "ok": true,
+        "detail": "API pública de wrap_text preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "ok": true,
+        "detail": "assinatura de preserve_paragraphs preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": " this message and exit.\\n'\n +  where 'Usage: cmd [OPTIONS]\\n\\n  Sync the files.\\n\\n  Copies every file that changed       since the last run.\\n\\nOptions:\\n  --help  Show this message and exit.\\n' = <Result okay>.output\n========================= 3 failed, 1 passed in 0.03s ==========================\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "src/click/formatting.py"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "ok": true,
+        "detail": "API pública de wrap_text preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "ok": true,
+        "detail": "assinatura de preserve_paragraphs preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163416.0303469,
+  "base_verdict": "fail"
+}

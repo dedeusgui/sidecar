@@ -1,0 +1,23 @@
+{
+  "schema": "lab-task/1",
+  "id": "CLK-LOC-01",
+  "split": "validation",
+  "class": "locate",
+  "repo": "click",
+  "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+  "prompt": "Neste repositório do click, preciso saber onde fica o código que monta a linha 'Usage:' que aparece no --help dos comandos. Não precisa mexer em nada. Responda com o caminho do arquivo e o nome da função que escreve essa linha.",
+  "oracle": {
+    "kind": "answer",
+    "answer_must_mention": [
+      "formatting.py",
+      "write_usage"
+    ],
+    "must_not_edit": true,
+    "timeout_s": 60
+  },
+  "scope": {
+    "allowed_paths": [],
+    "invariants": []
+  },
+  "notes": "Resposta esperada: src/click/formatting.py, HelpFormatter.write_usage (linha ~158 no commit fixado). Chamada por Command.format_usage em src/click/core.py (~linha 1190). Tarefa de localização: sem edição; o oráculo confere menções na resposta final."
+}

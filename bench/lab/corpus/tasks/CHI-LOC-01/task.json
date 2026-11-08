@@ -1,0 +1,21 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-LOC-01",
+  "split": "development",
+  "class": "locate",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "No middleware de throttle do chi, quando a fila de espera está cheia e a requisição é recusada na hora, qual arquivo e qual função montam o header Retry-After? Só preciso da localização. Não altere nada no repositório.",
+  "oracle": {
+    "kind": "answer",
+    "answer_must_mention": [
+      "middleware/throttle.go",
+      "setRetryAfterHeaderIfNeeded"
+    ]
+  },
+  "scope": {
+    "allowed_paths": [],
+    "invariants": []
+  },
+  "notes": "Dev. Origem: middleware/throttle.go no commit fixado. O ramo `default:` de ThrottleWithOpts (sem token de backlog disponível) chama t.setRetryAfterHeaderIfNeeded(w, false) antes de errCapacityExceeded; a função está definida no mesmo arquivo e usa opts.RetryAfterFn. Resposta esperada: middleware/throttle.go + setRetryAfterHeaderIfNeeded."
+}

@@ -1,0 +1,61 @@
+{
+  "schema": "lab-task/1",
+  "id": "EXP-EDIT-01",
+  "split": "development",
+  "class": "edit",
+  "repo": "express",
+  "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+  "prompt": "No res.jsonp do Express, quando o callback vem na query mas nada sobra depois da sanitização (por exemplo `?callback=!!!`), a resposta hoje sai como um script quebrado. Quero que, nesse caso, ela responda como JSON normal, sem tentar executar nada. Callbacks válidos e a sanitização dos demais casos devem continuar iguais, e a API pública não muda. Pode rodar os testes do repositório para conferir. Ao terminar, me diga o que mudou.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_exp_edit_01.js": "jsonp_callback_oracle_test.js"
+    },
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "test/zz_oracle_exp_edit_01.js"
+    ],
+    "require_output": [
+      "(?m)^(ok|not ok) \\d+ - EDIT01 callback formado so por caracteres invalidos responde JSON",
+      "(?m)^(ok|not ok) \\d+ - EDIT01 callback valido continua como script executavel",
+      "(?m)^(ok|not ok) \\d+ - EDIT01 callback com caracteres filtrados continua sendo sanitizado"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/response.js",
+      "test/res.jsonp.js"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "pattern": "res\\.jsonp = function jsonp\\(obj\\)",
+        "why": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "pattern": "stringify\\(obj, replacer, spaces, escape\\)",
+        "why": "serialização com replacer/spaces/json escape preservada"
+      }
+    ]
+  },
+  "setup": [
+    [
+      "npm",
+      "install",
+      "--no-audit",
+      "--no-fund"
+    ]
+  ],
+  "setup_timeout_s": 600,
+  "notes": "Origem: lib/response.js:289-293 (no commit fixado) sanitiza o callback depois de já decidir que ele é válido, então `!!!` vira string vazia e o script emitido fica sintaticamente inválido. Oráculo exige JSON quando nada sobra e preserva callbacks válidos. Prompt descreve o comportamento desejado sem nomear a solução. Teste oculto escrito para este projeto; não copiado de test/res.jsonp.js.",
+  "setup_env": {
+    "NODE_EXTRA_CA_CERTS": "/root/.ccr/ca-bundle.crt",
+    "SSL_CERT_FILE": "/root/.ccr/ca-bundle.crt"
+  }
+}

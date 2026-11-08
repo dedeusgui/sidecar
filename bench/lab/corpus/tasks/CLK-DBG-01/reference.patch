@@ -1,0 +1,13 @@
+diff --git a/src/click/formatting.py b/src/click/formatting.py
+index c4aa2de..d63411f 100644
+--- a/src/click/formatting.py
++++ b/src/click/formatting.py
+@@ -81,7 +81,7 @@ def wrap_text(
+         if buf[0].strip() == "\b":
+             p.append((indent or 0, True, "\n".join(buf[1:])))
+         else:
+-            p.append((indent or 0, False, " ".join(buf)))
++            p.append((indent or 0, False, " ".join(part.strip() for part in buf if part.strip())))
+         del buf[:]
+ 
+     for line in text.splitlines():

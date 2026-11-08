@@ -1,0 +1,17 @@
+diff --git a/src/click/types.py b/src/click/types.py
+index b6e98a9..49220b6 100644
+--- a/src/click/types.py
++++ b/src/click/types.py
+@@ -510,7 +510,11 @@ class Choice(ParamType[_ValueT_co], t.Generic[_ValueT_co]):
+             matched = (c for c in str_choices if c.startswith(incomplete))
+         else:
+             incomplete = incomplete.lower()
+-            matched = (c for c in str_choices if c.lower().startswith(incomplete))
++            matched = (
++                choice if isinstance(choice, str) else c
++                for choice, c in zip(self.choices, str_choices)
++                if c.lower().startswith(incomplete)
++            )
+ 
+         return [CompletionItem(c) for c in matched]
+ 

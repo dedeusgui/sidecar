@@ -1,0 +1,455 @@
+{
+  "schema": "lab-scorecard/1",
+  "sections": {
+    "agentic": {
+      "arms": {
+        "OFF": {
+          "runs": 8,
+          "comparable": 8,
+          "excluded": 0,
+          "passed": 6,
+          "pass_rate": 0.75,
+          "hidden_tests_passed": 7,
+          "scope_violations": 2,
+          "scope_violations_non_test": 1,
+          "invariant_violations": 0,
+          "infra_errors": 0,
+          "cost_total": 0.064,
+          "cost_per_success": 0.0107,
+          "wall_per_success_p50": 27.21,
+          "wall_p95": 58.26,
+          "tool_calls_mean": 11,
+          "injected_chars_mean": 0,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0
+        },
+        "V1": {
+          "runs": 8,
+          "comparable": 8,
+          "excluded": 0,
+          "passed": 5,
+          "pass_rate": 0.625,
+          "hidden_tests_passed": 8,
+          "scope_violations": 3,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 0,
+          "infra_errors": 0,
+          "cost_total": 0.0566,
+          "cost_per_success": 0.0113,
+          "wall_per_success_p50": 26.58,
+          "wall_p95": 47.31,
+          "tool_calls_mean": 9.5,
+          "injected_chars_mean": 1285.1,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0
+        },
+        "V2": {
+          "runs": 8,
+          "comparable": 8,
+          "excluded": 0,
+          "passed": 6,
+          "pass_rate": 0.75,
+          "hidden_tests_passed": 8,
+          "scope_violations": 2,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 0,
+          "infra_errors": 0,
+          "cost_total": 0.0566,
+          "cost_per_success": 0.0094,
+          "wall_per_success_p50": 22.22,
+          "wall_p95": 45.78,
+          "tool_calls_mean": 9.62,
+          "injected_chars_mean": 1602.1,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0
+        }
+      },
+      "by_split": {
+        "development": {
+          "OFF": {
+            "runs": 8,
+            "comparable": 8,
+            "excluded": 0,
+            "passed": 6,
+            "pass_rate": 0.75,
+            "hidden_tests_passed": 7,
+            "scope_violations": 2,
+            "scope_violations_non_test": 1,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.064,
+            "cost_per_success": 0.0107,
+            "wall_per_success_p50": 27.21,
+            "wall_p95": 58.26,
+            "tool_calls_mean": 11,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V1": {
+            "runs": 8,
+            "comparable": 8,
+            "excluded": 0,
+            "passed": 5,
+            "pass_rate": 0.625,
+            "hidden_tests_passed": 8,
+            "scope_violations": 3,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0566,
+            "cost_per_success": 0.0113,
+            "wall_per_success_p50": 26.58,
+            "wall_p95": 47.31,
+            "tool_calls_mean": 9.5,
+            "injected_chars_mean": 1285.1,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V2": {
+            "runs": 8,
+            "comparable": 8,
+            "excluded": 0,
+            "passed": 6,
+            "pass_rate": 0.75,
+            "hidden_tests_passed": 8,
+            "scope_violations": 2,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0566,
+            "cost_per_success": 0.0094,
+            "wall_per_success_p50": 22.22,
+            "wall_p95": 45.78,
+            "tool_calls_mean": 9.62,
+            "injected_chars_mean": 1602.1,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          }
+        }
+      },
+      "by_class": {
+        "ambiguous": {
+          "OFF": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 0,
+            "scope_violations": 1,
+            "scope_violations_non_test": 1,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0134,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 54.25,
+            "tool_calls_mean": 14,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V1": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0109,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 41.47,
+            "tool_calls_mean": 16,
+            "injected_chars_mean": 1565,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V2": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0101,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 35.14,
+            "tool_calls_mean": 12,
+            "injected_chars_mean": 3507,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          }
+        },
+        "debug": {
+          "OFF": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 3,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 3,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0265,
+            "cost_per_success": 0.0088,
+            "wall_per_success_p50": 33.29,
+            "wall_p95": 58.26,
+            "tool_calls_mean": 13.33,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V1": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 0.667,
+            "hidden_tests_passed": 3,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0221,
+            "cost_per_success": 0.0111,
+            "wall_per_success_p50": 25.52,
+            "wall_p95": 28.51,
+            "tool_calls_mean": 10,
+            "injected_chars_mean": 1285.7,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V2": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 3,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 3,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.022,
+            "cost_per_success": 0.0073,
+            "wall_per_success_p50": 22.9,
+            "wall_p95": 40.1,
+            "tool_calls_mean": 9.67,
+            "injected_chars_mean": 1529.7,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          }
+        },
+        "edit": {
+          "OFF": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 0.667,
+            "hidden_tests_passed": 3,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0221,
+            "cost_per_success": 0.011,
+            "wall_per_success_p50": 27.21,
+            "wall_p95": 51.68,
+            "tool_calls_mean": 10.33,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V1": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 0.667,
+            "hidden_tests_passed": 3,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0211,
+            "cost_per_success": 0.0106,
+            "wall_per_success_p50": 26.58,
+            "wall_p95": 47.31,
+            "tool_calls_mean": 9.33,
+            "injected_chars_mean": 939.7,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V2": {
+            "runs": 3,
+            "comparable": 3,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 0.667,
+            "hidden_tests_passed": 3,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0221,
+            "cost_per_success": 0.0111,
+            "wall_per_success_p50": 22.22,
+            "wall_p95": 45.78,
+            "tool_calls_mean": 11.33,
+            "injected_chars_mean": 846.7,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          }
+        },
+        "locate": {
+          "OFF": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0021,
+            "cost_per_success": 0.0021,
+            "wall_per_success_p50": 6.59,
+            "wall_p95": 6.59,
+            "tool_calls_mean": 3,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V1": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0024,
+            "cost_per_success": 0.0024,
+            "wall_per_success_p50": 6.58,
+            "wall_p95": 6.58,
+            "tool_calls_mean": 2,
+            "injected_chars_mean": 2040,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          },
+          "V2": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0025,
+            "cost_per_success": 0.0025,
+            "wall_per_success_p50": 5.66,
+            "wall_p95": 5.66,
+            "tool_calls_mean": 2,
+            "injected_chars_mean": 2181,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0
+          }
+        }
+      },
+      "paired_vs_OFF": {
+        "V1": {
+          "pairs": 8,
+          "d_pass_mean": -0.125,
+          "d_pass_ci95": [
+            -0.375,
+            0
+          ],
+          "d_cost_mean": -0.0009,
+          "d_cost_ci95": [
+            -0.0018219774999999995,
+            -0.0001802162499999995
+          ],
+          "conclusion": "inconclusivo"
+        },
+        "V2": {
+          "pairs": 8,
+          "d_pass_mean": 0,
+          "d_pass_ci95": [
+            0,
+            0
+          ],
+          "d_cost_mean": -0.0009,
+          "d_cost_ci95": [
+            -0.0021618149999999997,
+            0.00045509624999999986
+          ],
+          "conclusion": "inconclusivo"
+        }
+      }
+    }
+  },
+  "limits": [
+    "N pequeno é descritivo; sem significância não há ganho comprovado.",
+    "Execuções com evidence=simulated validam a infraestrutura, não o produto.",
+    "Retrieval offline não é resultado de desenvolvimento; ver seção offline separadamente.",
+    "Custo ausente (None) não é zero; cost_per_success só aparece quando todas as execuções comparáveis têm custo."
+  ]
+}

@@ -28,6 +28,7 @@ func ProfileBudget(name string) (int, bool) {
 type PackOptions struct {
 	Budget int           // tokens available to the context block
 	Seen   ctxbuild.Seen // evidence already delivered in this session; nil when none
+	Tuning *Tuning       // nil = DefaultTuning
 }
 
 // PackTrace explains the packing decision for `sidecar explain`.
@@ -80,7 +81,7 @@ func Pack(cands []Evidence, o PackOptions) ([]Evidence, map[string]string, PackT
 		rank[e.ID] = i
 		best = max(best, e.Confidence)
 	}
-	if len(open) == 0 || best < minBlockConfidence {
+	if len(open) == 0 || best < tuningOrDefault(o.Tuning).MinBlockConfidence {
 		pt.Abstained, pt.Reason = true, "no evidence reaches the block confidence gate"
 		for _, e := range open {
 			excluded[e.ID] = "block abstained: no item reaches the confidence gate"

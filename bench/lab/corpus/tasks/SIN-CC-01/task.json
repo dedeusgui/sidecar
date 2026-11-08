@@ -1,0 +1,59 @@
+{
+  "schema": "lab-task/1",
+  "id": "SIN-CC-01",
+  "split": "validation",
+  "class": "contract-change",
+  "repo": "sinatra",
+  "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+  "prompt": "Downloads com nome acentuado saem estragados no navegador: um arquivo chamado `relatório final.pdf` aparece com o nome quebrado. Quero que os helpers `attachment` e `send_file` também enviem o nome no formato RFC 5987, com o parâmetro `filename*=UTF-8''...` (bytes UTF-8 percent-encoded, espaço como %20), quando o nome não for só ASCII. Os cabeçalhos de nomes só ASCII precisam continuar exatamente como estão hoje, porque apps e clientes já dependem disso. Mantenha a API pública. Não acesse a rede. Ao terminar, resuma a mudança em poucas linhas.",
+  "setup": [
+    [
+      "bundle",
+      "_2.5.22_",
+      "install",
+      "--path",
+      "vendor/bundle"
+    ]
+  ],
+  "setup_timeout_s": 900,
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_attachment_test.rb": "zz_oracle_attachment_test.rb"
+    },
+    "command": [
+      "bundle",
+      "exec",
+      "ruby",
+      "-Ilib",
+      "test/zz_oracle_attachment_test.rb",
+      "-v"
+    ],
+    "require_output": [
+      "ZzSinatraAttachmentOracleTest#test_ascii_attachment_header_is_unchanged = [0-9.]+ s = [.FE]",
+      "[0-9]+ runs, [0-9]+ assertions"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/sinatra/base.rb",
+      "test/helpers_test.rb"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "pattern": "def attachment\\(filename = nil, disposition = :attachment\\)",
+        "why": "assinatura pública de attachment preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "pattern": "MULTIPART_FORM_DATA_REPLACEMENT_TABLE",
+        "why": "escape de aspas e quebras de linha no filename preservado"
+      }
+    ]
+  },
+  "notes": "Dev. Contrato a preservar: cabeçalho Content-Disposition de nomes só ASCII (inclui escape de aspas em lib/sinatra/base.rb, método attachment, ~linha 415; testes existentes em test/helpers_test.rb ~linhas 760-920). Lacuna real: não há filename* (RFC 5987) para nomes não ASCII; o nome sai como UTF-8 cru em filename=. Oráculo escrito do zero. Setup: bundler 4 removeu --path; usa-se bundle _2.5.22_."
+}

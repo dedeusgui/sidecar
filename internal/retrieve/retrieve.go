@@ -40,6 +40,8 @@ type Options struct {
 	// Seen reports evidence already delivered in this session; nil means none was.
 	Seen   ctxbuild.Seen
 	Ablate Ablation
+	// Tuning overrides the V2 ranking/abstention parameters for offline replay; nil means DefaultTuning.
+	Tuning *Tuning
 	// LSPTrusted and LSPServer are the opt-in language-server hooks. The lsp package imports
 	// retrieve, so the caller supplies them. Notes need SIDECAR_LSP=1 and LSPTrusted(Root); LSPServer
 	// returns the server name that can confirm rel, or "" for none.
@@ -151,6 +153,7 @@ type candidate struct {
 	altMatches    int
 	promptTerms   int
 	v2Own         bool
+	tun           *Tuning // nil = DefaultTuning; set from Options.Tuning for V2 candidates
 	rels          []string
 	neighbor      bool
 	seedCoverage  float64
@@ -254,7 +257,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 		scoreOwnText(c, concepts)
 		if v2 {
 			c.directMatches, c.altMatches = ownMatches(c.hit, terms, opts.Ablate.NoTranslation)
-			c.promptTerms, c.v2Own = len(uniqueStrings(terms)), true
+			c.promptTerms, c.v2Own, c.tun = len(uniqueStrings(terms)), true, opts.Tuning
 		}
 	}
 	res.Trace.Timings["exact"] = time.Since(t)
@@ -380,7 +383,7 @@ func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evid
 		}
 		return append(out, concerns...), nil, nil
 	}
-	selected, excluded, pt := Pack(append(pool, concerns...), PackOptions{Budget: budget, Seen: opts.Seen})
+	selected, excluded, pt := Pack(append(pool, concerns...), PackOptions{Budget: budget, Seen: opts.Seen, Tuning: opts.Tuning})
 	tr.Packing = &pt
 	return selected, excluded, nil
 }
@@ -1229,10 +1232,11 @@ func uniqueStrings(xs []string) []string {
 // dictionary can map a common word onto a common code word (horário to time, which matches
 // timeout). Confidence stays inside [0.3, 0.9]; only an exact identifier reaches 0.95.
 func ownTextConfidence(c *candidate) float64 {
-	support := float64(c.directMatches) + ownAltWeight*float64(c.altMatches)
-	denom := math.Min(float64(max(c.promptTerms, 1)), ownCoverCap)
+	t := tuningOrDefault(c.tun)
+	support := float64(c.directMatches) + t.OwnAltWeight*float64(c.altMatches)
+	denom := math.Min(float64(max(c.promptTerms, 1)), t.OwnCoverCap)
 	cover := math.Min(support/denom, 1)
-	return 0.3 + 0.6*cover
+	return t.OwnConfBase + t.OwnConfSpan*cover
 }
 
 // tokensOf estimates the metadata line that the brief renders for the item.

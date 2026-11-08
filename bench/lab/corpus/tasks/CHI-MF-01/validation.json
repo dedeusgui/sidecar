@@ -1,0 +1,79 @@
+{
+  "id": "CHI-MF-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/path_rewrite.go",
+        "ok": true,
+        "detail": "API pública de PathRewrite preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/strip.go",
+        "ok": true,
+        "detail": "API pública de RedirectSlashes preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/strip.go",
+        "ok": true,
+        "detail": "API pública de StripSlashes preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/strip.go",
+        "ok": true,
+        "detail": "normalização de barra invertida (anti open redirect) preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "path (0.00s)\n    --- FAIL: TestBenchmarkURLRewriteEscapedAndMounted/redirect_slashes_inside_a_route_is_relative_to_the_full_path (0.00s)\n    --- PASS: TestBenchmarkURLRewriteEscapedAndMounted/redirect_slashes_at_top_level_still_works (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.004s\nFAIL\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "middleware/path_rewrite.go",
+      "middleware/strip.go"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/path_rewrite.go",
+        "ok": true,
+        "detail": "API pública de PathRewrite preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/strip.go",
+        "ok": true,
+        "detail": "API pública de RedirectSlashes preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/strip.go",
+        "ok": true,
+        "detail": "API pública de StripSlashes preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/strip.go",
+        "ok": true,
+        "detail": "normalização de barra invertida (anti open redirect) preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163380.7980702,
+  "base_verdict": "fail"
+}

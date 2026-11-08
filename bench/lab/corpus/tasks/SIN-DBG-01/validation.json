@@ -1,0 +1,54 @@
+{
+  "id": "SIN-DBG-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "ok": true,
+        "detail": "assinatura pública de etag preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "ok": true,
+        "detail": "If-Match continua usando comparação forte (RFC 9110 13.1.1)"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ":21]:\nIf-None-Match usa comparação fraca: W/\"abc\" equivale a \"abc\".\nExpected: 304\n  Actual: 200\n\n  3) Failure:\nZzSinatraEtagWeakOracleTest#test_if_none_match_list_with_weak_member [test/zz_oracle_etag_weak_test.rb:36]:\nExpected: 304\n  Actual: 200\n\n7 runs, 9 assertions, 3 failures, 0 errors, 0 skips\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "lib/sinatra/base.rb"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "ok": true,
+        "detail": "assinatura pública de etag preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "ok": true,
+        "detail": "If-Match continua usando comparação forte (RFC 9110 13.1.1)"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163640.0800335,
+  "base_verdict": "fail"
+}

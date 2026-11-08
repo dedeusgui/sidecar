@@ -1,0 +1,55 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-VOI-01",
+  "split": "holdout",
+  "class": "voice",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "ó então, o compressor do chi tá usando gzip mesmo quando o cliente manda accept-encoding com gzip q zero, tipo gzip;q=0 né, aí tinha que ser recusado. e se vier gzip com q zero ponto cinco pode continuar usando gzip normal. não precisa mexer na api do Compressor pfv",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "middleware/zz_oracle_compress_q_test.go": "compress_q_oracle_test.go"
+    },
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./middleware",
+      "-run",
+      "^TestBenchmarkCompressQValueZero$"
+    ],
+    "require_output": [
+      "--- PASS: TestBenchmarkCompressQValueZero|--- FAIL: TestBenchmarkCompressQValueZero"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "middleware/compress.go",
+      "middleware/compress_test.go"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/compress.go",
+        "pattern": "func NewCompressor\\(level int, types \\.\\.\\.string\\) \\*Compressor",
+        "why": "construtor público NewCompressor preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/compress.go",
+        "pattern": "func \\(c \\*Compressor\\) SetEncoder\\(encoding string, fn EncoderFunc\\)",
+        "why": "SetEncoder preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/compress.go",
+        "pattern": "type EncoderFunc func\\(w io\\.Writer, level int\\) io\\.Writer",
+        "why": "tipo EncoderFunc preservado"
+      }
+    ]
+  },
+  "notes": "Holdout (voice). Origem: middleware/compress.go, matchAcceptEncoding usa strings.Contains e ignora parâmetros q; 'gzip;q=0' é tratado como aceito. Sonda local: Accept-Encoding 'gzip;q=0' -> Content-Encoding gzip. RFC 9110 §12.4.2: q=0 = não aceito. Transcrição de ditado simulada, em PT-BR coloquial."
+}

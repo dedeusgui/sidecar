@@ -1,0 +1,23 @@
+--- a/middleware/route_headers.go
++++ b/middleware/route_headers.go
+@@ -1,7 +1,9 @@
+ package middleware
+ 
+ import (
++	"maps"
+ 	"net/http"
++	"slices"
+ 	"strings"
+ )
+ 
+@@ -83,7 +85,9 @@
+ 		}
+ 
+ 		// find first matching header route, and continue
+-		for header, matchers := range hr {
++		// Visit headers in sorted order so the same request always selects the same route.
++		for _, header := range slices.Sorted(maps.Keys(hr)) {
++			matchers := hr[header]
+ 			headerValue := r.Header.Get(header)
+ 			if headerValue == "" {
+ 				continue

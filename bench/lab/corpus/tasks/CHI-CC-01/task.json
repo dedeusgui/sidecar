@@ -1,0 +1,67 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-CC-01",
+  "split": "validation",
+  "class": "contract-change",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "No middleware RouteHeaders do chi, quando a requisição tem dois headers que casam com rotas diferentes (por exemplo Origin e Host), a rota escolhida muda de uma requisição para outra, mesmo com os mesmos headers. Quero que a escolha seja sempre a mesma para a mesma requisição. Não quebre quem já usa o pacote: RouteHeaders, o tipo HeaderRouter e os métodos Route, RouteAny, RouteDefault e Handler continuam com a mesma assinatura e o mesmo comportamento para os casos com um único header.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "middleware/zz_oracle_route_headers_test.go": "route_headers_oracle_test.go"
+    },
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./middleware",
+      "-run",
+      "^TestBenchmarkRouteHeadersDeterministic$"
+    ],
+    "require_output": [
+      "--- PASS: TestBenchmarkRouteHeadersDeterministic|--- FAIL: TestBenchmarkRouteHeadersDeterministic"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "middleware/route_headers.go",
+      "middleware/route_headers_test.go"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "pattern": "type HeaderRouter map\\[string\\]\\[\\]HeaderRoute",
+        "why": "tipo público HeaderRouter preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "pattern": "func RouteHeaders\\(\\) HeaderRouter",
+        "why": "construtor público preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "pattern": "func \\(hr HeaderRouter\\) Route\\(header, match string, middlewareHandler func\\(next http\\.Handler\\) http\\.Handler\\) HeaderRouter",
+        "why": "assinatura de Route preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "pattern": "func \\(hr HeaderRouter\\) RouteDefault\\(handler func\\(next http\\.Handler\\) http\\.Handler\\) HeaderRouter",
+        "why": "assinatura de RouteDefault preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/route_headers.go",
+        "pattern": "func \\(hr HeaderRouter\\) Handler\\(next http\\.Handler\\) http\\.Handler",
+        "why": "assinatura de Handler preservada"
+      }
+    ]
+  },
+  "notes": "Validação. Origem: middleware/route_headers.go, HeaderRouter.Handler faz `for header, matchers := range hr` (ordem de iteração de map aleatória em Go). Sonda local: com Origin e Host ambos casando, 300 requisições idênticas escolheram origin 257 vezes e host 43 vezes. Contrato preservado: HeaderRouter continua sendo map[string][]HeaderRoute (público). A ordem escolhida pela solução é livre; o oráculo exige apenas determinismo e os casos de um header e default."
+}
