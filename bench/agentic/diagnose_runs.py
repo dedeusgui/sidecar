@@ -113,6 +113,13 @@ def run_explain(sidecar, clone, home, prompt):
     return json.loads(p.stdout)
 
 
+def prompt_literal_paths(clone, prompt):
+    """Arquivos do checkout que contêm o texto do prompt. Se houver algum, o caso negativo não é limpo:
+    a recuperação casa com o próprio texto da pergunta, e não com vocabulário genérico."""
+    p = subprocess.run(["git", "-C", clone, "grep", "-l", "-i", "-F", prompt], capture_output=True, text=True)
+    return [line for line in p.stdout.splitlines() if line]
+
+
 def attach_explain(items, rows, cases, sidecar, repo, commit):
     """Associa a cada execução com falha (e a cada negativo com contexto) o `explain --json` do caso,
     no checkout descartável do commit fixado e com índice próprio. Não afirma causalidade."""
@@ -127,10 +134,12 @@ def attach_explain(items, rows, cases, sidecar, repo, commit):
         subprocess.run([sidecar, "index", "--root", clone], env=dict(os.environ, SIDECAR_HOME=home, SIDECAR_ENGINE="v2"),
                        capture_output=True, check=True, timeout=600)
         for item, row in zip(items, rows):
-            if item["success"] is True and not (row.get("category") == "negative" and row.get("arm") == "ON"):
-                continue
             case = prompts.get(row.get("case"))
             if not case:
+                continue
+            if row.get("category") == "negative":
+                item["prompt_in_repo"] = prompt_literal_paths(clone, case["prompt"])
+            if item["success"] is True and not (row.get("category") == "negative" and row.get("arm") == "ON"):
                 continue
             doc = run_explain(sidecar, clone, home, case["prompt"])
             if doc is not None:
@@ -166,6 +175,13 @@ def render(items, source):
                 lines.append(f"  - não-gold entre os 5 primeiros: `{c['id']}` score {c['score']}, cobertura {c['coverage']}, "
                              f"exato {c['exact']}, razão: {c['reason']}")
             lines.append(f"- latência por fase (ms): {e['latency_ms']}")
+            lines.append("")
+        contaminated = [d for d in items if d.get("prompt_in_repo")]
+        if contaminated:
+            lines += ["## Casos negativos não limpos", "",
+                      "O texto do prompt aparece no checkout; nesses casos a recuperação pode casar com a própria pergunta:", ""]
+            for d in contaminated:
+                lines.append(f"- {d['run']}: {', '.join(d['prompt_in_repo'])}")
             lines.append("")
     return "\n".join(lines) + "\n"
 

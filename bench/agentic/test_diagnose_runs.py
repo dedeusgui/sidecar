@@ -74,5 +74,18 @@ class ExplainTests(unittest.TestCase):
         self.assertIsNone(s["gold_rank_in_candidates"])
 
 
+class ContaminationTests(unittest.TestCase):
+    def test_prompt_text_in_checkout_is_reported_for_negatives(self):
+        import subprocess, tempfile, os
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run(["git", "-C", tmp, "init", "-q"], check=True)
+            with open(os.path.join(tmp, "doc.md"), "w") as f:
+                f.write("a pergunta: como faço pão de fermentação natural em casa?\n")
+            subprocess.run(["git", "-C", tmp, "add", "-A"], check=True)
+            hits = d.prompt_literal_paths(tmp, "como faço pão de fermentação natural em casa?")
+            self.assertEqual(hits, ["doc.md"])
+            self.assertEqual(d.prompt_literal_paths(tmp, "uma pergunta que não está no repositório"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
