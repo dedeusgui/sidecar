@@ -181,6 +181,11 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 			rec["decision_error"] = err.Error() // fail open: the prompt keeps its code evidence
 		}
 		rec["decisions"] = n
+		if retrieve.FeatureEnabled("impact") {
+			if err := applyImpact(ctx, ix.Store(), root, &res, rec); err != nil {
+				rec["impact_error"] = err.Error() // fail open
+			}
+		}
 	}
 
 	t = time.Now()

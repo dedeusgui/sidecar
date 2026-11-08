@@ -16,7 +16,7 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 | R2 Adaptive Context Engine | V2 com abstenção parcial | política por intenção, E17, termos genéricos | gates R2 | 🟡 rodada 1: [eval-r2](eval-r2-2026-11-08.md) — política `adaptive` opt-in (sem perda offline, −6/−16% tokens); H1 inconclusiva (flag off); H2 rejeitada; E17 = lacuna de dicionário. Gate de sucesso agentic pendente |
 | R3 Task Evidence Brief | `ContractEvidence`, packer | brief rastreável | gate R3 | ⬜ |
 | R4 TaskUncertainty / grooming | — | detector, política, decisões, benchmark | gate R4 | ⬜ |
-| R5 Impact/Verification | `ContractEvidence` | blast radius, verificações | gate R5 | ⬜ |
+| R5 Impact/Verification | `ContractEvidence` | blast radius, verificações | gate R5 | 🟡 [change-impact](change-impact.md): `sidecar impact` + nota opt-in; histórico real: 46%/63%/49% (chi/click/express) com 3–6 arquivos sinalizados; gate agentic pendente |
 | R6 Session Intelligence | `SessionObserver` passivo | traces, estagnação | gate R6 | ⬜ |
 | R7 Studio/adapters/release | docs de integração | estático, matriz de suporte | gate R7 | ⬜ |
 
