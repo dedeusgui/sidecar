@@ -28,7 +28,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "64985\n  type: 'test'\n  ...\n# Subtest: H3 valor unico do X-Forwarded-Host continua igual\nok 7 - H3 valor unico do X-Forwarded-Host continua igual\n  ---\n  duration_ms: 1.381695\n  type: 'test'\n  ...\n1..7\n# tests 7\n# suites 0\n# pass 5\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 108.439749\n"
+    "detail": "59682\n  type: 'test'\n  ...\n# Subtest: H3 valor unico do X-Forwarded-Host continua igual\nok 7 - H3 valor unico do X-Forwarded-Host continua igual\n  ---\n  duration_ms: 1.580339\n  type: 'test'\n  ...\n1..7\n# tests 7\n# suites 0\n# pass 5\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 147.720935\n"
   },
   "reference": {
     "kind": "tests",
@@ -61,6 +61,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794175730.8772414,
+  "ts": 1794176024.8571503,
   "base_verdict": "fail"
 }

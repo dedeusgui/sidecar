@@ -28,7 +28,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "dRejections (node:internal/process/task_queues:103:5)\n    async Test.run (node:internal/test_runner/test:1054:7)\n    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)\n  ...\n1..7\n# tests 7\n# suites 0\n# pass 3\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 205.566597\n"
+    "detail": "dRejections (node:internal/process/task_queues:103:5)\n    async Test.run (node:internal/test_runner/test:1054:7)\n    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)\n  ...\n1..7\n# tests 7\n# suites 0\n# pass 3\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 106.390782\n"
   },
   "reference": {
     "kind": "tests",
@@ -61,6 +61,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794175673.420973,
+  "ts": 1794175998.5196788,
   "base_verdict": "fail"
 }
