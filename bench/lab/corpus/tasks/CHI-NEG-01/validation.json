@@ -1,0 +1,24 @@
+{
+  "id": "CHI-NEG-01",
+  "ok": true,
+  "base": {
+    "kind": "no_change",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "file_unchanged",
+        "path": "go.mod",
+        "ok": true,
+        "detail": "módulo não deve ser alterado em conversa"
+      }
+    ],
+    "isolation": null,
+    "detail": ""
+  },
+  "reference": null,
+  "ts": 1794162677.3354914,
+  "base_verdict": "pass"
+}

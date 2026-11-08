@@ -1,0 +1,66 @@
+{
+  "id": "CHI-VOI-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/compress.go",
+        "ok": true,
+        "detail": "construtor público NewCompressor preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/compress.go",
+        "ok": true,
+        "detail": "SetEncoder preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/compress.go",
+        "ok": true,
+        "detail": "tipo EncoderFunc preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "_test.go:34: Accept-Encoding \"gzip;q=0\": Content-Encoding = \"gzip\", want \"\"\n    zz_oracle_compress_q_test.go:34: Accept-Encoding \"gzip;q=0, deflate\": Content-Encoding = \"gzip\", want \"deflate\"\n--- FAIL: TestBenchmarkCompressQValueZero (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.003s\nFAIL\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "middleware/compress.go"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/compress.go",
+        "ok": true,
+        "detail": "construtor público NewCompressor preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/compress.go",
+        "ok": true,
+        "detail": "SetEncoder preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/compress.go",
+        "ok": true,
+        "detail": "tipo EncoderFunc preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794162677.4193463,
+  "base_verdict": "fail"
+}

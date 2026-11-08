@@ -1,0 +1,54 @@
+{
+  "id": "CLK-EDIT-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "ok": true,
+        "detail": "classe Choice preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "ok": true,
+        "detail": "método shell_complete preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "a'] == ['Apple', 'banana']\n  \n  At index 0 diff: 'apple' != 'Apple'\n  \n  Full diff: (-: missing in left side, +: extra in left side)\n    [\n  -     'Apple',\n  ?      ^\n  +     'apple',\n  ?      ^\n        'banana',\n    ]\n========================= 3 failed, 2 passed in 0.04s ==========================\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "src/click/types.py"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "ok": true,
+        "detail": "classe Choice preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "ok": true,
+        "detail": "método shell_complete preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794162564.599046,
+  "base_verdict": "fail"
+}

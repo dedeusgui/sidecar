@@ -1,0 +1,37 @@
+diff --git a/src/click/_compat.py b/src/click/_compat.py
+index 8507a50..ab3bed1 100644
+--- a/src/click/_compat.py
++++ b/src/click/_compat.py
+@@ -16,7 +16,7 @@ WIN = sys.platform.startswith("win")
+ # intermediate bytes (0x20-0x2F), then a final byte (0x40-0x7E). Broader than the
+ # SGR codes Click emits, so foreign sequences (colon-delimited true-color, mouse
+ # reporting) are stripped too.
+-_ansi_re = re.compile(r"\033\[[0-?]*[ -/]*[@-~]")
++_ansi_re = re.compile(r"\033\[[0-?]*[ -/]*[@-~]|\033\]8;[^;\007\033]*;[^\007\033]*(?:\007|\033\\)")
+ 
+ 
+ def _make_text_stream(
+diff --git a/src/click/termui.py b/src/click/termui.py
+index 8fe0085..9937d90 100644
+--- a/src/click/termui.py
++++ b/src/click/termui.py
+@@ -651,6 +651,7 @@ def style(
+     reverse: bool | None = None,
+     strikethrough: bool | None = None,
+     reset: bool = True,
++    link: str | None = None,
+ ) -> str:
+     """Styles a text with ANSI styles and returns the new string.  By
+     default the styling is self contained which means that at the end
+@@ -762,7 +763,10 @@ def style(
+     bits.append(text)
+     if reset:
+         bits.append(_ansi_reset_all)
+-    return "".join(bits)
++    rv = "".join(bits)
++    if link is not None:
++        rv = f"\033]8;;{link}\033\\" + rv + "\033]8;;\033\\"
++    return rv
+ 
+ 
+ def unstyle(text: str) -> str:

@@ -1,0 +1,25 @@
+diff --git a/src/click/formatting.py b/src/click/formatting.py
+index c4aa2de..9836a1d 100644
+--- a/src/click/formatting.py
++++ b/src/click/formatting.py
+@@ -33,7 +33,8 @@ def wrap_text(
+     width: int = 78,
+     initial_indent: str = "",
+     subsequent_indent: str = "",
+-    preserve_paragraphs: bool = False,
++    keep_paragraphs: bool = False,
++    preserve_paragraphs: bool | None = None,
+ ) -> str:
+     """A helper function that intelligently wraps text.  By default, it
+     assumes that it operates on a single paragraph of text but if the
+@@ -68,7 +69,9 @@ def wrap_text(
+         subsequent_indent=subsequent_indent,
+         replace_whitespace=False,
+     )
+-    if not preserve_paragraphs:
++    if preserve_paragraphs is not None:
++        keep_paragraphs = preserve_paragraphs
++    if not keep_paragraphs:
+         return wrapper.fill(text)
+ 
+     p: list[tuple[int, bool, str]] = []

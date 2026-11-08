@@ -1,0 +1,55 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-DBG-01",
+  "split": "development",
+  "class": "debug",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "Estou usando o RequestLogger do chi com um LogFormatter próprio e algumas linhas saem com status 0 (aparece como 000). O cliente recebe 200 nesses casos, então o status registrado está errado. Dá pra reproduzir com um handler que retorna sem escrever nada. Corrige sem mudar a interface LogFormatter nem a assinatura do RequestLogger.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "middleware/zz_oracle_logger_status_test.go": "logger_status_oracle_test.go"
+    },
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./middleware",
+      "-run",
+      "^TestBenchmarkLoggerRecordsClientStatus$"
+    ],
+    "require_output": [
+      "--- PASS: TestBenchmarkLoggerRecordsClientStatus|--- FAIL: TestBenchmarkLoggerRecordsClientStatus"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "middleware/logger.go",
+      "middleware/logger_test.go"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/logger.go",
+        "pattern": "func RequestLogger\\(f LogFormatter\\) func\\(next http\\.Handler\\) http\\.Handler",
+        "why": "assinatura pública de RequestLogger preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/logger.go",
+        "pattern": "NewLogEntry\\(r \\*http\\.Request\\) LogEntry",
+        "why": "interface LogFormatter preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/logger.go",
+        "pattern": "Write\\(status, bytes int, header http\\.Header, elapsed time\\.Duration, extra any\\)",
+        "why": "interface LogEntry preservada"
+      }
+    ]
+  },
+  "notes": "Dev. Origem: middleware/logger.go, RequestLogger (defer que chama entry.Write(ww.Status(), ...)). Status() de WrapResponseWriter retorna 0 quando nada foi escrito (documentado em wrap_writer.go), mas net/http responde 200. Defeito verificado com sonda local: handler vazio -> cliente 200, status logado 0. Não alterar wrap_writer.go: Status() é contrato documentado."
+}

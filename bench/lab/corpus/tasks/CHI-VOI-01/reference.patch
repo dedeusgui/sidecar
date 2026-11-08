@@ -1,0 +1,42 @@
+--- a/middleware/compress.go
++++ b/middleware/compress.go
+@@ -9,6 +9,7 @@
+ 	"io"
+ 	"net"
+ 	"net/http"
++	"strconv"
+ 	"strings"
+ 	"sync"
+ )
+@@ -259,12 +260,30 @@
+ 
+ func matchAcceptEncoding(accepted []string, encoding string) bool {
+ 	for _, v := range accepted {
+-		if strings.Contains(v, encoding) {
++		if strings.Contains(v, encoding) && !isRefusedEncoding(v) {
+ 			return true
+ 		}
+ 	}
+ 	return false
+ }
++
++// isRefusedEncoding reports whether an Accept-Encoding entry has a q-value of 0,
++// which means the client does not accept that coding.
++func isRefusedEncoding(entry string) bool {
++	_, params, found := strings.Cut(entry, ";")
++	if !found {
++		return false
++	}
++	for _, param := range strings.Split(params, ";") {
++		key, value, ok := strings.Cut(strings.TrimSpace(param), "=")
++		if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
++			continue
++		}
++		q, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
++		return err == nil && q == 0
++	}
++	return false
++}
+ 
+ // An EncoderFunc is a function that wraps the provided io.Writer with a
+ // streaming compression algorithm and returns it.

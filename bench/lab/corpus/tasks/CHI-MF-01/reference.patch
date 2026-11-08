@@ -1,0 +1,46 @@
+--- a/middleware/path_rewrite.go
++++ b/middleware/path_rewrite.go
+@@ -9,7 +9,12 @@
+ func PathRewrite(old, new string) func(http.Handler) http.Handler {
+ 	return func(next http.Handler) http.Handler {
+ 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+-			r.URL.Path = strings.Replace(r.URL.Path, old, new, 1)
++			rewritten := strings.Replace(r.URL.Path, old, new, 1)
++			if rewritten != r.URL.Path {
++				// The router matches RawPath when it is set, so drop the stale encoded form.
++				r.URL.RawPath = ""
++			}
++			r.URL.Path = rewritten
+ 			next.ServeHTTP(w, r)
+ 		})
+ 	}
+--- a/middleware/strip.go
++++ b/middleware/strip.go
+@@ -49,17 +49,23 @@
+ 		}
+ 
+ 		if len(path) > 1 && path[len(path)-1] == '/' {
++			// Inside a subrouter RoutePath is relative to the mount point, so redirect
++			// to the full request path instead.
++			full := r.URL.RawPath
++			if full == "" {
++				full = r.URL.Path
++			}
+ 			// Normalize backslashes to forward slashes to prevent "/\evil.com" style redirects
+ 			// that some clients may interpret as protocol-relative.
+-			path = strings.ReplaceAll(path, `\`, `/`)
++			full = strings.ReplaceAll(full, `\`, `/`)
+ 
+ 			// Collapse leading/trailing slashes and force a single leading slash.
+-			path := "/" + strings.Trim(path, "/")
++			target := "/" + strings.Trim(full, "/")
+ 
+ 			if r.URL.RawQuery != "" {
+-				path = fmt.Sprintf("%s?%s", path, r.URL.RawQuery)
++				target = fmt.Sprintf("%s?%s", target, r.URL.RawQuery)
+ 			}
+-			http.Redirect(w, r, path, 301)
++			http.Redirect(w, r, target, 301)
+ 			return
+ 		}
+ 

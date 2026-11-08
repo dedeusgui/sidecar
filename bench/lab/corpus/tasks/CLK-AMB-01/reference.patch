@@ -1,0 +1,17 @@
+diff --git a/src/click/types.py b/src/click/types.py
+index b6e98a9..cc75751 100644
+--- a/src/click/types.py
++++ b/src/click/types.py
+@@ -482,7 +482,11 @@ class Choice(ParamType[_ValueT_co], t.Generic[_ValueT_co]):
+ 
+         .. versionadded:: 8.2
+         """
+-        choices_str = ", ".join(map(repr, self._normalized_mapping(ctx=ctx).values()))
++        shown = [
++            choice if isinstance(choice, str) and not self.case_sensitive else normalized
++            for choice, normalized in self._normalized_mapping(ctx=ctx).items()
++        ]
++        choices_str = ", ".join(map(repr, shown))
+         return ngettext(
+             "{value!r} is not {choice}.",
+             "{value!r} is not one of {choices}.",

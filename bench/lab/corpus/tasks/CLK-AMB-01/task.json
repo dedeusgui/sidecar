@@ -1,0 +1,64 @@
+{
+  "schema": "lab-task/1",
+  "id": "CLK-AMB-01",
+  "split": "development",
+  "class": "ambiguous",
+  "repo": "click",
+  "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+  "prompt": "Quando alguém digita um valor errado numa opção click.Choice que não diferencia maiúsculas de minúsculas, a mensagem de erro mostra as opções de um jeito que confunde quem usa o CLI. Dá um jeito nisso, por favor. Não mexa em como os valores são aceitos.",
+  "underspec": {
+    "decision": "Como listar as opções na mensagem de erro de um Choice sem diferenciar maiúsculas",
+    "options": [
+      "como foram declaradas (ex.: 'Apple', 'banana')",
+      "normalizadas em minúsculas (ex.: 'apple', 'banana')"
+    ],
+    "canned_answer": "Listar as opções exatamente como foram declaradas no Choice (ex.: 'Apple', 'banana')."
+  },
+  "setup": [
+    ["python3", "-m", "venv", ".venv"],
+    ["./.venv/bin/pip", "install", "-q", "-e", ".", "pytest"]
+  ],
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "tests/test_zz_clk_amb_oracle.py": "choice_error_oracle_test.py"
+    },
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "-v",
+      "tests/test_zz_clk_amb_oracle.py"
+    ],
+    "require_output": [
+      "test_ci_invalid_message_lists_declared_spellings\\s+(PASSED|FAILED)",
+      "test_ci_invalid_message_via_get_invalid_choice_message\\s+(PASSED|FAILED)",
+      "test_ci_valid_value_still_converts_to_declared_choice\\s+(PASSED|FAILED)",
+      "test_case_sensitive_invalid_message_is_unchanged\\s+(PASSED|FAILED)"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/click/types.py",
+      "tests/test_types/test_Choice.py"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "pattern": "def get_invalid_choice_message\\(",
+        "why": "método público get_invalid_choice_message preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "pattern": "def normalize_choice\\(",
+        "why": "hook normalize_choice preservado"
+      }
+    ]
+  },
+  "notes": "Origem: src/click/types.py, Choice.get_invalid_choice_message (commit fixado): usa _normalized_mapping, então com case_sensitive=False lista 'apple' em vez de 'Apple'. Tarefa ambígua: a decisão (declarada vs normalizada) está em underspec.canned_answer. Testes escritos do zero."
+}

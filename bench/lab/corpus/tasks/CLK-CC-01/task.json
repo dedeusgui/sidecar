@@ -1,0 +1,58 @@
+{
+  "schema": "lab-task/1",
+  "id": "CLK-CC-01",
+  "split": "validation",
+  "class": "contract-change",
+  "repo": "click",
+  "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+  "prompt": "Na função wrap_text do click, o parâmetro preserve_paragraphs ficou com um nome que não diz bem o que faz. Renomeie para keep_paragraphs, com o mesmo significado e o mesmo default (False). Mas quem já chama wrap_text(..., preserve_paragraphs=True) em código próprio precisa continuar funcionando, sem nenhum aviso e com o mesmo resultado. Ajuste o que for necessário. Não altere a API pública além disso. Ao terminar, descreva brevemente o que fez.",
+  "setup": [
+    ["python3", "-m", "venv", ".venv"],
+    ["./.venv/bin/pip", "install", "-q", "-e", ".", "pytest"]
+  ],
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "tests/test_zz_clk_cc_oracle.py": "wrap_keyword_oracle_test.py"
+    },
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "-v",
+      "tests/test_zz_clk_cc_oracle.py"
+    ],
+    "require_output": [
+      "test_keep_paragraphs_keyword_is_accepted\\s+(PASSED|FAILED)",
+      "test_keep_paragraphs_matches_preserve_paragraphs_result\\s+(PASSED|FAILED)",
+      "test_preserve_paragraphs_still_works_without_warning\\s+(PASSED|FAILED)",
+      "test_default_still_does_not_keep_paragraphs\\s+(PASSED|FAILED)",
+      "test_keep_paragraphs_parameter_default_is_false\\s+(PASSED|FAILED)",
+      "test_help_paragraphs_render_as_before\\s+(PASSED|FAILED)"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/click/formatting.py",
+      "tests/test_formatting.py"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "pattern": "def wrap_text\\(",
+        "why": "função wrap_text continua existindo"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "pattern": "preserve_paragraphs",
+        "why": "nome antigo continua aceito para quem já chama"
+      }
+    ]
+  },
+  "notes": "Contrato: wrap_text(text, width, initial_indent, subsequent_indent, preserve_paragraphs=False) é chamado por HelpFormatter (src/click/formatting.py, write_text e write_dl) com preserve_paragraphs=True. A renomeação precisa manter o nome antigo funcionando sem warning (pytest roda com filterwarnings=error). Testes escritos do zero."
+}

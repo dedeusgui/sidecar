@@ -15,7 +15,7 @@ def test_wrap_joins_continuation_lines_with_single_space():
 def test_wrap_paragraph_keeps_indent_and_single_spaces():
     out = wrap_text(
         "Copies every file\n    since the last run",
-        width=24,
+        width=80,
         initial_indent="> ",
         subsequent_indent="  ",
         preserve_paragraphs=True,

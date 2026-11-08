@@ -1,0 +1,54 @@
+{
+  "id": "CLK-AMB-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "ok": true,
+        "detail": "método público get_invalid_choice_message preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "ok": true,
+        "detail": "hook normalize_choice preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "'cherry' is ...e', 'banana'.\" == \"'cherry' is ...e', 'banana'.\"\n  \n  - 'cherry' is not one of 'Apple', 'banana'.\n  ?                         ^\n  + 'cherry' is not one of 'apple', 'banana'.\n  ?                         ^\n========================= 2 failed, 2 passed in 0.03s ==========================\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "src/click/types.py"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "ok": true,
+        "detail": "método público get_invalid_choice_message preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "ok": true,
+        "detail": "hook normalize_choice preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794162679.9419234,
+  "base_verdict": "fail"
+}

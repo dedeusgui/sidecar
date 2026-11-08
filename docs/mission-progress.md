@@ -38,6 +38,7 @@ US$ 0,00 nesta missão até aqui (teto de US$ 10 não consumido).
 ## Bloqueios e riscos conhecidos
 
 - ⛔ Sem `bwrap` no ambiente cloud: oráculo isolado de rede por `unshare -rn`; agente `claude` sem sandbox de SO.
+- ⛔ monolog (MON-*): `composer install` falha — o proxy da sessão devolve 403 para api.github.com/codeload.github.com, então PHPUnit não instala; 3 tarefas pendentes (corpus alvo cai de 24 para 21). Sem contorno por outro host.
 - Corpus escrito por subagentes + mesmo time do produto: viés de autoria registrado.
 
 ## Próxima ação concreta

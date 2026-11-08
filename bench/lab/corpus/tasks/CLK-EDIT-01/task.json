@@ -1,0 +1,57 @@
+{
+  "schema": "lab-task/1",
+  "id": "CLK-EDIT-01",
+  "split": "development",
+  "class": "edit",
+  "repo": "click",
+  "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+  "prompt": "No click, uma opção com click.Choice(['Apple', 'banana'], case_sensitive=False) ao ser completada no shell hoje sugere 'apple' em minúsculas, mas eu declarei 'Apple'. Quero que a autocompletação, nesse caso de não diferenciar maiúsculas, sugira as opções exatamente como foram declaradas. Os valores aceitos na linha de comando não devem mudar, e a autocompletação de Choice que diferencia maiúsculas continua igual. Não altere a API pública. Ao terminar, descreva brevemente o que fez.",
+  "setup": [
+    ["python3", "-m", "venv", ".venv"],
+    ["./.venv/bin/pip", "install", "-q", "-e", ".", "pytest"]
+  ],
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "tests/test_zz_clk_edit_oracle.py": "choice_completion_oracle_test.py"
+    },
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "-v",
+      "tests/test_zz_clk_edit_oracle.py"
+    ],
+    "require_output": [
+      "test_ci_completion_offers_declared_spelling\\s+(PASSED|FAILED)",
+      "test_ci_completion_matches_any_case_and_keeps_declared_order\\s+(PASSED|FAILED)",
+      "test_ci_completion_empty_lists_all_declared_spellings\\s+(PASSED|FAILED)",
+      "test_ci_convert_still_accepts_any_case\\s+(PASSED|FAILED)",
+      "test_case_sensitive_completion_is_unchanged\\s+(PASSED|FAILED)"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/click/types.py",
+      "tests/test_types/test_Choice.py"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "pattern": "class Choice\\(ParamType",
+        "why": "classe Choice preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/types.py",
+        "pattern": "def shell_complete\\(",
+        "why": "método shell_complete preservado"
+      }
+    ]
+  },
+  "notes": "Origem: src/click/types.py, Choice.shell_complete (commit fixado). Para case_sensitive=False, o método devolve normed_value (casefold) em vez da opção declarada em str. Decisão de produto explícita no prompt. Testes escritos do zero."
+}

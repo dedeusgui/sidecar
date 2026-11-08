@@ -1,0 +1,15 @@
+diff --git a/lib/sinatra/base.rb b/lib/sinatra/base.rb
+index 7b26dd4..1829852 100644
+--- a/lib/sinatra/base.rb
++++ b/lib/sinatra/base.rb
+@@ -416,7 +416,9 @@ module Sinatra
+       response['Content-Disposition'] = disposition.to_s.dup
+       return unless filename
+ 
+-      params = format('; filename="%s"', File.basename(filename).gsub(/["\r\n]/, MULTIPART_FORM_DATA_REPLACEMENT_TABLE))
++      basename = File.basename(filename)
++      params = format('; filename="%s"', basename.gsub(/["\r\n]/, MULTIPART_FORM_DATA_REPLACEMENT_TABLE))
++      params << format("; filename*=UTF-8''%s", URI.encode_www_form_component(basename).gsub('+', '%20')) unless basename.ascii_only?
+       response['Content-Disposition'] << params
+       ext = File.extname(filename)
+       content_type(ext) unless response['content-type'] || ext.empty?

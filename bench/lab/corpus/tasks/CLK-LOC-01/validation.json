@@ -1,0 +1,17 @@
+{
+  "id": "CLK-LOC-01",
+  "ok": true,
+  "base": {
+    "kind": "answer",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [],
+    "isolation": null,
+    "detail": "faltando: formatting.py, write_usage"
+  },
+  "reference": null,
+  "ts": 1794162665.2993486,
+  "base_verdict": "fail"
+}
