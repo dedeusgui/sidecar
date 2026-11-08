@@ -408,12 +408,25 @@ def paired_runs(rows):
     return pairs, len(groups) - len(pairs)
 
 
+TRANSPORT_TEXT = {
+    "real_hook": "hook real do cliente (UserPromptSubmit registrado por `--settings`; entrega conferida no stream)",
+    "prompt_prefix": "prefixo de prompt (o runner chama `sidecar hook` e prefixa o contexto ao prompt; não é o hook do cliente)",
+    "none": "sem contexto (braço OFF)",
+}
+
+
 def report(path, md):
-    rows = [json.loads(l) for l in pathlib.Path(path).read_text().splitlines() if l.strip()]
+    all_rows = [json.loads(l) for l in pathlib.Path(path).read_text().splitlines() if l.strip()]
+    # Execuções com contaminação ou modelo servido diferente do solicitado ficam no arquivo bruto, mas não nas médias.
+    rows = [r for r in all_rows if r.get("comparable", True) is not False]
+    incomparable = len(all_rows) - len(rows)
+    transports = sorted({r.get("transport", "?") for r in all_rows})
+    described = "; ".join(f"{t}: {TRANSPORT_TEXT.get(t, 'desconhecido')}" for t in transports)
     lines = ["# Benchmark de agentes reais: Sidecar ON × OFF", "",
-             f"Fonte: `{path}` · execuções: {len(rows)}. O oráculo é o gold de arquivo do manifesto (o agente não o vê). "
-             "Tokens, custo e chamadas vêm do próprio cliente e podem faltar (`n/d`). ON injeta o contexto do binário "
-             "`sidecar hook` por prefixo de prompt quando há contexto; não usa o hook instalado do cliente.", ""]
+             f"Fonte: `{path}` · execuções: {len(all_rows)} · comparáveis: {len(rows)} · "
+             f"não comparáveis (fora das médias): {incomparable}. O oráculo é o gold de arquivo do manifesto (o agente não o vê). "
+             "Tokens, custo e chamadas vêm do próprio cliente e podem faltar (`n/d`). "
+             f"Transporte do braço ON neste arquivo — {described}.", ""]
     keys = sorted({(r["agent"], r["model"]) for r in rows})
     lines += ["## Resumo por agente", "",
               "| Agente / modelo | Braço | N | Sucesso | Hit@1 | Tempo médio (s) | Tokens in | Tokens out | Custo médio (US$) | Tool calls | Resposta malformada | Editou arquivo |",
@@ -487,7 +500,7 @@ def report(path, md):
               "- Tarefa de localização somente leitura; não mede edição de código nem testes.",
               "- Poucos casos por categoria e repetições: sem amostra adequada não há conclusão.",
               "- Os prompts de voz do manifesto compartilham um molde de preenchimento; não são transcrições independentes.",
-              "- Tempo de parede inclui a latência do modelo e variação de rede; ON inclui o tempo do `sidecar hook` (campo `sidecar_ms`).",
+              "- Tempo de parede inclui a latência do modelo e variação de rede. No prefixo, o tempo do hook entra no tempo de parede (`sidecar_ms`). No hook real o hook roda dentro do cliente e não é separável; `hook_probe_ms` é a mediana do mesmo payload medida fora do agente.",
               "- Preços e versões dos clientes mudam; registre-os junto do relatório."]
     pathlib.Path(md).write_text("\n".join(lines) + "\n")
     print(f"wrote {md}")

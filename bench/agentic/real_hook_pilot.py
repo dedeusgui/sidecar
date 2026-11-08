@@ -55,11 +55,16 @@ def build_claude_cmd(model, prompt, max_budget, settings=None):
     return cmd
 
 
+BUILTIN_PLUGINS = {"cc-plugin-agents-md", "cc-plugin-telemetry", "cc-plugin-privacy", "cc-plugin-plugin-authoring"}
+
+
 def parse_stream(text):
-    """Lê o stream-json: contexto entregue pelo hook, respostas, ferramentas, custo e modelo servido."""
-    out = {"hook_started": False, "hook_delivered": False, "hook_context": "", "result": None,
-           "is_error": None, "subtype": None, "cost_usd": None, "tokens_in": None, "tokens_out": None,
-           "tool_calls": 0, "turns": None, "served_models": None}
+    """Lê o stream-json: contexto entregue pelo hook, respostas, ferramentas, custo, modelo servido e o
+    que foi carregado no processo (init), para detectar contaminação de configurações globais."""
+    out = {"hook_started": False, "hook_delivered": False, "hook_context": "", "hook_names": [],
+           "result": None, "is_error": None, "subtype": None, "cost_usd": None, "tokens_in": None,
+           "tokens_out": None, "tool_calls": 0, "turns": None, "served_models": None, "init": None,
+           "saw_result": False}
     texts = []
     for line in text.splitlines():
         line = line.strip()
@@ -70,6 +75,18 @@ def parse_stream(text):
         except ValueError:
             continue
         t, st = d.get("type"), d.get("subtype")
+        if t == "system" and st == "init" and out["init"] is None:  # the stream has one init, at the start
+            out["init"] = {
+                "plugins": sorted({p.get("name", "?") for p in (d.get("plugins") or []) if isinstance(p, dict)
+                                   and p.get("source", "").split("@")[-1] != "builtin"}),
+                "plugin_names": sorted({p.get("name", "?") for p in (d.get("plugins") or []) if isinstance(p, dict)}),
+                "mcp_servers": d.get("mcp_servers") or [],
+                "skills": len(d.get("skills") or []),
+            }
+        if t == "system" and st in ("hook_started", "hook_response"):
+            name = d.get("hook_name") or d.get("hook_event")
+            if name and name not in out["hook_names"]:
+                out["hook_names"].append(name)
         if t == "system" and st == "hook_started" and d.get("hook_event") == "UserPromptSubmit":
             out["hook_started"] = True
         if t == "system" and st == "hook_response" and d.get("hook_event") == "UserPromptSubmit":
@@ -87,6 +104,7 @@ def parse_stream(text):
                 if isinstance(block, dict) and block.get("type") == "text":
                     texts.append(block.get("text", ""))
         if t == "result":
+            out["saw_result"] = True
             out["result"] = d.get("result") if isinstance(d.get("result"), str) else None
             out["is_error"] = d.get("is_error")
             out["subtype"] = st or d.get("subtype")
@@ -104,24 +122,66 @@ def parse_stream(text):
     return out
 
 
+def contamination(parsed, canary_fired, requested_model):
+    """Motivos pelos quais a execução não é comparável. Lista vazia = comparável."""
+    reasons = []
+    init = parsed.get("init")
+    if init is None:
+        reasons.append("stream sem evento init: não é possível verificar o que foi carregado")
+    else:
+        if init["plugins"]:
+            reasons.append("plugins não embutidos carregados: " + ", ".join(init["plugins"]))
+        if init["mcp_servers"]:
+            reasons.append("servidores MCP carregados")
+    if canary_fired:
+        reasons.append("canário de configuração global disparou")
+    served = parsed.get("served_models")
+    if not parsed.get("saw_result"):
+        reasons.append("stream incompleto: sem evento result")
+    elif not served:
+        reasons.append("modelo servido ausente em modelUsage")
+    elif served != [requested_model]:
+        reasons.append(f"modelo servido {served} difere do solicitado {requested_model}")
+    return reasons
+
+
 def clean(path):
     p = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "--untracked-files=all"],
                        capture_output=True, text=True, check=True)
     return p.stdout.strip() == ""
 
 
-def run_one(args, case, arm, rep, repo_path, commit, model):
+def make_config_dir(credentials, root):
+    """Diretório de configuração isolado: só as credenciais e um canário que dispara se for lido."""
+    cfg = tempfile.mkdtemp(prefix="hookpilot-cfg-", dir=root)
+    if credentials:
+        shutil.copy(credentials, os.path.join(cfg, ".credentials.json"))
+        os.chmod(os.path.join(cfg, ".credentials.json"), 0o600)
+    marker = os.path.join(cfg, "canary-fired.txt")
+    canary = {"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command":
+        f"sh -c 'echo fired >> {marker}'"}]}]}}
+    with open(os.path.join(cfg, "settings.json"), "w") as f:
+        json.dump(canary, f)
+    return cfg, marker
+
+
+def run_one(args, case, arm, rep, repo_path, commit, model, cfg_root):
     work = tempfile.mkdtemp(prefix="hookpilot-")
     home = tempfile.mkdtemp(prefix="hookpilot-home-")
+    cfg = None
     try:
         dest = os.path.join(work, "checkout")
         ra.checkout({"path": repo_path, "commit": commit}, dest)
         if not clean(dest):
             raise RuntimeError("checkout descartável não está limpo")
-        env = dict(os.environ, SIDECAR_HOME=home, SIDECAR_ENGINE=args.engine)
+        if os.path.exists(os.path.join(dest, ".claude")):
+            raise RuntimeError("o checkout contém .claude/: configuração de projeto não controlada")
+        cfg, marker = make_config_dir(args.credentials, cfg_root)  # uma configuração nova por execução
+        env = dict(os.environ, SIDECAR_HOME=home, SIDECAR_ENGINE=args.engine, CLAUDE_CONFIG_DIR=cfg)
         for key in ("ORCA_AGENT_HOOK_PORT", "ORCA_AGENT_HOOK_TOKEN", "ORCA_PANE_KEY"):
             env.pop(key, None)
         settings = None
+        hook_probe_ms = None
         if arm == "ON":
             subprocess.run([args.sidecar, "index", "--root", dest], env=env, capture_output=True, check=True, timeout=300)
             settings = hook_settings_json(args.sidecar)
@@ -138,18 +198,26 @@ def run_one(args, case, arm, rep, repo_path, commit, model):
             code, timed_out = -1, True
         wall = time.perf_counter() - t0
         parsed = parse_stream(out)
+        if arm == "ON":
+            hook_probe_ms = probe_hook_ms(args.sidecar, home, dest, case["prompt"])
         files = ra.answer_files(parsed["result"] or "")
         edited = not clean(dest)
+        canary_fired = os.path.exists(marker)
+        reasons = contamination(parsed, canary_fired, model)
         ctx = parsed["hook_context"]
         rec = {
             "agent": "claude", "model": model, "arm": arm, "rep": rep, "case": case["id"],
             "category": case["category"], "repo": case.get("repo", "sidecar"), "engine": args.engine,
-            "transport": "real_hook" if arm == "ON" else "none", "hook_fired": parsed["hook_started"] if arm == "ON" else None,
+            "transport": "real_hook" if arm == "ON" else "none",
+            "hook_fired": parsed["hook_started"] if arm == "ON" else None,
             "hook_delivered": parsed["hook_delivered"] if arm == "ON" else None,
+            "hook_names": parsed["hook_names"], "hook_probe_ms": hook_probe_ms,
             "wall_s": round(wall, 2), "sidecar_ms": None, "injected_chars": len(ctx),
             "exit": code, "timed_out": timed_out, "files": files, "edited_files": edited,
             "tokens_in": parsed["tokens_in"], "tokens_out": parsed["tokens_out"], "cost_usd": parsed["cost_usd"],
             "tool_calls": parsed["tool_calls"], "turns": parsed["turns"], "served_models": parsed["served_models"],
+            "init": parsed["init"], "canary_fired": canary_fired,
+            "comparable": not reasons, "incomparable_reasons": reasons,
             "stream_error": parsed["is_error"] is True or parsed["subtype"] not in (None, "success"),
             **ra.judge(case, files), **ra.attention(case, files, ctx, dest),
         }
@@ -169,6 +237,23 @@ def run_one(args, case, arm, rep, repo_path, commit, model):
     finally:
         shutil.rmtree(work, ignore_errors=True)
         shutil.rmtree(home, ignore_errors=True)
+        if cfg:
+            shutil.rmtree(cfg, ignore_errors=True)
+
+
+def probe_hook_ms(sidecar, home, workdir, prompt, repeats=3):
+    """Tempo do binário do hook sobre o mesmo payload, medido FORA do loop do agente (mediana)."""
+    payload = json.dumps({"hook_event_name": "UserPromptSubmit", "prompt": prompt, "cwd": workdir,
+                          "session_id": uuid.uuid4().hex})
+    times = []
+    for _ in range(repeats):
+        t0 = time.perf_counter()
+        p = subprocess.run([sidecar, "hook", "--agent", "claude"], input=payload, capture_output=True, text=True,
+                           env=dict(os.environ, SIDECAR_HOME=home), timeout=60)
+        if p.returncode != 0:
+            return None
+        times.append((time.perf_counter() - t0) * 1000)
+    return round(sorted(times)[len(times) // 2], 1)
 
 
 def sha256(path):
@@ -193,6 +278,8 @@ def main():
     ap.add_argument("--total-budget", type=float, default=1.0, help="teto total reservado (US$)")
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--yes-spend", action="store_true")
+    ap.add_argument("--credentials", default=os.path.expanduser("~/.claude/.credentials.json"),
+                    help="credenciais copiadas para a configuração isolada de cada execução")
     args = ap.parse_args()
     try:
         ra.validate_model("claude", args.model)
@@ -238,18 +325,22 @@ def main():
     with (out / "run-metadata.json").open("x") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
     spent = 0.0
+    cfg_root = tempfile.mkdtemp(prefix="hookpilot-cfgroot-")
     for i, (case, arm, rep) in enumerate(jobs, 1):
         print(f"[{i}/{len(jobs)}] {arm} {case['id']} rep{rep}", flush=True)
-        rec = run_one(args, case, arm, rep, args.repo, commit, args.model)
+        rec = run_one(args, case, arm, rep, args.repo, commit, args.model, cfg_root)
         spent += rec["cost_usd"] or 0.0
         with runs.open("a") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        if not rec["comparable"]:
+            print("execução não comparável (registrada, fora das médias): " + "; ".join(rec["incomparable_reasons"]), file=sys.stderr)
         if rec["exit"] != 0 or rec["timed_out"] or rec["edited_files"]:
             print("rodada interrompida: falha, timeout ou checkout alterado", file=sys.stderr)
             break
         if spent > args.total_budget:
             print(f"interrompido: custo medido US$ {spent:.4f} excede o teto", file=sys.stderr)
             break
+    shutil.rmtree(cfg_root, ignore_errors=True)
     print(f"custo medido: US$ {spent:.4f}")
     ra.report(str(runs), str(out / "agent-benchmark.md"))
 

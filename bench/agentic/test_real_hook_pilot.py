@@ -76,5 +76,52 @@ class CommandTests(unittest.TestCase):
             run_agents.validate_model("claude", "haiku")
 
 
+def init_event(plugins=(), mcp=()):
+    return json.dumps({"type": "system", "subtype": "init", "plugins": [
+        {"name": n, "source": f"{n}@synced" if n not in pilot.BUILTIN_PLUGINS else f"{n}@builtin"} for n in
+        list(plugins) + sorted(pilot.BUILTIN_PLUGINS)], "mcp_servers": list(mcp), "skills": []})
+
+
+class ComparabilityTests(unittest.TestCase):
+    def comparable_stream(self, served=("claude-haiku-5-5",), extra_init=()):
+        base = stream(None).splitlines()
+        return "\n".join([init_event(extra_init)] + base).replace(
+            '"claude-haiku-5-5"', json.dumps(list(served)[0]) if served else "null")
+
+    def test_builtin_only_init_with_requested_model_is_comparable(self):
+        p = pilot.parse_stream(self.comparable_stream())
+        self.assertEqual(pilot.contamination(p, False, "claude-haiku-5-5"), [])
+
+    def test_synced_global_plugin_makes_run_incomparable(self):
+        p = pilot.parse_stream(self.comparable_stream(extra_init=["superpowers"]))
+        reasons = pilot.contamination(p, False, "claude-haiku-5-5")
+        self.assertTrue(any("superpowers" in r for r in reasons), reasons)
+
+    def test_mcp_server_makes_run_incomparable(self):
+        p = pilot.parse_stream(init_event(mcp=["x"]) + "\n" + stream(None))
+        self.assertIn("servidores MCP carregados", pilot.contamination(p, False, "claude-haiku-5-5"))
+
+    def test_firing_canary_makes_run_incomparable(self):
+        p = pilot.parse_stream(self.comparable_stream())
+        self.assertTrue(any("canário" in r for r in pilot.contamination(p, True, "claude-haiku-5-5")))
+
+    def test_unexpected_served_model_is_recorded_and_incomparable(self):
+        p = pilot.parse_stream(self.comparable_stream(served=("claude-sonnet-5-5",)))
+        reasons = pilot.contamination(p, False, "claude-haiku-5-5")
+        self.assertTrue(any("difere do solicitado" in r for r in reasons), reasons)
+
+    def test_stream_without_result_or_init_is_incomparable(self):
+        p = pilot.parse_stream(stream(None).split("\n", 1)[1])  # drop the first event entirely
+        reasons = pilot.contamination(p, False, "claude-haiku-5-5")
+        self.assertTrue(any("sem evento init" in r for r in reasons))
+        truncated = pilot.parse_stream('{"type": "system", "subtype": "init", "plugins": [], "mcp_servers": []}')
+        self.assertTrue(any("incompleto" in r for r in pilot.contamination(truncated, False, "claude-haiku-5-5")))
+
+    def test_missing_cost_is_not_zero(self):
+        raw = stream(None).replace('"total_cost_usd": 0.0083', '"x": 1')
+        p = pilot.parse_stream(raw)
+        self.assertIsNone(p["cost_usd"])
+
+
 if __name__ == "__main__":
     unittest.main()
