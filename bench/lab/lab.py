@@ -502,6 +502,9 @@ class ClaudeAgent:
 
 # --------------------------------------------------------------------------- runner
 
+KNOWN_FEATURES = {"adaptive", "brief"}  # nomes aceitos em SIDECAR_FEATURES; crescem com R4-R6
+
+
 def parse_arms(spec):
     """OFF | V1 | V2 | NAME=engine[,ENV=val...]; engine None = sem hook (OFF)."""
     arms = []
@@ -510,8 +513,13 @@ def parse_arms(spec):
             arms.append({"name": "OFF", "engine": None, "env": {}})
         elif item in ("V1", "V2"):
             arms.append({"name": item, "engine": item.lower(), "env": {}})
+        elif item.startswith("V2+"):
+            feats = item[3:].split("+")
+            if not feats or any(f not in KNOWN_FEATURES for f in feats):
+                raise LabError(f"feature desconhecida em {item}: use {sorted(KNOWN_FEATURES)}")
+            arms.append({"name": item, "engine": "v2", "env": {"SIDECAR_FEATURES": ",".join(feats)}})
         else:
-            raise LabError(f"braço desconhecido: {item} (use OFF, V1, V2)")
+            raise LabError(f"braço desconhecido: {item} (use OFF, V1, V2, V2+<feature>[+<feature>])")
     return arms
 
 

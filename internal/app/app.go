@@ -184,7 +184,15 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	}
 
 	t = time.Now()
-	block, used := brief.RenderSession(res, statePath)
+	var block string
+	var used []string
+	if ropts.EngineVersion == "v2" && retrieve.FeatureEnabled("brief") {
+		var briefed bool
+		block, used, briefed = brief.RenderTaskSession(res, statePath)
+		rec["task_brief"] = briefed
+	} else {
+		block, used = brief.RenderSession(res, statePath)
+	}
 	if in.SessionID != "" {
 		recordEvidence(root, opts.Agent, in.SessionID, used)
 	}
