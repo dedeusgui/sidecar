@@ -1,0 +1,689 @@
+{
+  "runs": 225,
+  "arms": [
+    "OFF",
+    "V1",
+    "V2",
+    "V2+adaptive",
+    "V2+brief"
+  ],
+  "tasks": 15,
+  "reps": 3,
+  "failure_taxonomy": {
+    "OFF": {
+      "ok": 35,
+      "escopo_so_testes_extras": 8,
+      "invariante_quebrado": 1,
+      "escopo_fora_do_codigo_permitido": 1
+    },
+    "V1": {
+      "ok": 33,
+      "escopo_so_testes_extras": 8,
+      "escopo_fora_do_codigo_permitido": 2,
+      "invariante_quebrado": 2
+    },
+    "V2": {
+      "ok": 36,
+      "escopo_so_testes_extras": 6,
+      "escopo_fora_do_codigo_permitido": 2,
+      "invariante_quebrado": 1
+    },
+    "V2+adaptive": {
+      "ok": 35,
+      "escopo_so_testes_extras": 5,
+      "invariante_quebrado": 3,
+      "escopo_fora_do_codigo_permitido": 2
+    },
+    "V2+brief": {
+      "ok": 38,
+      "escopo_so_testes_extras": 6,
+      "invariante_quebrado": 1
+    }
+  },
+  "unsolved_by_all": [],
+  "solved_by_all": [
+    "CHI-EDIT-01",
+    "CHI-LOC-01",
+    "CLK-DBG-01",
+    "CLK-LOC-01",
+    "EXP-DBG-01",
+    "EXP-EDIT-01",
+    "EXP-NEG-01",
+    "SIN-CC-01"
+  ],
+  "split_arms": [
+    {
+      "task": "CHI-CC-01",
+      "class": "contract-change",
+      "rates": {
+        "OFF": 0.33,
+        "V1": 1.0,
+        "V2": 1.0,
+        "V2+adaptive": 1.0,
+        "V2+brief": 1.0
+      }
+    },
+    {
+      "task": "CHI-DBG-01",
+      "class": "debug",
+      "rates": {
+        "OFF": 1.0,
+        "V1": 0.0,
+        "V2": 0.33,
+        "V2+adaptive": 0.67,
+        "V2+brief": 0.67
+      }
+    },
+    {
+      "task": "CHI-MF-01",
+      "class": "multi-file",
+      "rates": {
+        "OFF": 0.33,
+        "V1": 0.0,
+        "V2": 0.67,
+        "V2+adaptive": 0.33,
+        "V2+brief": 0.67
+      }
+    },
+    {
+      "task": "CLK-AMB-01",
+      "class": "ambiguous",
+      "rates": {
+        "OFF": 0.0,
+        "V1": 0.0,
+        "V2": 0.67,
+        "V2+adaptive": 0.33,
+        "V2+brief": 0.0
+      }
+    },
+    {
+      "task": "CLK-CC-01",
+      "class": "contract-change",
+      "rates": {
+        "OFF": 1.0,
+        "V1": 1.0,
+        "V2": 0.33,
+        "V2+adaptive": 0.33,
+        "V2+brief": 1.0
+      }
+    },
+    {
+      "task": "CLK-EDIT-01",
+      "class": "edit",
+      "rates": {
+        "OFF": 0.0,
+        "V1": 0.0,
+        "V2": 0.0,
+        "V2+adaptive": 0.33,
+        "V2+brief": 0.33
+      }
+    },
+    {
+      "task": "SIN-DBG-01",
+      "class": "debug",
+      "rates": {
+        "OFF": 1.0,
+        "V1": 1.0,
+        "V2": 1.0,
+        "V2+adaptive": 0.67,
+        "V2+brief": 1.0
+      }
+    }
+  ],
+  "by_class": {
+    "ambiguous": {
+      "OFF": {
+        "n": 3,
+        "pass_rate": 0.0,
+        "tool_calls": 14,
+        "cost_usd": 0.011,
+        "tokens": 404622.667
+      },
+      "V1": {
+        "n": 3,
+        "pass_rate": 0.0,
+        "tool_calls": 12.333,
+        "cost_usd": 0.009,
+        "tokens": 360787.333
+      },
+      "V2": {
+        "n": 3,
+        "pass_rate": 0.67,
+        "tool_calls": 15.667,
+        "cost_usd": 0.011,
+        "tokens": 397935
+      },
+      "V2+adaptive": {
+        "n": 3,
+        "pass_rate": 0.33,
+        "tool_calls": 16.333,
+        "cost_usd": 0.011,
+        "tokens": 429082.667
+      },
+      "V2+brief": {
+        "n": 3,
+        "pass_rate": 0.0,
+        "tool_calls": 14.667,
+        "cost_usd": 0.01,
+        "tokens": 399485.333
+      }
+    },
+    "contract-change": {
+      "OFF": {
+        "n": 9,
+        "pass_rate": 0.78,
+        "tool_calls": 12.333,
+        "cost_usd": 0.008,
+        "tokens": 294361.667
+      },
+      "V1": {
+        "n": 9,
+        "pass_rate": 1.0,
+        "tool_calls": 14.889,
+        "cost_usd": 0.009,
+        "tokens": 324187.222
+      },
+      "V2": {
+        "n": 9,
+        "pass_rate": 0.78,
+        "tool_calls": 13.556,
+        "cost_usd": 0.009,
+        "tokens": 313893.333
+      },
+      "V2+adaptive": {
+        "n": 9,
+        "pass_rate": 0.78,
+        "tool_calls": 16.444,
+        "cost_usd": 0.01,
+        "tokens": 370147.222
+      },
+      "V2+brief": {
+        "n": 9,
+        "pass_rate": 1.0,
+        "tool_calls": 13.333,
+        "cost_usd": 0.009,
+        "tokens": 305779.222
+      }
+    },
+    "debug": {
+      "OFF": {
+        "n": 12,
+        "pass_rate": 1.0,
+        "tool_calls": 13.667,
+        "cost_usd": 0.009,
+        "tokens": 359058.333
+      },
+      "V1": {
+        "n": 12,
+        "pass_rate": 0.75,
+        "tool_calls": 12.667,
+        "cost_usd": 0.008,
+        "tokens": 305830.333
+      },
+      "V2": {
+        "n": 12,
+        "pass_rate": 0.83,
+        "tool_calls": 11.333,
+        "cost_usd": 0.008,
+        "tokens": 310491.333
+      },
+      "V2+adaptive": {
+        "n": 12,
+        "pass_rate": 0.83,
+        "tool_calls": 11,
+        "cost_usd": 0.008,
+        "tokens": 295266.667
+      },
+      "V2+brief": {
+        "n": 12,
+        "pass_rate": 0.92,
+        "tool_calls": 10.667,
+        "cost_usd": 0.007,
+        "tokens": 258651.25
+      }
+    },
+    "edit": {
+      "OFF": {
+        "n": 9,
+        "pass_rate": 0.67,
+        "tool_calls": 10.333,
+        "cost_usd": 0.006,
+        "tokens": 247029.889
+      },
+      "V1": {
+        "n": 9,
+        "pass_rate": 0.67,
+        "tool_calls": 10.222,
+        "cost_usd": 0.007,
+        "tokens": 261252.889
+      },
+      "V2": {
+        "n": 9,
+        "pass_rate": 0.67,
+        "tool_calls": 11,
+        "cost_usd": 0.007,
+        "tokens": 274548.111
+      },
+      "V2+adaptive": {
+        "n": 9,
+        "pass_rate": 0.78,
+        "tool_calls": 10.333,
+        "cost_usd": 0.007,
+        "tokens": 282268.222
+      },
+      "V2+brief": {
+        "n": 9,
+        "pass_rate": 0.78,
+        "tool_calls": 10.222,
+        "cost_usd": 0.007,
+        "tokens": 234387.889
+      }
+    },
+    "locate": {
+      "OFF": {
+        "n": 6,
+        "pass_rate": 1.0,
+        "tool_calls": 3.167,
+        "cost_usd": 0.003,
+        "tokens": 88742.167
+      },
+      "V1": {
+        "n": 6,
+        "pass_rate": 1.0,
+        "tool_calls": 1.667,
+        "cost_usd": 0.002,
+        "tokens": 61599.333
+      },
+      "V2": {
+        "n": 6,
+        "pass_rate": 1.0,
+        "tool_calls": 2.5,
+        "cost_usd": 0.003,
+        "tokens": 79666
+      },
+      "V2+adaptive": {
+        "n": 6,
+        "pass_rate": 1.0,
+        "tool_calls": 1.667,
+        "cost_usd": 0.002,
+        "tokens": 66566
+      },
+      "V2+brief": {
+        "n": 6,
+        "pass_rate": 1.0,
+        "tool_calls": 2.333,
+        "cost_usd": 0.002,
+        "tokens": 70184.333
+      }
+    },
+    "multi-file": {
+      "OFF": {
+        "n": 3,
+        "pass_rate": 0.33,
+        "tool_calls": 23,
+        "cost_usd": 0.019,
+        "tokens": 605409.667
+      },
+      "V1": {
+        "n": 3,
+        "pass_rate": 0.0,
+        "tool_calls": 22.667,
+        "cost_usd": 0.02,
+        "tokens": 730254.333
+      },
+      "V2": {
+        "n": 3,
+        "pass_rate": 0.67,
+        "tool_calls": 22.333,
+        "cost_usd": 0.017,
+        "tokens": 569113.333
+      },
+      "V2+adaptive": {
+        "n": 3,
+        "pass_rate": 0.33,
+        "tool_calls": 19.333,
+        "cost_usd": 0.02,
+        "tokens": 627005.667
+      },
+      "V2+brief": {
+        "n": 3,
+        "pass_rate": 0.67,
+        "tool_calls": 25.333,
+        "cost_usd": 0.02,
+        "tokens": 675776.333
+      }
+    },
+    "negative": {
+      "OFF": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 0,
+        "cost_usd": 0.001,
+        "tokens": 22795.333
+      },
+      "V1": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 0,
+        "cost_usd": 0.001,
+        "tokens": 23381.333
+      },
+      "V2": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 0,
+        "cost_usd": 0.001,
+        "tokens": 23558.667
+      },
+      "V2+adaptive": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 0,
+        "cost_usd": 0.001,
+        "tokens": 23392.333
+      },
+      "V2+brief": {
+        "n": 3,
+        "pass_rate": 1.0,
+        "tool_calls": 0,
+        "cost_usd": 0.001,
+        "tokens": 23458.333
+      }
+    }
+  },
+  "hot_spots": {
+    "tarefas_mais_caras": [
+      [
+        "CHI-MF-01",
+        0.019
+      ],
+      [
+        "CLK-AMB-01",
+        0.011
+      ],
+      [
+        "CHI-CC-01",
+        0.011
+      ],
+      [
+        "CHI-DBG-01",
+        0.011
+      ],
+      [
+        "SIN-DBG-01",
+        0.009
+      ]
+    ],
+    "redundantes_por_braco": {
+      "OFF": 0.786,
+      "V1": 0.381,
+      "V2": 0.643,
+      "V2+adaptive": 0.405,
+      "V2+brief": 0.405
+    },
+    "execucoes_com_estagnacao": {
+      "OFF": 0,
+      "V1": 0,
+      "V2": 0,
+      "V2+adaptive": 0,
+      "V2+brief": 0
+    },
+    "contexto_injetado_medio_chars": {
+      "OFF": 0,
+      "V1": 1268.022,
+      "V2": 1541.422,
+      "V2+adaptive": 1526.956,
+      "V2+brief": 1368.933
+    },
+    "contexto_entregue_pct": {
+      "V1": 100.0,
+      "V2": 100.0,
+      "V2+adaptive": 100.0,
+      "V2+brief": 100.0
+    }
+  },
+  "per_task": {
+    "CHI-CC-01": {
+      "class": "contract-change",
+      "split": "validation",
+      "repo": "chi",
+      "pass": {
+        "OFF": "1/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "3/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {
+        "escopo_so_testes_extras": 2
+      },
+      "tokens_mean": 399793.867,
+      "tool_calls_mean": 15.8
+    },
+    "CHI-DBG-01": {
+      "class": "debug",
+      "split": "development",
+      "repo": "chi",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "0/3",
+        "V2": "1/3",
+        "V2+adaptive": "2/3",
+        "V2+brief": "2/3"
+      },
+      "failure_kinds": {
+        "escopo_so_testes_extras": 6,
+        "escopo_fora_do_codigo_permitido": 1
+      },
+      "tokens_mean": 426403.267,
+      "tool_calls_mean": 16.2
+    },
+    "CHI-EDIT-01": {
+      "class": "edit",
+      "split": "development",
+      "repo": "chi",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "3/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 176312.6,
+      "tool_calls_mean": 8.8
+    },
+    "CHI-LOC-01": {
+      "class": "locate",
+      "split": "development",
+      "repo": "chi",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "3/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 84197.2,
+      "tool_calls_mean": 2.667
+    },
+    "CHI-MF-01": {
+      "class": "multi-file",
+      "split": "validation",
+      "repo": "chi",
+      "pass": {
+        "OFF": "1/3",
+        "V1": "0/3",
+        "V2": "2/3",
+        "V2+adaptive": "1/3",
+        "V2+brief": "2/3"
+      },
+      "failure_kinds": {
+        "invariante_quebrado": 7,
+        "escopo_so_testes_extras": 2
+      },
+      "tokens_mean": 641511.867,
+      "tool_calls_mean": 22.533
+    },
+    "CLK-AMB-01": {
+      "class": "ambiguous",
+      "split": "development",
+      "repo": "click",
+      "pass": {
+        "OFF": "0/3",
+        "V1": "0/3",
+        "V2": "2/3",
+        "V2+adaptive": "1/3",
+        "V2+brief": "0/3"
+      },
+      "failure_kinds": {
+        "escopo_so_testes_extras": 10,
+        "escopo_fora_do_codigo_permitido": 2
+      },
+      "tokens_mean": 398382.6,
+      "tool_calls_mean": 14.6
+    },
+    "CLK-CC-01": {
+      "class": "contract-change",
+      "split": "validation",
+      "repo": "click",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "1/3",
+        "V2+adaptive": "1/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {
+        "escopo_fora_do_codigo_permitido": 4
+      },
+      "tokens_mean": 262856.867,
+      "tool_calls_mean": 14.2
+    },
+    "CLK-DBG-01": {
+      "class": "debug",
+      "split": "development",
+      "repo": "click",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "3/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 239807.333,
+      "tool_calls_mean": 10
+    },
+    "CLK-EDIT-01": {
+      "class": "edit",
+      "split": "development",
+      "repo": "click",
+      "pass": {
+        "OFF": "0/3",
+        "V1": "0/3",
+        "V2": "0/3",
+        "V2+adaptive": "1/3",
+        "V2+brief": "1/3"
+      },
+      "failure_kinds": {
+        "escopo_so_testes_extras": 13
+      },
+      "tokens_mean": 276731.133,
+      "tool_calls_mean": 10
+    },
+    "CLK-LOC-01": {
+      "class": "locate",
+      "split": "validation",
+      "repo": "click",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "3/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 62505.933,
+      "tool_calls_mean": 1.867
+    },
+    "EXP-DBG-01": {
+      "class": "debug",
+      "split": "validation",
+      "repo": "express",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "3/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 242705.733,
+      "tool_calls_mean": 9.667
+    },
+    "EXP-EDIT-01": {
+      "class": "edit",
+      "split": "development",
+      "repo": "express",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "3/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 326648.467,
+      "tool_calls_mean": 12.467
+    },
+    "EXP-NEG-01": {
+      "class": "negative",
+      "split": "validation",
+      "repo": "express",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "3/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 23317.2,
+      "tool_calls_mean": 0
+    },
+    "SIN-CC-01": {
+      "class": "contract-change",
+      "split": "validation",
+      "repo": "sinatra",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "3/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {},
+      "tokens_mean": 302370.467,
+      "tool_calls_mean": 12.333
+    },
+    "SIN-DBG-01": {
+      "class": "debug",
+      "split": "development",
+      "repo": "sinatra",
+      "pass": {
+        "OFF": "3/3",
+        "V1": "3/3",
+        "V2": "3/3",
+        "V2+adaptive": "2/3",
+        "V2+brief": "3/3"
+      },
+      "failure_kinds": {
+        "invariante_quebrado": 1
+      },
+      "tokens_mean": 314522,
+      "tool_calls_mean": 11.6
+    }
+  }
+}

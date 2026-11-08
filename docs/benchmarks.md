@@ -23,7 +23,7 @@ Gerado de `bench/registry.json` (2026-11-08) por `python3 bench/consolidate.py`.
 | B09-impact-history | offline | A análise de impacto nomeia o arquivo que o mantenedor editou junto? | estrutural+co-mudança 46% (chi), 63% (click), 49% (express) com 3–6 arquivos; baseline mesmo diretório 71%/96%/42% com 17/15/5 | referência | sem IC; 3 primeiros arquivos por commit; express estrutural 0% |
 | B10-lab-pilot-dev1 | agentic | OFF/V1/V2 em tarefas de edição reais (piloto de desenvolvimento) | inconclusivo; V1/V2 vs OFF ≈ −12% tool calls/tokens/custo, IC cruza zero | SUPERADO por B12; rodou antes da correção de isolamento | possivelmente contaminado (agente podia ler o gabarito); sem traces |
 | B11-lab-pilot-r3 | agentic | V2, V2+adaptive, V2+brief em 15 tarefas | inconclusivo; único IC fora de zero é tempo do brief vs V2 (−26%), não confiável (CPU compartilhada) | SUPERADO por B12; rodou antes da correção de isolamento | possivelmente contaminado; excluiu tarefas de localização e negativas |
-| B12-lab-bench-clean | agentic | Qual o efeito de V1, V2 e dos componentes (adaptive, brief) em aprovação, tool calls, tokens, custo e tempo? | ver docs/benchmarks-2026-11-08.md (gerado ao fim da execução) | em execução | um modelo; tempo de parede com CPU compartilhada entre 3 processos; sem sandbox de SO |
+| B12-lab-bench-clean | agentic | Qual o efeito de V1, V2 e dos componentes (adaptive, brief) em aprovação, tool calls, tokens, custo e tempo? | sem melhora comprovada: V2+brief vs OFF aprovação +8,6%, tool calls −4,8%, tokens −8,8%, custo −4,0% (todos IC95 cruzam zero); testes ocultos 225/225 em todos os braços (teto); 5 de 63 comparações "significativas" ≈ acaso | referência (agentic) para eficiência; não mede capacidade | um modelo, 15 tarefas, 3 reps; teto de capacidade; tempo de parede contaminado por CPU; R4/R5/R6 não exercidos |
 | B13-install-e2e | infra | Instalar, disparar hooks reais e desinstalar preserva a configuração do usuário? | hooks e statusLine de terceiros preservados; UserPromptSubmit/PreToolUse/PostToolUse disparam; settings idêntico após uninstall | referência | PreCompact, Codex, Antigravity, upgrade e Windows/macOS não verificados |
 | B14-studio-browser | infra | O Studio renderiza dados reais sem erro e sem executar conteúdo hostil? | 0 erros de console, 0 requisições de rede, sem rolagem horizontal; payload hostil exibido como texto | referência | sem linha do tempo por sessão |
 
@@ -73,9 +73,9 @@ artefatos: `bench/results/lab-dev1-2026-11-08`
 comando: `python3 bench/lab/lab.py run --arms OFF,V2,V2+adaptive,V2+brief`  
 artefatos: —
 
-**B12-lab-bench-clean** — dados: 15 tarefas (dev+validation) × 5 braços × 3 repetições (225 execuções); isolamento corrigido; holdout intocado  
+**B12-lab-bench-clean** — dados: 15 tarefas (dev+validation) × 5 braços × 3 repetições = 225 execuções, todas comparáveis; claude-haiku-5-5; US$ 1,75; isolamento corrigido; holdout intocado  
 comando: `python3 bench/lab/lab.py run --arms OFF,V1,V2,V2+adaptive,V2+brief --rep-offset N`  
-artefatos: —
+artefatos: `docs/benchmarks-2026-11-08.md`, `bench/results/lab-bench-clean-2026-11-08`
 
 **B13-install-e2e** — dados: Claude Code 2.1.319 real, config isolada  
 comando: `ver bench/results/r7-install-e2e-2026-11-08.md`  
@@ -100,3 +100,6 @@ Cada pista aponta o benchmark que a sustenta e o que mediria a confirmação. S�
 | L07 | B12 | Tokens do agente são dominados por leitura de cache/arquivos (centenas de milhares), enquanto o contexto injetado tem ~1,5 mil caracteres | Atacar o custo onde ele está: reduzir releituras e resultados de ferramenta, não só melhorar o contexto inicial | B12: correlação entre tokens e chamadas por classe de tarefa; análise de hot spots | a decidir com os dados finais |
 | L08 | B10, B11 | Execuções que voltam em ~1 s sem modelo servido (causa desconhecida) removem tarefas inteiras da comparação | Registrar stderr e o evento de resultado do cliente em toda execução para diagnosticar; repetir automaticamente execuções sem resposta | B12 não deve ter exclusões; se tiver, investigar | média |
 | L09 | B12 | Isolamento do agente sem sandbox de SO: código que o agente roda lê o gabarito | Executar braços em contêiner ou usuário separado | teste de sonda que tente ler o oráculo via código executado | alta para o holdout final |
+| L10 | B12, B03 | No prompt negativo de express, V1/V2 injetaram contexto em 12/12 execuções (886–1103 chars) mesmo sendo conversa sem relação | Portão de abstenção por tipo de pedido (conversacional/sem alvo no repositório) antes de qualquer injeção | B03/B04 e um braço negativo em B12 com mais tarefas negativas | alta |
+| L11 | B12 | Testes ocultos passaram em 225/225 execuções: o corpus não discrimina capacidade (8 de 15 tarefas resolvidas por todos) | Corpus v2 com tarefas mais difíceis e mais por classe; reservar o holdout para ele | B12 repetido com o corpus v2: algum braço deve falhar teste oculto | alta (infra de medição) |
+| L12 | B12 | Efeito do contexto é heterogêneo por tarefa nos dois sentidos (ajuda CHI-CC-01, prejudica CHI-DBG-01 e CLK-CC-01) | Política seletiva por classe de tarefa e especificidade, medida por tarefa com repetições suficientes | B12 com ≥ 5 repetições nas tarefas que dividem os braços | alta |
