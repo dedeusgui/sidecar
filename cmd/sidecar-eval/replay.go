@@ -172,7 +172,22 @@ func gitHead() string {
 
 // runReplay replays the frozen cases over every variant. Nothing calls a model or the network, so a
 // hypothesis costs one pipeline pass. The active variant is run twice to prove the replay is deterministic.
-func runReplay(path string, cf casesFile, indexes map[string]*index.Index, outPath string) error {
+func runReplay(path string, cf casesFile, indexes map[string]*index.Index, outPath string, includeHoldout bool) error {
+	// The holdout is never used to choose among variants: replay is a tuning tool. --include-holdout exists for a
+	// final, single report and must be asked for.
+	var kept []caseSpec
+	skipped := 0
+	for _, c := range cf.Cases {
+		if c.Split == "holdout" && !includeHoldout {
+			skipped++
+			continue
+		}
+		kept = append(kept, c)
+	}
+	cf.Cases = kept
+	if skipped > 0 {
+		fmt.Fprintf(os.Stderr, "replay: %d holdout cases excluded (use --include-holdout for a final report)\n", skipped)
+	}
 	cfg, raw, err := loadReplayConfig(path)
 	if err != nil {
 		return err

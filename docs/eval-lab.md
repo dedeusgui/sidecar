@@ -53,6 +53,16 @@ Mede o pipeline em processo (V1 e V2) por estágio de `Trace.Timings` (`analyze`
 
 Seções **separadas** por nível de evidência (`agentic`, `simulated`, `offline_retrieval`), por braço, split e classe: taxa de aprovação, violações de escopo/invariantes, erros de infra, custo e tempo por tarefa correta (só quando todo custo comparável é conhecido), chamadas, caracteres injetados, modelos servidos e comparação pareada com OFF com IC bootstrap só com ≥ 5 pares (`inconclusivo` abaixo de 20). Retrieval offline nunca é somado a resultado agentic.
 
+## 5b. Isolamento do agente em relação ao gabarito (corrigido após revisão)
+
+Falha encontrada em 2026-11-08, **depois** dos primeiros pilotos: o agente roda como o mesmo usuário e `Read` aceita caminho absoluto, então ele podia **ler o oráculo oculto e o `reference.patch`** (reproduzido: sem regra, a leitura funciona). Os pilotos `lab-dev1` e o piloto R3 foram executados **antes** da correção e sem traces de ferramentas: não há como provar que nenhum agente leu o gabarito. Tratar seus números como **possivelmente contaminados** (a probabilidade é baixa, porque os prompts não citam o caminho, mas não está medida).
+
+Correção (`ClaudeAgent`): regras `--disallowedTools` para `Read/Grep/Glob/Edit/Write` no repositório e no diretório de saída (verificado: Read, Grep e até `ls` no caminho são negados); detecção pós-execução: qualquer evento de ferramenta que cite dados do benchmark (mesmo negado), e qualquer arquivo alterado pelo agente que os referencie, tornam a execução **não comparável**; a linha de base do `setup` fica fora do workspace; `oracle.files` não pode sair de `oracle/` nem escrever em `.git`.
+
+**Risco residual, sem sandbox de SO (sem `bwrap` aqui):** código que o agente escreve e roda com `go test` lê qualquer arquivo do usuário. A detecção por varredura do workspace pega o caso comum, não um agente que monte o caminho em tempo de execução. Isolamento forte exige contêiner/usuário separado.
+
+Outras correções da mesma revisão: timeout agora fica nas taxas como falha (antes sumia do `pass_rate` e do custo); custo desconhecido conta como o teto por execução no limite de gasto; `*` de glob não cruza `/`; `regex_absent` falha se o arquivo foi apagado; o holdout só pode ser avaliado uma vez (`--allow-repeat-final`); `validate-task` não consome o holdout porque nenhum resultado de agente é observado; `--replay` exclui o holdout (`--include-holdout` para um relatório final).
+
 ## 6. Lacunas conhecidas (R1)
 
 - `--tools-allow` padrão libera só `go test`/`ls`: agentes de click/express/sinatra não conseguem rodar a suíte própria da linguagem. Igual nos três braços, mas limita a qualidade absoluta.

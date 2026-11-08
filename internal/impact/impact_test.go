@@ -2,6 +2,7 @@ package impact
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -145,5 +146,40 @@ func TestAnalyzeDeterministic(t *testing.T) {
 		if a.Findings[i] != b.Findings[i] {
 			t.Fatalf("finding %d differs", i)
 		}
+	}
+}
+
+func TestAnalyzeFindsConsumersPastTheRowsThatTheChangeAlreadyCovers(t *testing.T) {
+	files := map[string]string{
+		"go.mod":       "module example.com/m\n\ngo 1.22\n",
+		"core/core.go": "package core\n\n// Run does the work.\nfunc Run() {}\n",
+	}
+	var changed []string
+	changed = append(changed, "core/core.go")
+	for i := 0; i < 9; i++ {
+		files[fmt.Sprintf("app%d/a.go", i)] = fmt.Sprintf("package app%d\n\nimport \"example.com/m/core\"\n\nfunc Use%d() { core.Run() }\n", i, i)
+		if i < 6 {
+			changed = append(changed, fmt.Sprintf("app%d/a.go", i)) // already part of the change
+		}
+	}
+	ix, root := fixture(t, files)
+	rep, err := Analyze(ix.Store(), root, changed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, f := range rep.Findings {
+		if f.Kind == "consumer" || f.Kind == "importer" {
+			found[f.Path] = true
+		}
+	}
+	// With a row limit applied before the filter, the six callers already changed would have filled it and hidden the rest.
+	for _, p := range []string{"app6/a.go", "app7/a.go", "app8/a.go"} {
+		if !found[p] {
+			t.Fatalf("%s consumes core.Run, was not changed, and must be flagged: %v", p, found)
+		}
+	}
+	if rep.HistoryIndexed {
+		t.Fatal("no Git history was indexed in this fixture")
 	}
 }

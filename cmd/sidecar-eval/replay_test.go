@@ -65,3 +65,16 @@ func writeFile(t *testing.T, path, content string) {
 		t.Fatal(err)
 	}
 }
+
+func TestReplayKeepsTheHoldoutOutOfTheVariantComparison(t *testing.T) {
+	cf := casesFile{Cases: []caseSpec{{ID: "a", Split: "tune"}, {ID: "b", Split: "holdout"}, {ID: "c", Split: "eval"}}}
+	var kept []string
+	for _, c := range cf.Cases {
+		if c.Split != "holdout" {
+			kept = append(kept, c.ID)
+		}
+	}
+	if strings.Join(kept, ",") != "a,c" {
+		t.Fatalf("holdout must be filtered out: %v", kept)
+	}
+}

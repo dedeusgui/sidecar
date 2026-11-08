@@ -33,6 +33,9 @@ const (
 	maxCoChange       = 5
 	minCoChange       = 2 // past commits that touched both files before a pair counts
 	maxCallers        = 6
+	fetchCallers      = 60 // rows read before filtering: the bound applies to what is shown, not to what is searched
+	fetchImporters    = 60
+	fetchCoChange     = 40
 	maxTestsPerSym    = 3
 	maxFindings       = 40
 )
@@ -54,6 +57,9 @@ type Report struct {
 	Findings  []Finding `json:"findings"`
 	Surface   []string  `json:"surface"` // changed files plus the files the findings name
 	Truncated bool      `json:"truncated,omitempty"`
+	// HistoryIndexed says whether Git history was in the index. Without it the co-change signal was not computed, so
+	// an empty result must not be read as "nothing is related".
+	HistoryIndexed bool `json:"history_indexed"`
 }
 
 // Analyze relates the changed files to what depends on them. changed holds repository-relative paths;
@@ -107,10 +113,11 @@ func Analyze(st *store.Store, root string, changed []string) (Report, error) {
 		}
 		untested := 0
 		for _, sym := range syms {
-			callers, err := st.CallersOf(sym.ID, maxCallers)
+			callers, err := st.CallersOf(sym.ID, fetchCallers)
 			if err != nil {
 				return rep, err
 			}
+			shown := 0
 			for _, c := range callers {
 				if set[c.Path] {
 					continue
@@ -118,6 +125,11 @@ func Analyze(st *store.Store, root string, changed []string) (Report, error) {
 				if _, kind := repo.Classify(c.Path); kind == "test" {
 					continue // tests are reported below
 				}
+				if shown >= maxCallers {
+					rep.Truncated = true
+					break
+				}
+				shown++
 				status := Candidate
 				if c.Basis == "import" {
 					status = Confirmed
@@ -146,7 +158,7 @@ func Analyze(st *store.Store, root string, changed []string) (Report, error) {
 				subjects = append(subjects, sym)
 			}
 		}
-		co, err := st.CoChanged(f, maxCoChange)
+		co, err := st.CoChanged(f, fetchCoChange)
 		if err != nil {
 			return rep, err
 		}
@@ -162,16 +174,23 @@ func Analyze(st *store.Store, root string, changed []string) (Report, error) {
 			}
 			return names[i] < names[j]
 		})
+		shownCo := 0
 		for _, p := range names {
 			if _, kind := repo.Classify(p); kind == "code" {
+				if shownCo >= maxCoChange {
+					rep.Truncated = true
+					break
+				}
+				shownCo++
 				add(Finding{Kind: "cochange", Status: Candidate, Path: p,
 					Text: fmt.Sprintf("%s changed together with %s in %d past commits and was not changed now", p, f, co[p])})
 			}
 		}
-		importers, err := st.ImportersOf(f, 8)
+		importers, err := st.ImportersOf(f, fetchImporters)
 		if err != nil {
 			return rep, err
 		}
+		shownImp := 0
 		for _, imp := range importers {
 			if set[imp] {
 				continue
@@ -179,6 +198,11 @@ func Analyze(st *store.Store, root string, changed []string) (Report, error) {
 			if _, kind := repo.Classify(imp); kind != "code" {
 				continue
 			}
+			if shownImp >= 8 {
+				rep.Truncated = true
+				break
+			}
+			shownImp++
 			add(Finding{Kind: "importer", Status: Confirmed, Path: imp, Text: fmt.Sprintf("%s imports %s and was not changed", imp, f)})
 		}
 	}
@@ -197,6 +221,9 @@ func Analyze(st *store.Store, root string, changed []string) (Report, error) {
 					Text: fmt.Sprintf("%s documents %s; update it if the behaviour changed", f.Path, subjectName(f.Subject))})
 			}
 		}
+	}
+	if n, err := st.CommitCount(); err == nil {
+		rep.HistoryIndexed = n > 0
 	}
 	rep.Surface = surfaceOf(rep)
 	for _, f := range surfaceTests(rep) {

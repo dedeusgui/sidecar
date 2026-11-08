@@ -3,6 +3,7 @@
 package ctxbuild
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -129,11 +130,13 @@ func limitFor(section string) int {
 	return maxItemRunes
 }
 
+// markerRe matches the block delimiters with any whitespace inside and any case.
+var markerRe = regexp.MustCompile(`(?i)\[\s*(end\s+)?sidecar\s+context\s*\]`)
+
 // sanitizeTo makes repository text single-line, free of control characters and unable to forge the block
 // delimiters, and caps it at limit runes.
 func sanitizeTo(s string, limit int) string {
-	s = strings.ReplaceAll(s, openMarker, "[marker removed]")
-	s = strings.ReplaceAll(s, closeMarker, "[marker removed]")
+	s = markerRe.ReplaceAllString(s, "[marker removed]")
 	var b strings.Builder
 	space := false
 	for _, r := range s {
@@ -147,7 +150,8 @@ func sanitizeTo(s string, limit int) string {
 		space = false
 		b.WriteRune(r)
 	}
-	out := strings.TrimSpace(b.String())
+	// Again after collapsing: a delimiter split by a newline or tab is only recognisable once whitespace is one space.
+	out := markerRe.ReplaceAllString(strings.TrimSpace(b.String()), "[marker removed]")
 	if utf8.RuneCountInString(out) > limit {
 		out = string([]rune(out)[:limit]) + "…"
 	}

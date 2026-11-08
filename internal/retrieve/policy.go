@@ -2,7 +2,10 @@ package retrieve
 
 import (
 	"os"
+	"regexp"
 	"strings"
+
+	"github.com/dedeusgui/sidecar/internal/lexical"
 )
 
 // Policy says which optional analyses a request can benefit from. It is a pure function of the
@@ -13,10 +16,19 @@ type Policy struct {
 	SkipContracts bool
 }
 
+// editVerbs recognises a request to change something, in Portuguese and English. The intent classifier does not:
+// "Change the session TTL" reads as general. It is shared with the clarification policy, so both agree on what an
+// edit request is.
+var editVerbs = regexp.MustCompile(`\b(adicion\w*|acrescent\w*|cri(e|ar|a)|implement\w*|alter(e|ar|a)|mud(e|ar|a)|modific\w*|troc(e|ar|a)|substitu\w*|remov\w*|exclu\w*|refator\w*|corrij\w*|conserte|migr(e|ar|a)|renome\w*|permit\w*|habilit\w*|desabilit\w*|aument\w*|reduz\w*|diminu\w*|ajust\w*|increase|decrease|reduce|raise|lower|adjust|bump|add|create|implement|change|update|modify|replace|remove|delete|refactor|fix|migrate|rename|support|enable|disable|make|allow)\b`)
+
+// IsEditRequest reports whether the prompt asks to change code or configuration.
+func IsEditRequest(prompt string) bool { return editVerbs.MatchString(lexical.Fold(prompt)) }
+
 // PolicyFor derives the policy. Any intent that edits, tests, explains, debugs or asks about impact
-// or contracts keeps every analysis: the cost saving applies only to pure lookups.
-func PolicyFor(in Intent) Policy {
-	if len(in.Kinds) == 0 {
+// or contracts keeps every analysis: the cost saving applies only to pure lookups, never to an edit request
+// (whose contracts decide what the change must preserve), whatever the intent classifier made of it.
+func PolicyFor(in Intent, prompt string) Policy {
+	if len(in.Kinds) == 0 || IsEditRequest(prompt) {
 		return Policy{}
 	}
 	for _, k := range in.Kinds {

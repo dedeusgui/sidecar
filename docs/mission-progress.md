@@ -49,6 +49,10 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 
 US$ 0,177 (piloto dev R1: 24 execuções) + ~US$ 0,01 (smoke de 2 execuções). Teto de US$ 10 (adicional) quase intacto.
 
+## Revisão independente (2026-11-08)
+
+Dois revisores Haiku (somente leitura) + eu. Cada achado foi **reproduzido ou verificado no código** antes de aceito. Corrigidos neste PR, com teste de regressão (e controle que falha sem a correção quando aplicável): isolamento do gabarito no lab; timeout fora das taxas; teto de gasto com custo desconhecido; glob e `regex_absent`; holdout em replay e repetição de avaliação final; limites aplicados antes do filtro em `impact` e aviso de truncamento/histórico; busca vazia tratada como repetição no observador; `groom` — pergunta perdida sem evidência, resposta com negação/substring virando decisão, política adaptativa tirando contratos de pedidos de edição, perguntas de valor para renomeações, falsos positivos de contradição, repetição da mesma pergunta gastando a cota, estado não atômico, `awaitingAnswer` sem TTL; sanitizador de `ctxbuild` com delimitador dividido por espaço. **Não corrigidos / aceitos:** sem sandbox de SO (código rodado por `go test` lê o gabarito); `hashID` sem sal; amostra e independência do `--impact-history`; `git worktree add` no repositório avaliado; estado de sessão sem lock entre hooks paralelos (suspeita, não reproduzida).
+
 ## Bloqueios e riscos conhecidos
 
 - ⛔ Sem `bwrap` no ambiente cloud: oráculo isolado de rede por `unshare -rn`; agente `claude` sem sandbox de SO.

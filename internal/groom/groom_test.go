@@ -176,3 +176,53 @@ func TestRepositoryTextInOptionsCannotAddInstructionLines(t *testing.T) {
 		t.Log("raw newline kept by Render; sanitised by ctxbuild")
 	}
 }
+
+func TestMatchAnswerRejectsNegationAndSubstringMatches(t *testing.T) {
+	two := []Option{{Label: "ChargeInvoice"}, {Label: "ChargeRefund"}}
+	for _, in := range []string{"nao use o ChargeInvoice", "use ChargeInvoice nunca", "ChargeInvoice not", "without ChargeInvoice"} {
+		if got := MatchAnswer(in, two); got != -1 {
+			t.Errorf("%q must not select an option, got %d", in, got)
+		}
+	}
+	if got := MatchAnswer("use o ChargeRefund", two); got != 1 {
+		t.Errorf("a plain choice must still match, got %d", got)
+	}
+	users := []Option{{Label: "user"}, {Label: "account"}}
+	if got := MatchAnswer("o username deve ser unico", users); got != -1 {
+		t.Errorf("'user' must not match inside 'username', got %d", got)
+	}
+	if got := MatchAnswer("user", users); got != 0 {
+		t.Errorf("the whole word matches, got %d", got)
+	}
+}
+
+func TestLimitQuestionIsOnlyForRequestsThatIntroduceOrChangeALimit(t *testing.T) {
+	for _, p := range []string{"renomeie a variavel timeout para idleTimeout", "rename the timeout field to idleTimeout",
+		"fix the timeout handling when the request fails", "add a max_length field to the user form"} {
+		rep := Analyze(p, retrieve.Result{})
+		if d := Decide(rep, p, 0, DefaultPolicy()); d.Action != None {
+			t.Errorf("%q needs no number, got %+v", p, d)
+		}
+	}
+	for _, p := range []string{"adicione um limite de tentativas no login", "aumente o SessionTTL", "reduce the retry limit"} {
+		rep := Analyze(p, retrieve.Result{})
+		if d := Decide(rep, p, 0, DefaultPolicy()); d.Action != Ask {
+			t.Errorf("%q does need the value: %+v", p, d)
+		}
+	}
+}
+
+func TestReplacementAndNegatedRemovalAreNotContradictions(t *testing.T) {
+	for _, p := range []string{"Adicione validação de email no cadastro. Remova a validação antiga do cadastro.",
+		"Add a retry to the client. Remove the old retry loop from the client.",
+		"Adicione um endpoint de exportação. Não remova o endpoint de importação."} {
+		for _, g := range Analyze(p, retrieve.Result{}).Gaps {
+			if g.State == Contradictory {
+				t.Errorf("%q is not contradictory: %+v", p, g)
+			}
+		}
+	}
+	if rep := Analyze("mantenha o cache de sessão ativo. mas remova o cache de sessão do login", retrieve.Result{}); rep.States[0] != Contradictory {
+		t.Errorf("a real contradiction must still be found: %+v", rep)
+	}
+}
