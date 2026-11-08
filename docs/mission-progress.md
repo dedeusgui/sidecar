@@ -13,7 +13,7 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 | R1.5 ROI do feedback (3 braços) | feedback com integridade (PR #6) | arms + semeadura por raiz estável | — | ⬜ |
 | R1.6 scorecard unificado | `bench/scorecard.py` (OFF/ON) | seções por evidência, pareado, custo/correta | `lab.py report` + testes | ✅ |
 | R1.7 comparação OFF/V1/V2/componentes | OFF/ON | braços V1, V2; componentes dependem de R2–R5 | `lab.py run --arms OFF,V1,V2` | 🟡 piloto dev feito (§Piloto); componentes aguardam R2–R5 |
-| R2 Adaptive Context Engine | V2 com abstenção parcial | política por intenção, E17, termos genéricos | gates R2 | ⬜ |
+| R2 Adaptive Context Engine | V2 com abstenção parcial | política por intenção, E17, termos genéricos | gates R2 | 🟡 rodada 1: [eval-r2](eval-r2-2026-11-08.md) — política `adaptive` opt-in (sem perda offline, −6/−16% tokens); H1 inconclusiva (flag off); H2 rejeitada; E17 = lacuna de dicionário. Gate de sucesso agentic pendente |
 | R3 Task Evidence Brief | `ContractEvidence`, packer | brief rastreável | gate R3 | ⬜ |
 | R4 TaskUncertainty / grooming | — | detector, política, decisões, benchmark | gate R4 | ⬜ |
 | R5 Impact/Verification | `ContractEvidence` | blast radius, verificações | gate R5 | ⬜ |
