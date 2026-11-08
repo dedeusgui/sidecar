@@ -1,0 +1,54 @@
+{
+  "id": "SIN-EDIT-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "ok": true,
+        "detail": "assinatura pública de content_type preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "ok": true,
+        "detail": "charset padrão por tipo preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "Failure:\nZzSinatraContentTypeCharsetOracleTest#test_nil_charset_removes_charset_parameter [test/zz_oracle_content_type_test.rb:22]:\n--- expected\n+++ actual\n@@ -1,3 +1,3 @@\n # encoding: UTF-8\n #    valid: true\n-\"text/plain\"\n+\"text/plain;charset=\"\n\n\n5 runs, 5 assertions, 3 failures, 0 errors, 0 skips\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "lib/sinatra/base.rb"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "ok": true,
+        "detail": "assinatura pública de content_type preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "ok": true,
+        "detail": "charset padrão por tipo preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794162744.2275462,
+  "base_verdict": "fail"
+}
