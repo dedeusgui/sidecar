@@ -22,7 +22,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "987_filename_star [test/zz_oracle_attachment_test.rb:34]:\nExpected # encoding: UTF-8\n#    valid: true\n\"attachment; filename=\\\"relat\\u00F3rio final.pdf\\\"\" to include # encoding: UTF-8\n#    valid: true\n\"filename*=UTF-8''relat%C3%B3rio%20final.pdf\".\n\n5 runs, 7 assertions, 2 failures, 0 errors, 0 skips\n"
+    "detail": "_file_has_rfc5987_filename_star [test/zz_oracle_attachment_test.rb:38]:\nExpected # encoding: UTF-8\n#    valid: true\n\"attachment; filename=\\\"relat\\u00F3rio.txt\\\"\" to include # encoding: UTF-8\n#    valid: true\n\"filename*=UTF-8''relat%C3%B3rio.txt\".\n\n5 runs, 7 assertions, 2 failures, 0 errors, 0 skips\n"
   },
   "reference": {
     "kind": "tests",
@@ -49,6 +49,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794162572.5944047,
+  "ts": 1794162965.6884627,
   "base_verdict": "fail"
 }
