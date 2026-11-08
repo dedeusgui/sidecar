@@ -9,13 +9,16 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
 	"github.com/dedeusgui/sidecar/internal/gitx"
 	"github.com/dedeusgui/sidecar/internal/paths"
+	"github.com/dedeusgui/sidecar/internal/progress"
 	"github.com/dedeusgui/sidecar/internal/repo"
 )
 
@@ -25,6 +28,8 @@ const (
 	SignalRepeatedSearch = "repeated_search"
 	SignalRedundantRead  = "redundant_read"
 	SignalRepeatedError  = "repeated_error"
+	SignalNearRepeat     = "near_repeat_search" // a search with almost the same terms as an earlier one, same epoch
+	SignalStagnation     = "stagnation"         // a window of redundant events with no edit or test (shadow only)
 )
 
 // loopThreshold is how many reads of one file, with no edit in between, raise redundant_read.
@@ -90,6 +95,7 @@ func Observe(agent adapter.Agent, event string, in io.Reader) (exit int) {
 		_ = os.Remove(paths.SessionState(string(agent), call.Session))
 		s.Compactions++
 		s.ClearEpoch()
+		s.Trace = nil // what the agent did before compaction says nothing about what it does after it
 		rec["status"] = "compacted"
 	} else {
 		rec["signals"] = applyTool(&s, call, root)
@@ -106,6 +112,71 @@ func Observe(agent adapter.Agent, event string, in io.Reader) (exit int) {
 // Use is counted on the pre-call event; the post-call event only contributes errors, so a
 // client that sends both does not count a call twice.
 func applyTool(s *brief.SessionSignals, c adapter.ToolCall, root string) []string {
+	raised := applyToolBasic(s, c, root)
+	return append(raised, classifyProgress(s, c, root)...)
+}
+
+// classifyProgress appends the event to the bounded trace and raises the passive progress signals. Keys are
+// hashes (a search is the sorted set of its hashed terms), so near-duplicate detection needs no clear text.
+// A decision to intervene is only counted (Shadows): there is no verified transport to deliver one.
+func classifyProgress(s *brief.SessionSignals, c adapter.ToolCall, root string) []string {
+	var ev progress.Event
+	switch {
+	case c.Phase == "post":
+		if c.Result != "error" || c.Error == "" {
+			return nil
+		}
+		ev = progress.Event{Kind: "other", Key: "err", Err: hashID(root, normalizeError(c.Error))}
+	case c.Kind == adapter.KindEdit:
+		ev = progress.Event{Kind: "edit", Key: hashID(root, relPath(root, c.Path))}
+	case c.Kind == adapter.KindTest:
+		ev = progress.Event{Kind: "test", Key: "test"}
+	case c.Kind == adapter.KindRead && c.Path != "":
+		ev = progress.Event{Kind: "read", Key: hashID(root, relPath(root, c.Path))}
+	case c.Kind == adapter.KindSearch:
+		ev = progress.Event{Kind: "search", Key: hashedTerms(root, c.Query)}
+	default:
+		return nil
+	}
+	s.Trace = append(s.Trace, ev)
+	if len(s.Trace) > brief.MaxTrace {
+		s.Trace = s.Trace[len(s.Trace)-brief.MaxTrace:]
+	}
+	rep := progress.Analyze(s.Trace)
+	var raised []string
+	raise := func(sig string) {
+		s.Signals[sig]++
+		raised = append(raised, sig)
+	}
+	if n := len(rep.Per); n > 0 && rep.Per[n-1] == progress.NearRepeat {
+		raise(SignalNearRepeat)
+	}
+	if k := len(rep.Shadows); k > 0 && rep.Shadows[k-1].At == len(s.Trace)-1 && s.Shadows < progress.ShadowMax {
+		s.Shadows++
+		raise(SignalStagnation)
+	}
+	return raised
+}
+
+// hashedTerms reduces a search to the sorted hashes of its distinct terms. Two searches with the same words in
+// another order, or one extra word, stay comparable without storing either text.
+func hashedTerms(root, query string) string {
+	f := strings.FieldsFunc(strings.ToLower(query), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' })
+	set := map[string]bool{}
+	for _, t := range f {
+		if len(t) >= 2 {
+			set[hashID(root, "term", t)[:10]] = true
+		}
+	}
+	out := make([]string, 0, len(set))
+	for h := range set {
+		out = append(out, h)
+	}
+	sort.Strings(out)
+	return strings.Join(out, " ")
+}
+
+func applyToolBasic(s *brief.SessionSignals, c adapter.ToolCall, root string) []string {
 	var raised []string
 	raise := func(signal string) {
 		s.Signals[signal]++

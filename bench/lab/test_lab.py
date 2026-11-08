@@ -269,6 +269,30 @@ class RunnerTests(LabCase):
             lab.cmd_run(self.run_args(allow_unvalidated=False))
 
 
+class ToolTraceTests(unittest.TestCase):
+    def stream(self, *blocks):
+        return "\n".join(json.dumps(b) for b in blocks)
+
+    def test_tool_events_maps_tools_and_failures(self):
+        use = lambda i, name, inp: {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": i, "name": name, "input": inp}]}}
+        s = self.stream(use("1", "Read", {"file_path": "a.go"}), use("2", "Grep", {"pattern": "foo bar"}),
+                        use("3", "Edit", {"file_path": "a.go"}), use("4", "Bash", {"command": "go test ./..."}),
+                        use("5", "Bash", {"command": "rg timeout"}), use("6", "Bash", {"command": "cat b.go"}),
+                        {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "4", "is_error": True, "content": "FAIL line 42"}]}})
+        ev = lab.tool_events(s)
+        self.assertEqual([e["kind"] for e in ev], ["read", "search", "edit", "test", "search", "read", "other"])
+        self.assertEqual(ev[-1]["err"], "fail line #")
+
+    def test_summarize_reports_redundancy_only_when_progress_exists(self):
+        base = {"comparable": True, "success": True, "cost_usd": 0.1, "wall_s": 1.0, "tool_calls": 1, "injected_chars": 0,
+                "served_models": ["m"], "verdict": "pass", "oracle": {"scope_ok": True, "invariants": [], "tests": "pass", "outside_scope": []}}
+        self.assertIsNone(lab.summarize([dict(base)])["redundant_calls_mean"])
+        with_p = dict(base, progress={"redundant": 4, "stagnant_windows": 1})
+        s = lab.summarize([dict(base, progress={"redundant": 2, "stagnant_windows": 0}), with_p])
+        self.assertEqual(s["redundant_calls_mean"], 3)
+        self.assertEqual(s["stagnant_runs"], 1)
+
+
 class HoldoutTests(LabCase):
     def test_holdout_sealed_without_final_and_ledgered_with_final(self):
         self.make_task("T-EDIT-H1", split="holdout")

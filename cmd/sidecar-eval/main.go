@@ -107,6 +107,8 @@ func main() {
 	outPath := flag.String("out", "", "write full results as JSON to this path")
 	replayPath := flag.String("replay", "", "offline replay: run the V2 pipeline over versioned tuning variants (config file) and compare against the active one")
 	replayCheck := flag.String("replay-check", "", "verify the active tuning in this config equals the compiled defaults, then exit")
+	impactHistory := flag.String("impact-history", "", "evaluate change-impact analysis on the Git history of this repository (needs history)")
+	impactN := flag.Int("impact-commits", 40, "commits to use with --impact-history")
 	groomFlag := flag.Bool("groom", false, "clarification benchmark: run the V2 pipeline and the ask/assume policy over cases with expect_ask labels")
 	perfRuns := flag.Int("perf", 0, "measure cold/warm latency per pipeline stage with this many warm runs per case (p50/p95/p99)")
 	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
@@ -129,6 +131,11 @@ func main() {
 	if *replayCheck != "" {
 		must(checkActiveTuning(*replayCheck))
 		fmt.Println("active tuning matches compiled defaults")
+		return
+	}
+
+	if *impactHistory != "" {
+		must(runImpactHistory(*impactHistory, *impactN, *outPath))
 		return
 	}
 

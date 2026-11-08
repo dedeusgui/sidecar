@@ -316,3 +316,58 @@ func TestHookPayloadKeepsWindowsPathsIntact(t *testing.T) {
 		t.Fatalf("cwd = %q, want %q", call.CWD, cwd)
 	}
 }
+
+func TestNearRepeatSearchRaisesPassiveSignalAcrossWordOrder(t *testing.T) {
+	s := fresh()
+	got := run(&s, search("handle timeout error in middleware"), search("middleware error timeout handle"), search("completely different words here"))
+	// Same word set in another order is an exact repeat of the term set; one extra word is a near repeat.
+	got2 := run(&s, search("handle timeout error in middleware context"))
+	if !contains(got, SignalRepeatedSearch) && !contains(got, SignalNearRepeat) {
+		t.Fatalf("a reordered search must be flagged as a repeat: %v", got)
+	}
+	if !contains(got2, SignalNearRepeat) {
+		t.Fatalf("one extra word is a near repeat: %v", got2)
+	}
+}
+
+func TestStagnationIsShadowOnlyBoundedAndCleared(t *testing.T) {
+	s := fresh()
+	var calls []adapter.ToolCall
+	for i := 0; i < 60; i++ {
+		calls = append(calls, read("/work/repo/a.go"))
+	}
+	run(&s, calls...)
+	if s.Shadows == 0 || s.Shadows > 3 {
+		t.Fatalf("shadow decisions must be rate limited, got %d", s.Shadows)
+	}
+	if s.Signals[SignalStagnation] != s.Shadows {
+		t.Fatalf("stagnation signals %d vs shadows %d", s.Signals[SignalStagnation], s.Shadows)
+	}
+	if len(s.Trace) > brief.MaxTrace {
+		t.Fatalf("trace unbounded: %d", len(s.Trace))
+	}
+	run(&s, edit("/work/repo/a.go"), read("/work/repo/a.go"), test())
+	if s.Signals[SignalStagnation] > 3 {
+		t.Fatal("legitimate edit cycles must not add stagnation")
+	}
+}
+
+func TestTraceStoresOnlyHashes(t *testing.T) {
+	s := fresh()
+	run(&s, search("secret_token_name lookup"), read("/work/repo/internal/billing/charge.go"), failure("panic: SecretValue 42"))
+	data, _ := json.Marshal(s)
+	for _, leak := range []string{"secret_token_name", "billing", "charge.go", "SecretValue", "lookup"} {
+		if strings.Contains(string(data), leak) {
+			t.Fatalf("the trace stored clear text %q: %s", leak, data)
+		}
+	}
+}
+
+func contains(xs []string, v string) bool {
+	for _, x := range xs {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
