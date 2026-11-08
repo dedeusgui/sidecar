@@ -1,0 +1,54 @@
+{
+  "id": "CHI-H2",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/content_type.go",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/content_type.go",
+        "ok": true,
+        "detail": "resposta 415 preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "rd/mixed_exact_and_wildcard_entries (0.00s)\n    --- PASS: TestBenchmarkAllowContentTypeWildcard/mixed_entries_still_reject_unknown (0.00s)\n    --- PASS: TestBenchmarkAllowContentTypeWildcard/missing_content_type_with_body_is_rejected (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.003s\nFAIL\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "middleware/content_type.go"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/content_type.go",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/content_type.go",
+        "ok": true,
+        "detail": "resposta 415 preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794175473.3027096,
+  "base_verdict": "fail"
+}

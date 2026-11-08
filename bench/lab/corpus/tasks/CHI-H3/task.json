@@ -1,0 +1,49 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-H3",
+  "split": "holdout",
+  "class": "edit",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "No chi, o middleware SupressNotFound responde 404 cedo para requisições que não batem em nenhuma rota, para não gastar processamento com elas. Está divergindo do roteador em rotas que existem: com o middleware ativo, um método que a rota não aceita (por exemplo POST em uma rota só de GET) vira 404, quando sem o middleware o roteador responde 405 com o cabeçalho Allow; e caminhos com caracteres codificados em percentual, como %2F, podem ser avaliados de forma diferente do roteador. Ajuste o middleware para que, em rotas existentes, a resposta seja igual à que o roteador daria sem ele, e só responda 404 antecipadamente quando a requisição não bater em nenhuma rota, sem chamar os próximos middlewares nem o handler. Mantenha a assinatura pública. Não acesse a rede. Ao terminar, descreva brevemente o que mudou.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "middleware/zz_oracle_supress_notfound_parity_test.go": "supress_notfound_parity_oracle_test.go"
+    },
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./middleware",
+      "-run",
+      "^TestBenchmarkSupressNotFoundParity$"
+    ],
+    "require_output": [
+      "--- PASS: TestBenchmarkSupressNotFoundParity|--- FAIL: TestBenchmarkSupressNotFoundParity"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "middleware/supress_notfound.go",
+      "middleware/supress_notfound*_test.go"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/supress_notfound.go",
+        "pattern": "func SupressNotFound\\(router \\*chi.Mux\\) func\\(next http.Handler\\) http.Handler",
+        "why": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/supress_notfound.go",
+        "pattern": "router.NotFoundHandler\\(\\).ServeHTTP",
+        "why": "404 delegado ao NotFound configurado no roteador"
+      }
+    ]
+  },
+  "notes": "Holdout (selado: só validate-task). Origem (commit fixado): middleware/supress_notfound.go linha 19 usa Match(method, r.URL.Path) e ignora RawPath, que o roteador usa (mux.go:462-463); e Match falso para método errado, então 405 vira 404 (mux.go:492-496 responde 405 quando rctx.methodNotAllowed). Sondas locais: GET /a/x%2Fy -> 404 com o middleware e 200 sem; POST /only -> 404 com e 405 sem. Comparação de paridade com o roteador sem middleware é o oráculo. Métodos customizados via RegisterMethod não são cobertos pelo oráculo."
+}

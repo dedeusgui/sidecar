@@ -1,0 +1,49 @@
+{
+  "schema": "lab-task/1",
+  "id": "CHI-H1",
+  "split": "development",
+  "class": "debug",
+  "repo": "chi",
+  "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt": "No chi, o middleware URLFormat tira a extensão (.json, .xml) do final da URL e guarda o formato no contexto. Hoje, se a URL tiver caractere codificado em percentual, como %2F ou %2E, o resultado diverge do que o roteador entrega sem o middleware: a rota pode dar 404, ou o parâmetro chega decodificado. Corrija para que, com o middleware ativo, os segmentos cheguem ao roteador exatamente como chegam sem ele, retirando só a extensão do fim do caminho. URLs sem codificação devem continuar funcionando igual. Mantenha a API pública. Não acesse a rede. Ao terminar, descreva brevemente o que mudou.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "middleware/zz_oracle_url_format_test.go": "url_format_oracle_test.go"
+    },
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./middleware",
+      "-run",
+      "^TestBenchmarkURLFormatEncodedSegments$"
+    ],
+    "require_output": [
+      "--- PASS: TestBenchmarkURLFormatEncodedSegments|--- FAIL: TestBenchmarkURLFormatEncodedSegments"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "middleware/url_format.go",
+      "middleware/url_format*_test.go"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/url_format.go",
+        "pattern": "func URLFormat\\(next http.Handler\\) http.Handler",
+        "why": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/url_format.go",
+        "pattern": "URLFormatCtxKey = &contextKey\\{\"URLFormat\"\\}",
+        "why": "chave de contexto pública preservada"
+      }
+    ]
+  },
+  "notes": "Debug. Origem (commit fixado): middleware/url_format.go linha 51 usa r.URL.Path, que já vem decodificado; linha 67 corta RoutePath. Roteamento do chi usa RawPath quando definido (mux.go:462-463; get_head.go:16 e clean_path.go:18 fazem o mesmo). Sonda local: com URLFormat, GET /articles/a%2Fb.json dá 404 (sem o middleware, 200 com id 'a%2Fb.json'); GET /articles/x%2Ey.json vira id 'x.y' em vez de 'x%2Ey'. Defeito real; mux.go não é alterado."
+}
