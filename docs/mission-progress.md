@@ -12,7 +12,7 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 | R1.4 perf p50/p95/p99 cold/warm por estágio | `hook_probe_ms` apenas | `--perf` por estágio | `sidecar-eval --perf` | ✅ (cold n pequeno) |
 | R1.5 ROI do feedback (3 braços) | feedback com integridade (PR #6) | arms + semeadura por raiz estável | — | ⬜ |
 | R1.6 scorecard unificado | `bench/scorecard.py` (OFF/ON) | seções por evidência, pareado, custo/correta | `lab.py report` + testes | ✅ |
-| R1.7 comparação OFF/V1/V2/componentes | OFF/ON | braços V1, V2; componentes dependem de R2–R5 | `lab.py run --arms OFF,V1,V2` | 🟡 piloto dev feito (§Piloto); componentes aguardam R2–R5 |
+| R1.7 comparação OFF/V1/V2/componentes | OFF/ON | braços V1, V2; componentes dependem de R2–R5 | `lab.py run --arms OFF,V1,V2,V2+adaptive,V2+brief` | ✅ medido (225 execuções, §Benchmark limpo); R4/R5/R6 sem braço por falta de canal interativo |
 | R2 Adaptive Context Engine | V2 com abstenção parcial | política por intenção, E17, termos genéricos | gates R2 | 🟡 rodada 1: [eval-r2](eval-r2-2026-11-08.md) — política `adaptive` opt-in (sem perda offline, −6/−16% tokens); H1 inconclusiva (flag off); H2 rejeitada; E17 = lacuna de dicionário. Gate de sucesso agentic pendente |
 | R3 Task Evidence Brief | `ContractEvidence`, packer | brief rastreável | gate R3 | 🟡 [task-brief](task-brief.md): `SIDECAR_FEATURES=brief` opt-in; qualidade offline idêntica, tokens 417→340; piloto agentic: ver §Piloto R3 |
 | R4 TaskUncertainty / grooming | — | detector, política, decisões, benchmark | gate R4 | 🟡 [grooming](grooming.md): `SIDECAR_FEATURES=groom` opt-in; 0/17 perguntas desnecessárias, 8/11 corretas (fixture interna); benefício líquido não medido |
@@ -47,7 +47,11 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 
 ## Gastos de modelo
 
-US$ 0,177 (piloto dev R1: 24 execuções) + ~US$ 0,01 (smoke de 2 execuções). Teto de US$ 10 (adicional) quase intacto.
+≈ US$ 2,5 de US$ 10: benchmark limpo US$ 1,75 (225 execuções), piloto R3 US$ 0,45, piloto dev US$ 0,18, verificações e sondas ≈ US$ 0,1.
+
+## Benchmark limpo OFF/V1/V2/componentes (R1.7, evidência agentic)
+
+[benchmarks-2026-11-08.md](benchmarks-2026-11-08.md): 225 execuções (15 tarefas × 5 braços × 3 repetições), `claude-haiku-5-5`, todas comparáveis, US$ 1,75, isolamento corrigido, holdout intocado. **Sem melhora comprovada**: V2+brief vs OFF aprovação estrita +8,6%, tool calls −4,8%, tokens −8,8%, custo −4,0% (todos IC95 cruzam zero). Testes ocultos 225/225 em todos os braços (teto de capacidade: o corpus mede eficiência e escopo, não capacidade); 5 de 63 comparações "significativas" é compatível com acaso; tempo de parede contaminado por CPU compartilhada. Os pilotos anteriores (`lab-dev1`, R3) ficam como **superados e possivelmente contaminados**. Índice e pistas para o V3: [benchmarks.md](benchmarks.md).
 
 ## Revisão independente (2026-11-08)
 
@@ -61,4 +65,4 @@ Dois revisores Haiku (somente leitura) + eu. Cada achado foi **reproduzido ou ve
 
 ## Próxima ação concreta
 
-Mesclar o PR de R1 e começar R2 (política de contexto adaptativa; reproduzir falso positivo residual e E17 no replay).
+Corpus v2 mais difícil (testes ocultos passaram 225/225), canal interativo para medir R4/R5/R6, sandbox de SO antes de gastar o holdout, e portão de abstenção para prompts conversacionais (L10). Ver pistas L01–L12 em benchmarks.md.
