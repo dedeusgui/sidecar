@@ -22,7 +22,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "-\n  duration_ms: 0.878163\n  type: 'test'\n  ...\n# Subtest: H1 tipos ja suportados continuam iguais\nok 6 - H1 tipos ja suportados continuam iguais\n  ---\n  duration_ms: 10.098644\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 98.524574\n"
+    "detail": "\n  duration_ms: 0.986003\n  type: 'test'\n  ...\n# Subtest: H1 tipos ja suportados continuam iguais\nok 6 - H1 tipos ja suportados continuam iguais\n  ---\n  duration_ms: 11.706488\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 114.989744\n"
   },
   "reference": {
     "kind": "tests",
@@ -49,6 +49,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794175638.7997525,
+  "ts": 1794175961.94458,
   "base_verdict": "fail"
 }
