@@ -46,6 +46,21 @@
 | `Cost/ToolOutput Diagnostics` | RTK-OSS → Headroom → ARB | Simulação de budget, retenção de erros, medição de economia **de tarefa inteira** |
 | `Install/Adapters/UX` | colbymchenry/codegraph → Claude/Codex/Antigravity CLI oficiais | Preservação de hooks, ownership, opt-in UI e recuperação de falhas |
 
+## Referências adicionais para R3–R5: contexto de tarefa, grooming e verificação (2026-11-08)
+
+Estas referências complementam a matriz original. **Não significam dependências instaladas ou desempenho comprovado do Sidecar.** Antes de adaptar qualquer componente, fixar commit SHA, conferir licença por arquivo e reproduzir testes pertinentes. O agente não deve copiar um workflow inteiro apenas para introduzir perguntas.
+
+| Referência | Caminho para estudar (conferir no SHA fixado) | Hipótese para o Sidecar |
+|---|---|---|
+| [GSD](https://github.com/gsd-build/get-shit-done) | `get-shit-done/workflows/discuss-phase-assumptions.md`, `agents/gsd-assumptions-analyzer.md` | Inspecionar código antes de questionar; suposições com evidência, confiança e custo concreto de erro; reduzir entrevistas desnecessárias |
+| [GitHub Spec Kit](https://github.com/github/spec-kit) | `templates/commands/clarify.md` | Taxonomia de lacunas; priorizar dúvidas por impacto; perguntas sequenciais; não induzir specs longas obrigatórias |
+| [OpenSpec](https://github.com/Fission-AI/OpenSpec) | `src/core/templates/workflows/verify-change.ts` | Verificar cumprimento de requisitos e coerência do patch; não confundir checklist marcado com comportamento testado |
+| [Ask-or-Assume](https://github.com/nedwards99/ask-or-assume) | Protocolo de avaliação e corpus, caso licenciamento permita | Quando perguntar ou assumir; medir custo de perguntas, retrabalho e sucesso do oráculo, sem reproduzir números de terceiros |
+
+**Prioridade de uso:** GSD + Spec Kit para R4; OpenSpec + Superpowers para R5; CodeGraph + ARB para R2; reusar `ContractEvidence`, `EvidencePacker`, `SessionObserver` antes de criar subsistema novo. Para o protocolo de perguntas, verificar a API real de cada agente (Claude Code, Codex, Antigravity CLI), inclusive diferenças cloud/headless. O hook do Sidecar pode orientar o agente, mas não presumir controle sobre a ferramenta de perguntas.
+
+**Pesquisas adicionais:** avaliar técnicas de clarification-seeking e requirement elicitation no benchmark; comparar cenários claros, subespecificados, contraditórios e com contratos desatualizados. Perguntas devem alterar materialmente implementação ou validação; redução de ambiguidades subjetivas não basta sem qualidade de patch.
+
 ## Gate legal e de qualidade para código vindo de terceiros
 
 - **Padrão:** documentação e comportamento públicos podem informar requisitos e testes; não inserir código de terceiro por mera semelhança. A implementação própria precisa passar revisão técnica.
