@@ -57,3 +57,14 @@ Problema: hoje `sidecar doctor` e `sidecar explain` dão diagnóstico, mas o usu
 - Se um gerenciador de pacotes controla o binário, quem faz update dos paths do hook?
 
 **Rodada E (2026-11-07):** nenhum hook, adaptador ou instalador foi alterado. Os estados acima permanecem como estavam; o E2E de Codex e Antigravity CLI continua pendente.
+
+
+## Matriz de suporte verificada (2026-11-08)
+
+| Cliente | `UserPromptSubmit` (contexto) | Observação de ferramenta | `PreCompact` | Pergunta nativa (R4) | Evidência |
+|---|---|---|---|---|---|
+| Claude Code 2.1.319 | **E2E real**: hook instalado, disparado, contexto entregue | **E2E real**: `PreToolUse`/`PostToolUse` com metadados hasheados; falha de ferramenta não documentada (`result: unknown`) | não registrado pelo instalador; **não verificado** | `AskUserQuestion` (interativo; ausente em `-p`); **E2E interativo não executado** | [r7-install-e2e](../bench/results/r7-install-e2e-2026-11-08.md) |
+| Codex | só testes de contrato | não observado | — | nenhuma ferramenta verificada (texto) | CLI não disponível neste ambiente |
+| Antigravity CLI | só testes de contrato (`PreInvocation`, `injectSteps`) | `PreTool`/`PostTool` por contrato | — | nenhuma ferramenta verificada (texto) | CLI não disponível neste ambiente |
+
+Cloud × local: o ambiente de nuvem usado aqui carrega hooks do `CLAUDE_CONFIG_DIR` e não tem `bwrap`; permissões (`--allowedTools`, `acceptEdits`) e sandbox de SO continuam responsabilidade do cliente. Fallback: qualquer falha do Sidecar deixa o prompt seguir sem contexto (stdout limpo, log local sem prompt).

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<title>Sidecar Studio</title>
+<style>
+:root{--bg:#fbfbfa;--panel:#fff;--ink:#1c1e21;--muted:#5f6670;--line:#dcdfe3;--accent:#2457c5;--ok:#17703a;--bad:#b3261e;--warn:#8a5a00;--chip:#eef1f6}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--panel:#1b1e23;--ink:#e6e8eb;--muted:#9aa3ae;--line:#2d3239;--accent:#7aa2f7;--ok:#5fd08a;--bad:#ff8a80;--warn:#e5b567;--chip:#252a31}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:16px 16px 0;max-width:1200px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 12px}
+nav{display:flex;flex-wrap:wrap;gap:6px;max-width:1200px;margin:0 auto;padding:0 16px 8px;border-bottom:1px solid var(--line)}
+nav button{background:var(--chip);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font:inherit}
+nav button[aria-selected=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+nav button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{max-width:1200px;margin:0 auto;padding:16px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:0 0 14px;overflow-x:auto}
+h2{font-size:15px;margin:0 0 8px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;border-radius:4px;padding:0 6px;font-size:12px;background:var(--chip)}
+.pass{color:var(--ok);font-weight:600}.fail{color:var(--bad);font-weight:600}.error,.warn{color:var(--warn);font-weight:600}
+.muted{color:var(--muted)}
+pre{background:var(--chip);border-radius:6px;padding:8px;overflow:auto;max-height:420px;white-space:pre-wrap;word-break:break-word;margin:0}
+.bar{height:8px;background:var(--accent);border-radius:4px;min-width:1px}
+.note{border-left:3px solid var(--warn);padding:2px 10px;color:var(--muted);margin:0 0 10px}
+@media (max-width:640px){main,header,nav{padding-left:12px;padding-right:12px}}
+</style>
+</head>
+<body>
+<header><h1>Sidecar Studio</h1><p class="sub" id="sub"></p></header>
+<nav id="tabs" role="tablist" aria-label="Views"></nav>
+<main id="main" tabindex="-1"></main>
+<script>
+"use strict";
+const DOCS = /*__DATA__*/null;
+const $ = (id) => document.getElementById(id);
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) { if (k === "class") e.className = v; else e.setAttribute(k, v); }
+  for (const kid of kids.flat()) { if (kid === null || kid === undefined || kid === false) continue; e.append(kid instanceof Node ? kid : document.createTextNode(String(kid))); }
+  return e;
+}
+const fmt = (v, d = 2) => (typeof v === "number" ? (Number.isInteger(v) ? String(v) : v.toFixed(d)) : (v === null || v === undefined ? "–" : String(v)));
+const pct = (v) => (typeof v === "number" ? (v * 100).toFixed(0) + "%" : "–");
+function table(cols, rows, numeric = []) {
+  const t = el("table");
+  t.append(el("thead", {}, el("tr", {}, cols.map((c) => el("th", { class: numeric.includes(c) ? "n" : "" }, c)))));
+  t.append(el("tbody", {}, rows.map((r) => el("tr", {}, cols.map((c) => {
+    const cell = r[c];
+    if (cell instanceof Node) return el("td", {}, cell);
+    return el("td", { class: numeric.includes(c) ? "n" : "" }, fmt(cell));
+  })))));
+  return t;
+}
+function sec(title, ...body) { return el("section", {}, el("h2", {}, title), body); }
+function verdict(v) { return el("span", { class: v }, v); }
+const asList = (x) => (Array.isArray(x) ? x : []);
+
+// ---- views -------------------------------------------------------------------------------------------------
+function viewExplain(d) {
+  const x = d.data, out = [];
+  out.push(sec("Task and intent",
+    el("p", {}, "engine ", el("b", {}, fmt(x.engine)), " · intent ", (x.intent && x.intent.kinds || []).join(", ") || "–", " (score ", fmt(x.intent && x.intent.confidence), ")"),
+    el("p", { class: "muted" }, "terms: ", asList(x.terms).join(", ") || "–"),
+    x.translations && Object.keys(x.translations).length ? el("p", { class: "muted" }, "translations: ", Object.entries(x.translations).map(([k, v]) => k + "→" + asList(v).join("/")).join("; ")) : null));
+  const tm = x.timings_ms || {}, max = Math.max(1, ...Object.values(tm).filter((v) => typeof v === "number"));
+  out.push(sec("Cost by phase (ms)", table(["phase", "ms", ""], Object.entries(tm).map(([k, v]) => ({ phase: k, ms: v, "": el("div", { class: "bar", style: "width:" + Math.max(1, Math.round((v / max) * 100)) + "%" }) })), ["ms"])));
+  const cands = asList(x.candidates);
+  out.push(sec("Candidates: selected and discarded (" + cands.length + ")", table(["name", "kind", "path", "source", "lexical", "coverage", "score", "confidence", "kept", "why"],
+    cands.map((c) => ({ name: c.Name, kind: c.Kind, path: c.Path, source: c.source, lexical: c.Lexical, coverage: c.Coverage, score: c.Score, confidence: c.confidence,
+      kept: el("span", { class: c.Kept ? "pass" : "muted" }, c.Kept ? "kept" : "dropped"), why: c.reason_suppressed || c.reason_selected || c.Reason })), ["lexical", "coverage", "score", "confidence"])));
+  if (asList(x.contracts).length) out.push(sec("Contracts found", table(["status", "subject", "source", "path", "line", "claim"], x.contracts.map((c) => ({ status: c.status, subject: c.subject, source: c.source, path: c.path, line: c.line, claim: c.claim })), ["line"])));
+  if (x.packing) out.push(sec("Packing", el("p", {}, "budget ", fmt(x.packing.budget_tokens), " tokens · used ", fmt(x.packing.used_tokens), " · selected ", fmt(x.packing.selected), x.packing.abstained ? " · ABSTAINED: " + x.packing.reason : "")));
+  out.push(sec("Context actually delivered", x.context ? el("pre", {}, x.context) : el("p", { class: "muted" }, "nothing was delivered (abstention or no evidence)")));
+  return out;
+}
+
+function summarizeRuns(rows) {
+  const arms = Object.create(null); // an arm named __proto__ must not touch Object.prototype
+  for (const r of rows) {
+    const a = (arms[r.arm] = arms[r.arm] || { arm: r.arm, runs: 0, comparable: 0, pass: 0, hidden: 0, cost: 0, costN: 0, calls: 0, callsN: 0, red: 0, redN: 0 });
+    a.runs++; if (!r.comparable) continue; a.comparable++;
+    if (r.success) a.pass++;
+    if (r.oracle && r.oracle.tests === "pass") a.hidden++;
+    if (typeof r.cost_usd === "number") { a.cost += r.cost_usd; a.costN++; }
+    if (typeof r.tool_calls === "number") { a.calls += r.tool_calls; a.callsN++; }
+    if (r.progress && typeof r.progress.redundant === "number") { a.red += r.progress.redundant; a.redN++; }
+  }
+  return Object.values(arms).map((a) => ({ arm: a.arm, runs: a.runs, comparable: a.comparable, pass: a.pass, "pass rate": a.comparable ? a.pass / a.comparable : null,
+    "hidden tests ok": a.hidden, "mean cost USD": a.costN ? a.cost / a.costN : null, "mean tool calls": a.callsN ? a.calls / a.callsN : null, "mean redundant calls": a.redN ? a.red / a.redN : null }));
+}
+function viewRuns(d) {
+  const rows = asList(d.data), out = [];
+  const ev = new Set(rows.map((r) => r.evidence));
+  out.push(el("p", { class: "note" }, "Evidence level: " + [...ev].join(", ") + ". Small N is descriptive; no row here is a proven gain. Simulated runs test the infrastructure, not the product."));
+  out.push(sec("By arm", table(["arm", "runs", "comparable", "pass", "pass rate", "hidden tests ok", "mean cost USD", "mean tool calls", "mean redundant calls"], summarizeRuns(rows), ["runs", "comparable", "pass", "pass rate", "hidden tests ok", "mean cost USD", "mean tool calls", "mean redundant calls"])));
+  const arms = [...new Set(rows.map((r) => r.arm))], tasks = [...new Set(rows.map((r) => r.task))].sort();
+  const by = Object.create(null); for (const r of rows) by[r.task + "|" + r.arm] = r;
+  out.push(sec("Per task (verdict · cost · wall s)", table(["task", "class", "split", ...arms], tasks.map((t) => {
+    const any = rows.find((r) => r.task === t), row = { task: t, class: any.class, split: any.split };
+    for (const a of arms) { const r = by[t + "|" + a]; row[a] = r ? el("span", {}, verdict(r.verdict), " ", el("span", { class: "muted" }, fmt(r.cost_usd, 4) + " · " + fmt(r.wall_s, 0))) : "–"; }
+    return row;
+  }))));
+  const issues = rows.filter((r) => !r.comparable || (r.oracle && !r.oracle.scope_ok));
+  if (issues.length) out.push(sec("Excluded or out-of-scope runs (" + issues.length + ")", table(["task", "arm", "comparable", "outside scope", "reasons"], issues.map((r) => ({ task: r.task, arm: r.arm, comparable: String(r.comparable), "outside scope": (r.oracle && r.oracle.outside_scope || []).join(", "), reasons: (r.incomparable_reasons || []).join("; ") || r.agent_error })))));
+  return out;
+}
+function viewScorecard(d) {
+  const out = [], x = d.data;
+  for (const [ev, s] of Object.entries(x.sections || {})) {
+    if (!s.arms) { out.push(sec(ev, el("pre", {}, JSON.stringify(s, null, 1).slice(0, 4000)))); continue; }
+    out.push(sec("Evidence: " + ev, table(["arm", "runs", "comparable", "passed", "pass_rate", "cost_per_success", "scope_violations", "redundant_calls_mean"], Object.entries(s.arms).map(([a, v]) => Object.assign({ arm: a }, v)), ["runs", "comparable", "passed", "pass_rate", "cost_per_success", "scope_violations", "redundant_calls_mean"])));
+    out.push(sec("Paired vs OFF (" + ev + ")", table(["arm", "pairs", "d_pass_mean", "conclusion"], Object.entries(s.paired_vs_OFF || {}).map(([a, v]) => ({ arm: a, pairs: v.pairs, d_pass_mean: v.d_pass_mean, conclusion: v.conclusion })), ["pairs", "d_pass_mean"])));
+  }
+  out.push(sec("Limits", el("ul", {}, asList(x.limits).map((l) => el("li", {}, l)))));
+  return out;
+}
+function viewReplay(d) {
+  const x = d.data, out = [];
+  out.push(el("p", { class: "note" }, "Offline retrieval replay (config " + fmt(x.config_version) + ", deterministic=" + fmt(x.deterministic) + "). Not an agent result."));
+  out.push(sec("Variants", table(["variant", "Hit@1", "Hit@5", "MRR", "FP %", "tokens", "regressions", "improvements"], asList(x.variants).map((v) => { const s = (v.summary_by_split || {}).all || {};
+    return { variant: v.name, "Hit@1": s.Hit1, "Hit@5": s.Hit5, MRR: s.MRR, "FP %": s.FalsePos, tokens: s.Tokens, regressions: asList(v.regressions_vs_active).length, improvements: asList(v.improvements_vs_active).length }; }), ["Hit@1", "Hit@5", "MRR", "FP %", "tokens", "regressions", "improvements"])));
+  const regs = asList(x.variants).flatMap((v) => asList(v.regressions_vs_active).map((c) => ({ variant: v.name, case: c.Case, split: c.Split, detail: c.Detail })));
+  if (regs.length) out.push(sec("Regressions against the active tuning", table(["variant", "case", "split", "detail"], regs)));
+  return out;
+}
+function viewPerf(d) {
+  const x = d.data, out = [el("p", { class: "note" }, fmt(x.limitation))];
+  for (const mode of ["warm_by_stage", "cold_by_stage"]) for (const [eng, stages] of Object.entries(x[mode] || {}))
+    out.push(sec(eng + " · " + mode.replace("_by_stage", ""), table(["stage", "n", "p50_ms", "p95_ms", "p99_ms", "max_ms"], Object.entries(stages).map(([k, v]) => Object.assign({ stage: k }, v)), ["n", "p50_ms", "p95_ms", "p99_ms", "max_ms"])));
+  return out;
+}
+function viewGroom(d) {
+  const x = d.data, s = x.summary || {}, out = [];
+  out.push(sec("Clarification benchmark", el("p", {}, "asked correctly ", fmt(s.tp), "/", fmt((s.tp || 0) + (s.fn || 0)), " · unnecessary questions ", fmt(s.fp), "/", fmt((s.fp || 0) + (s.tn || 0)), " · state agreement ", fmt(s.state_ok), "/", fmt(s.state_n)),
+    el("p", { class: "muted" }, "Internal fixture written by the detector's author: a regression gate, not evidence of usefulness.")));
+  out.push(sec("Cases", table(["case", "category", "expected ask", "action", "states", "decision"], asList(x.outcomes).map((o) => ({ case: o.case, category: o.category, "expected ask": String(o.expect_ask), action: el("span", { class: (o.expect_ask === (o.action === "ask")) ? "pass" : "fail" }, o.action), states: asList(o.states).join(", "), decision: o.decision })))));
+  return out;
+}
+function viewImpact(d) {
+  const x = d.data, n = x.held_out || 0;
+  return [sec("Change impact on real history: " + fmt(x.repo), el("p", {}, fmt(x.commits), " commits · ", fmt(n), " held-out files"),
+    table(["signal", "named the next edited file", "rate"], [{ signal: "structural", "named the next edited file": x.structural, rate: n ? pct(x.structural / n) : "–" }, { signal: "co-change", "named the next edited file": x.cochange, rate: n ? pct(x.cochange / n) : "–" },
+      { signal: "structural + co-change", "named the next edited file": x.both, rate: n ? pct(x.both / n) : "–" }, { signal: "baseline: same directory", "named the next edited file": x.baseline_same_dir, rate: n ? pct(x.baseline_same_dir / n) : "–" }]))];
+}
+function viewRaw(d) { return [sec(d.name + " (" + d.kind + ")", el("pre", {}, JSON.stringify(d.data, null, 1).slice(0, 20000)))]; }
+
+const VIEWS = { explain: viewExplain, "lab-run/1[]": viewRuns, "lab-scorecard/1": viewScorecard, "replay/1": viewReplay, "perf/1": viewPerf, "groom-eval/1": viewGroom, "impact-history/1": viewImpact };
+const LABEL = { explain: "Explain", "lab-run/1[]": "Runs", "lab-scorecard/1": "Scorecard", "replay/1": "Variants", "perf/1": "Perf", "groom-eval/1": "Clarification", "impact-history/1": "Impact" };
+
+function show(i) {
+  const d = DOCS[i];
+  [...$("tabs").children].forEach((b, j) => b.setAttribute("aria-selected", String(i === j)));
+  const view = VIEWS[d.kind] || viewRaw;
+  const main = $("main"); main.replaceChildren(...view(d)); main.focus({ preventScroll: true });
+}
+(function init() {
+  if (!Array.isArray(DOCS) || !DOCS.length) { $("main").append(el("p", {}, "No data embedded.")); return; }
+  $("sub").textContent = "Static view of " + DOCS.length + " input(s). Nothing leaves this page; data is rendered as text, never as markup.";
+  DOCS.forEach((d, i) => { const b = el("button", { role: "tab", type: "button" }, (LABEL[d.kind] || "Data") + " · " + d.name); b.addEventListener("click", () => show(i)); $("tabs").append(b); });
+  show(0);
+})();
+</script>
+</body>
+</html>
