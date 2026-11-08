@@ -1,5 +1,7 @@
 # Benchmark real em spring-petclinic e go-chi/chi: OFF × Sidecar V1 × Sidecar V2
 
+> **Nota (2026-11-08):** as tabelas das seções 4 e 5 vêm da primeira coleta (antes do léxico TSV e da poda estrutural). A simulação foi reexecutada; valores atuais em [agentic-ab-report.md](agentic-ab-report.md), [real-repos-scores.json](real-repos-scores.json) e [feedback-and-voice-roi.md](feedback-and-voice-roi.md). Continua sendo uma simulação com política fixa, sem agente de linguagem.
+
 **Leia antes dos números.** Três limites definem o que este relatório pode afirmar:
 
 1. **Nenhum agente de linguagem foi executado.** As 6 tarefas agênticas usam uma **simulação instrumentada** (`bench/agentic/instrumented_sim.py`): uma política fixa de grep e leitura, igual nos três braços. Só a fonte de candidatos muda. Tempo, chamadas e tokens vêm de execuções reais de `grep`, leitura de arquivo e `sidecar explain`. A simulação mede o valor do contexto entregue sob uma política fixa, não a produtividade de um agente real.

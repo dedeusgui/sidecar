@@ -252,3 +252,12 @@ go run ./cmd/sidecar-eval --agentic-report <diretorio-com-runs.jsonl> --agentic-
 4. **Split cego novo:** gabaritos escritos antes da medição, sem olhar a saída. Holdout atual não serve mais para isso.
 5. **Corpus externo:** baixar o Agent Retrieval Bench fora do repositório, verificar o esquema e escrever o conversor. Confirmar a licença do ContextBench antes de qualquer uso.
 6. **Piloto agentic:** 4 tarefas × 3 modelos × OFF e ON-v2, 24 execuções, só com autorização de custo e com oráculos verificados antes das execuções.
+
+## Rodada F (2026-11-08): 10 repositórios reais, voz e léxico algorítmico
+
+Resultados completos e limites em [bench/results/feedback-and-voice-roi.md](../bench/results/feedback-and-voice-roi.md) e [bench/results/ten-repos-benchmark.md](../bench/results/ten-repos-benchmark.md). Suíte: `bench/ten_repos_cases.json` (10 repositórios, 50 casos de um único autor, split de desenvolvimento), preparada por `bench/agentic/setup_10_repos.sh`.
+
+- **Executado:** recuperação offline (50/50 cenários nos métodos lexical+grafo, v2.1 e v2; Hit@5 20/20 em direto, 9/10 em PT imperfeito, 10/10 em voz; 0/10 falsos positivos) e a simulação agêntica de 90 runs com política fixa.
+- **Não executado:** agente real (Claude Code, Codex, Antigravity CLI) em ON/OFF. Não existe score por cliente; qualquer tabela desse tipo seria inventada.
+- **Mudanças:** dicionário PT-BR→EN passou de mapa em Go para transdutor de cognatos (`internal/lexical/cognates.go`) mais `lexicon_pt_en.tsv` embutido e `$SIDECAR_HOME/lexicon.json`; destilação de prompts longos (`focalTerms`); poda da expansão estrutural; docstrings Python.
+- **Regra:** benchmarks internos (`bench/cases.json`, `bench/v2_scenarios.json`, esta suíte) detectam regressão. Utilidade para agentes exige repositórios externos reais, prompts realistas (inclusive de voz independentes) e agente caixa-preta, com o `sidecar feedback record` ao fim de cada tarefa de dogfooding.
