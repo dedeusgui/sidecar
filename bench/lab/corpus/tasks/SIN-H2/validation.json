@@ -22,7 +22,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "kept [test/zz_oracle_link_headers_test.rb:55]:\n--- expected\n+++ actual\n@@ -1,3 +1,3 @@\n-# encoding: UTF-8\n+# encoding: ASCII-8BIT\n #    valid: true\n-\"<link href=\\\"/x\\\" title=\\\"a, <b>\\\" />\"\n+\"<link href=\\\"/x\\\" title=\\\"a /><link href=\\\"b>\\\"  />\"\n\n\n13 runs, 15 assertions, 7 failures, 0 errors, 0 skips\n"
+    "detail": "1,3 @@\n-# encoding: UTF-8\n+# encoding: ASCII-8BIT\n #    valid: true\n-\"<link href=\\\"/a.css\\\" rel=stylesheet /><link href=\\\"/b,c.js\\\" rel=preload />\"\n+\"<link href=\\\"/a.css\\\" rel=stylesheet /><link href=\\\"/\\\"  /><link href=\\\".js\\\" rel=preload />\"\n\n\n13 runs, 15 assertions, 7 failures, 0 errors, 0 skips\n"
   },
   "reference": {
     "kind": "tests",
@@ -49,6 +49,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794175619.7420475,
+  "ts": 1794176154.3298333,
   "base_verdict": "fail"
 }

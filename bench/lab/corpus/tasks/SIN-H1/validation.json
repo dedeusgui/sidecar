@@ -22,7 +22,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "stays_indifferent:\nArgumentError: wrong number of arguments (given 1, expected 0)\n    lib/sinatra/indifferent_hash.rb:160:in `transform_keys'\n    test/zz_oracle_indifferent_transform_keys_test.rb:53:in `test_nested_hash_value_stays_indifferent'\n\n15 runs, 3 assertions, 0 failures, 12 errors, 0 skips\n"
+    "detail": "non_symbol_keys_in_mapping:\nArgumentError: wrong number of arguments (given 1, expected 0)\n    lib/sinatra/indifferent_hash.rb:160:in `transform_keys'\n    test/zz_oracle_indifferent_transform_keys_test.rb:37:in `test_non_symbol_keys_in_mapping'\n\n15 runs, 3 assertions, 0 failures, 12 errors, 0 skips\n"
   },
   "reference": {
     "kind": "tests",
@@ -49,6 +49,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794175518.1068213,
+  "ts": 1794176057.8815353,
   "base_verdict": "fail"
 }
