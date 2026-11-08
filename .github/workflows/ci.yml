@@ -79,6 +79,8 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s bench/agent -p 'test_*.py' -v
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s bench/agentic -p 'test_*.py' -v
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s bench -p 'test_scorecard.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s bench -p 'test_consolidate.py' -v
+          python3 bench/consolidate.py --check
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s bench/lab -p 'test_*.py' -v
       - name: Retrieval benchmark (tune / eval / holdout)
         run: go run ./cmd/sidecar-eval --cases bench/cases.json --out bench/results/ci.json

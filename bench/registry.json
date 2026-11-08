@@ -1,0 +1,287 @@
+{
+  "schema": "bench-registry/1",
+  "updated": "2026-11-08",
+  "evidence_levels": {
+    "infra": "prova que uma peça funciona (teste, E2E de instalação); não mede ganho",
+    "offline": "recuperação/política medida sem agente; não é resultado de desenvolvimento",
+    "agentic": "agente real, tarefa de edição, oráculo independente; único nível que sustenta alegação de ganho, e só com IC e N adequado"
+  },
+  "benchmarks": [
+    {
+      "id": "B01-retrieval-internal",
+      "level": "offline",
+      "question": "A recuperação acha o gold em fixtures internas (tune/eval/holdout)?",
+      "data": "bench/cases.json (71 casos, 3 fixtures); escrito pelo autor do código",
+      "command": "go run ./cmd/sidecar-eval --cases bench/cases.json",
+      "artifacts": [
+        "bench/cases.json"
+      ],
+      "headline": "gate mínimo e regressão; sem alegação de utilidade",
+      "status": "referência de regressão",
+      "caveat": "viés de autoria; holdout interno já foi visto"
+    },
+    {
+      "id": "B02-retrieval-external",
+      "level": "offline",
+      "question": "A recuperação acha o gold em 10 repositórios reais fixados?",
+      "data": "bench/ten_repos_cases.json (40 positivos, commits fixados)",
+      "command": "bash bench/agentic/setup_10_repos.sh /tmp/sidecar-real-bench && go run ./cmd/sidecar-eval --external-cases /tmp/sidecar-real-bench/ten-repos-manifest.json",
+      "artifacts": [
+        "bench/ten_repos_cases.json"
+      ],
+      "headline": "V2 Hit@1 50,0%, Hit@5 97,5%, MRR 0,694 (reproduz o PR #6)",
+      "status": "referência",
+      "caveat": "40 casos, localização apenas"
+    },
+    {
+      "id": "B03-hard-negatives",
+      "level": "offline",
+      "question": "A V2 injeta contexto em prompts fora de assunto?",
+      "data": "bench/negatives (240 prompts × 10 repos; holdout antigo foi visto)",
+      "command": "python3 bench/negatives/make_manifest.py --checkout DIR OUT && go run ./cmd/sidecar-eval --external-cases OUT",
+      "artifacts": [
+        "bench/negatives/hard_negatives.json"
+      ],
+      "headline": "falsos positivos dev+validation 28/180 (15,6%), igual ao PR #6",
+      "status": "referência",
+      "caveat": "holdout deste conjunto não é cego"
+    },
+    {
+      "id": "B04-long-prompts",
+      "level": "offline",
+      "question": "Prompts longos/ruidosos (voz, PT-BR) recuperam e se abstêm?",
+      "data": "bench/r2/long_prompts.json (16 positivos + 6 negativos longos; escritos DEPOIS de ver o modo de falha)",
+      "command": "python3 bench/r2/make_manifest.py --checkout DIR OUT && go run ./cmd/sidecar-eval --external-cases OUT",
+      "artifacts": [
+        "bench/r2/long_prompts.json",
+        "docs/eval-r2-2026-11-08.md"
+      ],
+      "headline": "V2: Hit@5 87,5% nos positivos longos; **50% de falsos positivos** nos negativos longos (3/6)",
+      "status": "regressão; não cego",
+      "caveat": "N=22; uma perda = 6 pontos"
+    },
+    {
+      "id": "B05-replay",
+      "level": "offline",
+      "question": "Algum parâmetro da confiança/abstenção melhora a recuperação sem perder recall?",
+      "data": "bench/replay/params.json sobre B02/B03/B04 (holdout excluído por padrão)",
+      "command": "go run ./cmd/sidecar-eval --external-cases OUT --replay bench/replay/params.json",
+      "artifacts": [
+        "bench/replay/params.json",
+        "docs/eval-r2-2026-11-08.md"
+      ],
+      "headline": "H1 (≥6 termos exigem suporte ≥3): FP dev 15→11%, val 16,2→8,8%, perde 1 de 16 positivos longos → inconclusiva; H2 (exceção por IDF) rejeitada",
+      "status": "inconclusivo; defaults mantidos",
+      "caveat": "determinismo provado; grade pequena"
+    },
+    {
+      "id": "B06-perf",
+      "level": "offline",
+      "question": "Quanto custa o pipeline por estágio (cold/warm, p50/p95/p99)?",
+      "data": "10 repositórios externos, n=540 chamadas warm por engine",
+      "command": "go run ./cmd/sidecar-eval --external-cases OUT --perf 10",
+      "artifacts": [],
+      "headline": "V1 total p50 7,5 / p95 13,4 ms; V2 p50 13,7 / p95 56,7; V2+adaptive p50 10,5 / p95 58,6 (cauda sem ganho)",
+      "status": "referência",
+      "caveat": "em processo; sem custo do processo do hook nem do cliente; cold n=10"
+    },
+    {
+      "id": "B07-brief-tokens",
+      "level": "offline",
+      "question": "O brief injeta menos texto que o bloco padrão com a mesma recuperação?",
+      "data": "B02 e B04",
+      "command": "go run ./cmd/sidecar-eval --external-cases OUT (método 'v2 + task brief')",
+      "artifacts": [
+        "docs/task-brief.md"
+      ],
+      "headline": "tokens médios 417→340 (positivos), 454→385 (longos); Hit@5/FP idênticos",
+      "status": "referência",
+      "caveat": "menos tokens não prova economia para o agente"
+    },
+    {
+      "id": "B08-groom",
+      "level": "offline",
+      "question": "A política pergunta só o que importa?",
+      "data": "bench/groom_cases.json (28 casos rotulados antes de rodar; fixture interna)",
+      "command": "go run ./cmd/sidecar-eval --cases bench/groom_cases.json --groom",
+      "artifacts": [
+        "bench/groom_cases.json",
+        "docs/grooming.md"
+      ],
+      "headline": "0/17 perguntas desnecessárias; 8/11 perguntas corretas; 3 erros mantidos (A06, A07, A09)",
+      "status": "regressão",
+      "caveat": "autor do detector escreveu os casos; sem benefício líquido medido"
+    },
+    {
+      "id": "B09-impact-history",
+      "level": "offline",
+      "question": "A análise de impacto nomeia o arquivo que o mantenedor editou junto?",
+      "data": "histórico real de chi, click e express (commits de 2–6 arquivos)",
+      "command": "go run ./cmd/sidecar-eval --impact-history REPO --impact-commits 40",
+      "artifacts": [
+        "docs/change-impact.md"
+      ],
+      "headline": "estrutural+co-mudança 46% (chi), 63% (click), 49% (express) com 3–6 arquivos; baseline mesmo diretório 71%/96%/42% com 17/15/5",
+      "status": "referência",
+      "caveat": "sem IC; 3 primeiros arquivos por commit; express estrutural 0%"
+    },
+    {
+      "id": "B10-lab-pilot-dev1",
+      "level": "agentic",
+      "question": "OFF/V1/V2 em tarefas de edição reais (piloto de desenvolvimento)",
+      "data": "8 tarefas development × 3 braços × 1 rep; claude-haiku-5-5; US$ 0,177",
+      "command": "python3 bench/lab/lab.py run --arms OFF,V1,V2 --splits development",
+      "artifacts": [
+        "bench/results/lab-dev1-2026-11-08"
+      ],
+      "headline": "inconclusivo; V1/V2 vs OFF ≈ −12% tool calls/tokens/custo, IC cruza zero",
+      "status": "SUPERADO por B12; rodou antes da correção de isolamento",
+      "caveat": "possivelmente contaminado (agente podia ler o gabarito); sem traces"
+    },
+    {
+      "id": "B11-lab-pilot-r3",
+      "level": "agentic",
+      "question": "V2, V2+adaptive, V2+brief em 15 tarefas",
+      "data": "15 tarefas × 4 braços × 1 rep; 11 de 60 execuções excluídas (resposta em ~1 s sem modelo servido; causa desconhecida)",
+      "command": "python3 bench/lab/lab.py run --arms OFF,V2,V2+adaptive,V2+brief",
+      "artifacts": [],
+      "headline": "inconclusivo; único IC fora de zero é tempo do brief vs V2 (−26%), não confiável (CPU compartilhada)",
+      "status": "SUPERADO por B12; rodou antes da correção de isolamento",
+      "caveat": "possivelmente contaminado; excluiu tarefas de localização e negativas"
+    },
+    {
+      "id": "B12-lab-bench-clean",
+      "level": "agentic",
+      "question": "Qual o efeito de V1, V2 e dos componentes (adaptive, brief) em aprovação, tool calls, tokens, custo e tempo?",
+      "data": "15 tarefas (dev+validation) × 5 braços × 3 repetições (225 execuções); isolamento corrigido; holdout intocado",
+      "command": "python3 bench/lab/lab.py run --arms OFF,V1,V2,V2+adaptive,V2+brief --rep-offset N",
+      "artifacts": [],
+      "headline": "ver docs/benchmarks-2026-11-08.md (gerado ao fim da execução)",
+      "status": "em execução",
+      "caveat": "um modelo; tempo de parede com CPU compartilhada entre 3 processos; sem sandbox de SO"
+    },
+    {
+      "id": "B13-install-e2e",
+      "level": "infra",
+      "question": "Instalar, disparar hooks reais e desinstalar preserva a configuração do usuário?",
+      "data": "Claude Code 2.1.319 real, config isolada",
+      "command": "ver bench/results/r7-install-e2e-2026-11-08.md",
+      "artifacts": [
+        "bench/results/r7-install-e2e-2026-11-08.md"
+      ],
+      "headline": "hooks e statusLine de terceiros preservados; UserPromptSubmit/PreToolUse/PostToolUse disparam; settings idêntico após uninstall",
+      "status": "referência",
+      "caveat": "PreCompact, Codex, Antigravity, upgrade e Windows/macOS não verificados"
+    },
+    {
+      "id": "B14-studio-browser",
+      "level": "infra",
+      "question": "O Studio renderiza dados reais sem erro e sem executar conteúdo hostil?",
+      "data": "Chromium via Playwright; 7 abas; viewport desktop e 390 px",
+      "command": "ver docs/studio.md",
+      "artifacts": [
+        "docs/studio.md"
+      ],
+      "headline": "0 erros de console, 0 requisições de rede, sem rolagem horizontal; payload hostil exibido como texto",
+      "status": "referência",
+      "caveat": "sem linha do tempo por sessão"
+    }
+  ],
+  "improvement_leads": [
+    {
+      "id": "L01",
+      "source": [
+        "B02",
+        "B04"
+      ],
+      "problem": "Lacuna de dicionário PT→EN: 'alíquota' sem tradução derruba o caso E17; nenhum parâmetro de confiança o separa de falsos positivos",
+      "hypothesis_v3": "Derivar equivalências do próprio vocabulário do repositório (comentários, docs, nomes) em vez de só dicionário estático",
+      "confirm_with": "B02/B04 mais um conjunto novo de PT-BR; medir Hit@5 sem subir FP",
+      "priority": "alta"
+    },
+    {
+      "id": "L02",
+      "source": [
+        "B03",
+        "B04"
+      ],
+      "problem": "Prompts longos fora de assunto vazam (50%); contagem de termos não separa âncora rara de termo genérico",
+      "hypothesis_v3": "Sinal de especificidade por raridade do termo no vocabulário de NOMES do repositório (não só texto)",
+      "confirm_with": "B04 (N maior) + B03 sem perder positivos longos",
+      "priority": "alta"
+    },
+    {
+      "id": "L03",
+      "source": [
+        "B09"
+      ],
+      "problem": "Grafo estrutural não resolve funções atribuídas (`res.x = function`): 0% em express",
+      "hypothesis_v3": "Extrator reconhecer definições por atribuição em JS/TS; combinar com co-mudança como sinal próprio",
+      "confirm_with": "B09 em express e outro repositório JS",
+      "priority": "média"
+    },
+    {
+      "id": "L04",
+      "source": [
+        "B08"
+      ],
+      "problem": "Clarificação perde pedidos de valor sem palavra de limite (LateFeePercent) e alvos ambíguos sem candidatos comparáveis",
+      "hypothesis_v3": "Detectar parâmetros numéricos pelas constantes do repositório e comparar candidatos por especificidade, não só por score",
+      "confirm_with": "B08 ampliado com casos externos e rótulos de terceiros",
+      "priority": "média"
+    },
+    {
+      "id": "L05",
+      "source": [
+        "B10",
+        "B12"
+      ],
+      "problem": "Escopo estrito do corpus reprova agentes que só adicionaram testes; tarefas aparecem 'não resolvidas' por calibração, não por qualidade",
+      "hypothesis_v3": "Corpus v2: testes permitidos por padrão; reportar sempre aprovação estrita e testes ocultos",
+      "confirm_with": "B12 com as duas métricas (já reportadas)",
+      "priority": "alta (infra de medição)"
+    },
+    {
+      "id": "L06",
+      "source": [
+        "B08",
+        "B12"
+      ],
+      "problem": "Grooming (R4) e intervenção (R6) não podem ser avaliados sem canal de duas vias com o usuário/agente",
+      "hypothesis_v3": "Desenhar um canal verificado (pergunta nativa interativa e entrega no meio do turno) e um protocolo com usuário simulado e respostas pré-definidas",
+      "confirm_with": "novo benchmark agentic multi-turno; E2E por cliente",
+      "priority": "alta (bloqueia R4/R6)"
+    },
+    {
+      "id": "L07",
+      "source": [
+        "B12"
+      ],
+      "problem": "Tokens do agente são dominados por leitura de cache/arquivos (centenas de milhares), enquanto o contexto injetado tem ~1,5 mil caracteres",
+      "hypothesis_v3": "Atacar o custo onde ele está: reduzir releituras e resultados de ferramenta, não só melhorar o contexto inicial",
+      "confirm_with": "B12: correlação entre tokens e chamadas por classe de tarefa; análise de hot spots",
+      "priority": "a decidir com os dados finais"
+    },
+    {
+      "id": "L08",
+      "source": [
+        "B10",
+        "B11"
+      ],
+      "problem": "Execuções que voltam em ~1 s sem modelo servido (causa desconhecida) removem tarefas inteiras da comparação",
+      "hypothesis_v3": "Registrar stderr e o evento de resultado do cliente em toda execução para diagnosticar; repetir automaticamente execuções sem resposta",
+      "confirm_with": "B12 não deve ter exclusões; se tiver, investigar",
+      "priority": "média"
+    },
+    {
+      "id": "L09",
+      "source": [
+        "B12"
+      ],
+      "problem": "Isolamento do agente sem sandbox de SO: código que o agente roda lê o gabarito",
+      "hypothesis_v3": "Executar braços em contêiner ou usuário separado",
+      "confirm_with": "teste de sonda que tente ler o oráculo via código executado",
+      "priority": "alta para o holdout final"
+    }
+  ]
+}

@@ -840,14 +840,15 @@ def summarize(rows):
     }
 
 
-METRICS = (("pass_rate", "taxa de aprovação", "pass"), ("tool_calls", "chamadas de ferramenta", "calls"), ("tokens", "tokens (entrada+saída)", "tok"),
+METRICS = (("pass_rate", "taxa de aprovação (estrita: teste+escopo+invariantes)", "pass"), ("hidden_pass", "testes ocultos passaram (sem escopo)", "hid"), ("tool_calls", "chamadas de ferramenta", "calls"), ("tokens", "tokens (entrada+saída)", "tok"),
            ("cost_usd", "custo US$", "cost"), ("wall_s", "tempo s", "wall"), ("redundant", "chamadas redundantes", "red"))
 
 
 def run_metrics(r):
     prog = r.get("progress") or {}
     tin, tout = r.get("tokens_in"), r.get("tokens_out")
-    return {"pass_rate": 1.0 if r["success"] else 0.0, "tool_calls": r.get("tool_calls"),
+    return {"pass_rate": 1.0 if r["success"] else 0.0, "hidden_pass": 1.0 if (r.get("oracle") or {}).get("tests") == "pass" else 0.0,
+            "tool_calls": r.get("tool_calls"),
             "tokens": (tin + tout) if isinstance(tin, int) and isinstance(tout, int) else None,
             "cost_usd": r.get("cost_usd"), "wall_s": r.get("wall_s"), "redundant": prog.get("redundant")}
 
@@ -986,7 +987,10 @@ def render_md(rep):
 
 
 def cmd_report(args):
-    rows = [json.loads(l) for l in pathlib.Path(args.runs).read_text().splitlines() if l.strip()]
+    rows = [json.loads(l) for path in args.runs for l in pathlib.Path(path).read_text().splitlines() if l.strip()]
+    keys = [(r["task"], r["arm"], r["rep"]) for r in rows]
+    if len(keys) != len(set(keys)):
+        raise LabError("runs repetidos entre os arquivos (mesma tarefa, braço e repetição): use --rep-offset distintos")
     offline = load_json(args.offline)["summary"] if args.offline and "summary" in load_json(args.offline) else (
         {"file": args.offline} if args.offline else None)
     rep = build_report(rows, offline)
@@ -1018,7 +1022,7 @@ def main(argv=None):
     p.add_argument("--tools-allow", default="Read,Grep,Glob,Edit,Write,Bash(go test:*),Bash(ls:*)")
     p.add_argument("--yes-spend", action="store_true"); p.add_argument("--final", action="store_true")
     p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--rep-offset", type=int, default=0, help="índice da primeira repetição; permite processos paralelos com repetições distintas"); p.add_argument("--scripted-behaviour", default="reference")
-    p = sub.add_parser("report"); p.add_argument("runs"); p.add_argument("--md"); p.add_argument("--json"); p.add_argument("--offline")
+    p = sub.add_parser("report"); p.add_argument("runs", nargs="+", help="um ou mais runs.jsonl (repetições de processos diferentes são juntadas)"); p.add_argument("--md"); p.add_argument("--json"); p.add_argument("--offline")
     a = ap.parse_args(argv)
     try:
         if a.cmd == "validate-task":
