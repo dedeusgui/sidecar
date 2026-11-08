@@ -12,7 +12,25 @@ import (
 	"github.com/dedeusgui/sidecar/internal/store"
 )
 
+// interactive removes the CI markers a runner sets: the policy treats CI as a session nobody can answer.
+func interactive(t *testing.T) {
+	t.Helper()
+	t.Setenv("CI", "")
+	t.Setenv("SIDECAR_ASK", "")
+}
+
+func TestGroomAssumesInsteadOfAskingInCI(t *testing.T) {
+	t.Setenv("CI", "true")
+	res := retrieve.Result{}
+	rec := map[string]any{}
+	_ = applyGroom(nil, t.TempDir(), t.TempDir()+"/state", adapter.Claude, "s", "adicione um limite de tentativas no login", &res, time.Now(), rec)
+	if rec["groom_action"] != groom.Assume {
+		t.Fatalf("a CI session cannot answer: the note must be an assumption, got %v", rec)
+	}
+}
+
 func TestGroomQuestionIsDeliveredEvenWhenThereIsNoOtherEvidence(t *testing.T) {
+	interactive(t)
 	res := retrieve.Result{} // budget 0: nothing else to show
 	rec := map[string]any{}
 	if err := applyGroom(nil, t.TempDir(), t.TempDir()+"/state", adapter.Claude, "s", "adicione um limite de tentativas no login", &res, time.Now(), rec); err != nil {
@@ -31,6 +49,7 @@ func TestGroomQuestionIsDeliveredEvenWhenThereIsNoOtherEvidence(t *testing.T) {
 }
 
 func TestGroomDoesNotRepeatAPendingQuestionOrSpendTheQuota(t *testing.T) {
+	interactive(t)
 	state := t.TempDir() + "/state"
 	prompt := "adicione um limite de tentativas no login"
 	for turn := 1; turn <= 3; turn++ {
