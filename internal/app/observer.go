@@ -120,7 +120,7 @@ func applyTool(s *brief.SessionSignals, c adapter.ToolCall, root string) []strin
 // hashes (a search is the sorted set of its hashed terms), so near-duplicate detection needs no clear text.
 // A decision to intervene is only counted (Shadows): there is no verified transport to deliver one.
 func classifyProgress(s *brief.SessionSignals, c adapter.ToolCall, root string) []string {
-	ev := progress.Event{}
+	var ev progress.Event
 	switch {
 	case c.Phase == "post":
 		if c.Result != "error" || c.Error == "" {
