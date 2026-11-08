@@ -17,7 +17,7 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 | R3 Task Evidence Brief | `ContractEvidence`, packer | brief rastreável | gate R3 | ⬜ |
 | R4 TaskUncertainty / grooming | — | detector, política, decisões, benchmark | gate R4 | ⬜ |
 | R5 Impact/Verification | `ContractEvidence` | blast radius, verificações | gate R5 | ⬜ |
-| R6 Session Intelligence | `SessionObserver` passivo | traces, estagnação | gate R6 | ⬜ |
+| R6 Session Intelligence | `SessionObserver` passivo | traces, estagnação | gate R6 | 🟡 [session-intelligence](session-intelligence.md): classificação passiva + sombra + `sidecar progress` + métricas no lab; sem transporte de intervenção (gate pendente) |
 | R7 Studio/adapters/release | docs de integração | estático, matriz de suporte | gate R7 | ⬜ |
 
 ## Corpus (R1.1)

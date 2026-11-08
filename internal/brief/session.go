@@ -3,6 +3,7 @@ package brief
 import (
 	"encoding/json"
 	"errors"
+	"github.com/dedeusgui/sidecar/internal/progress"
 	"os"
 	"path/filepath"
 	"time"
@@ -43,7 +44,14 @@ type SessionSignals struct {
 	// Presented holds hashes of the evidence the hook actually injected into this session: one per
 	// path and one per path and symbol. Feedback is only attributed to evidence found here.
 	Presented map[string]bool `json:"evidence_presented,omitempty"`
+	// Trace is the bounded sequence of observed tool events, as hashes only (progress.Event keys are hashed
+	// terms or paths). Shadows counts the intervention decisions Sidecar would have made; none is delivered.
+	Trace   []progress.Event `json:"trace,omitempty"`
+	Shadows int              `json:"shadow_decisions,omitempty"`
 }
+
+// MaxTrace bounds Trace.
+const MaxTrace = 64
 
 // NewSignals returns empty signals for version, valid until now plus SessionTTL.
 func NewSignals(version string, now time.Time) SessionSignals {
