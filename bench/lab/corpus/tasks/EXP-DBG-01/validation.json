@@ -1,0 +1,42 @@
+{
+  "id": "EXP-DBG-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "API pública preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "type: 'test'\n  ...\n# Subtest: DBG01 links com array de valores continua funcionando\nok 4 - DBG01 links com array de valores continua funcionando\n  ---\n  duration_ms: 1.171955\n  type: 'test'\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 2\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 117.884604\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "lib/response.js"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "API pública preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163266.9519243,
+  "base_verdict": "fail"
+}

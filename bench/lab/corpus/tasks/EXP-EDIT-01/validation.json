@@ -1,0 +1,54 @@
+{
+  "id": "EXP-EDIT-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "serialização com replacer/spaces/json escape preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "st: EDIT01 callback com caracteres filtrados continua sendo sanitizado\nok 3 - EDIT01 callback com caracteres filtrados continua sendo sanitizado\n  ---\n  duration_ms: 2.541609\n  type: 'test'\n  ...\n1..3\n# tests 3\n# suites 0\n# pass 2\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 141.091329\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "lib/response.js"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "serialização com replacer/spaces/json escape preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163232.3286133,
+  "base_verdict": "fail"
+}

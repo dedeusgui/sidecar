@@ -270,7 +270,10 @@ def prepare_workspace(task, dest):
     work = materialize(task, dest)
     cmds = task.get("setup") or []
     if cmds:
-        env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG") if k in os.environ}
+        # A fase de setup usa rede: repassa só o necessário para proxy/CA, nunca credenciais de modelo.
+        keep = ("PATH", "HOME", "LANG", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy",
+                "SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "GIT_SSL_CAINFO")
+        env = {k: os.environ[k] for k in keep if k in os.environ}
         env.update(task.get("setup_env") or {})
         for argv in cmds:
             code, out, err, to = run(argv, cwd=work, env=env, timeout=task.get("setup_timeout_s", 900))

@@ -53,5 +53,9 @@
     ]
   ],
   "setup_timeout_s": 600,
-  "notes": "Origem: lib/response.js:289-293 (no commit fixado) sanitiza o callback depois de já decidir que ele é válido, então `!!!` vira string vazia e o script emitido fica sintaticamente inválido. Oráculo exige JSON quando nada sobra e preserva callbacks válidos. Prompt descreve o comportamento desejado sem nomear a solução. Teste oculto escrito para este projeto; não copiado de test/res.jsonp.js."
+  "notes": "Origem: lib/response.js:289-293 (no commit fixado) sanitiza o callback depois de já decidir que ele é válido, então `!!!` vira string vazia e o script emitido fica sintaticamente inválido. Oráculo exige JSON quando nada sobra e preserva callbacks válidos. Prompt descreve o comportamento desejado sem nomear a solução. Teste oculto escrito para este projeto; não copiado de test/res.jsonp.js.",
+  "setup_env": {
+    "NODE_EXTRA_CA_CERTS": "/root/.ccr/ca-bundle.crt",
+    "SSL_CERT_FILE": "/root/.ccr/ca-bundle.crt"
+  }
 }

@@ -55,5 +55,9 @@
     ]
   ],
   "setup_timeout_s": 600,
-  "notes": "Mudança de contrato de entrada: res.redirect em lib/response.js:815-831 (commit fixado) trata qualquer não-string como deprecado. Com URL, a Location já funciona mas o aviso é emitido via depd no stderr, o que o oráculo captura. Os contratos observáveis de string, HTML, HEAD, Vary e tipos não suportados ficam como invariantes. Teste oculto escrito para este projeto."
+  "notes": "Mudança de contrato de entrada: res.redirect em lib/response.js:815-831 (commit fixado) trata qualquer não-string como deprecado. Com URL, a Location já funciona mas o aviso é emitido via depd no stderr, o que o oráculo captura. Os contratos observáveis de string, HTML, HEAD, Vary e tipos não suportados ficam como invariantes. Teste oculto escrito para este projeto.",
+  "setup_env": {
+    "NODE_EXTRA_CA_CERTS": "/root/.ccr/ca-bundle.crt",
+    "SSL_CERT_FILE": "/root/.ccr/ca-bundle.crt"
+  }
 }

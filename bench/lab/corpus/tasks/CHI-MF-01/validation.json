@@ -34,7 +34,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "path (0.00s)\n    --- FAIL: TestBenchmarkURLRewriteEscapedAndMounted/redirect_slashes_inside_a_route_is_relative_to_the_full_path (0.00s)\n    --- PASS: TestBenchmarkURLRewriteEscapedAndMounted/redirect_slashes_at_top_level_still_works (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.002s\nFAIL\n"
+    "detail": "path (0.00s)\n    --- FAIL: TestBenchmarkURLRewriteEscapedAndMounted/redirect_slashes_inside_a_route_is_relative_to_the_full_path (0.00s)\n    --- PASS: TestBenchmarkURLRewriteEscapedAndMounted/redirect_slashes_at_top_level_still_works (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.004s\nFAIL\n"
   },
   "reference": {
     "kind": "tests",
@@ -74,6 +74,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794162719.1761727,
+  "ts": 1794163380.7980702,
   "base_verdict": "fail"
 }

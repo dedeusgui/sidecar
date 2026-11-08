@@ -1,0 +1,54 @@
+{
+  "id": "EXP-CC-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "assinatura pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "aviso de deprecação para tipos inválidos preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "t: CC01 tipo que nao e string nem URL continua com aviso de deprecacao\nok 5 - CC01 tipo que nao e string nem URL continua com aviso de deprecacao\n  ---\n  duration_ms: 0.978846\n  type: 'test'\n  ...\n1..5\n# tests 5\n# suites 0\n# pass 3\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 99.404765\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "lib/response.js"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "assinatura pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "aviso de deprecação para tipos inválidos preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794163296.833553,
+  "base_verdict": "fail"
+}

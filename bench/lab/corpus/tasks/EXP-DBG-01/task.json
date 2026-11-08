@@ -48,5 +48,9 @@
     ]
   ],
   "setup_timeout_s": 600,
-  "notes": "Defeito real: lib/response.js:98-101 (commit fixado). Com objeto vazio, Object.keys(...).map produz '' e o código ainda anexa ', ' ao Link existente, deixando vírgula sobrando; sem Link prévio, define Link vazio. Verificado por requisição HTTP antes de escrever o oráculo. Teste oculto escrito para este projeto."
+  "notes": "Defeito real: lib/response.js:98-101 (commit fixado). Com objeto vazio, Object.keys(...).map produz '' e o código ainda anexa ', ' ao Link existente, deixando vírgula sobrando; sem Link prévio, define Link vazio. Verificado por requisição HTTP antes de escrever o oráculo. Teste oculto escrito para este projeto.",
+  "setup_env": {
+    "NODE_EXTRA_CA_CERTS": "/root/.ccr/ca-bundle.crt",
+    "SSL_CERT_FILE": "/root/.ccr/ca-bundle.crt"
+  }
 }
