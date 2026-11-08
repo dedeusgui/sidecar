@@ -10,6 +10,7 @@ import (
 
 // Section names, in the order they appear in the block.
 const (
+	TaskBrief = "TASK BRIEF" // opt-in compact brief; replaces the sections below when it applies
 	Code      = "RELEVANT CODE"
 	Relations = "STRUCTURAL RELATIONS"
 	Contracts = "EXISTING CONTRACTS"
@@ -17,7 +18,7 @@ const (
 	Concerns  = "POTENTIAL CONCERNS"
 )
 
-var sectionOrder = []string{Code, Relations, Contracts, Git, Concerns}
+var sectionOrder = []string{TaskBrief, Code, Relations, Contracts, Git, Concerns}
 
 const (
 	openMarker   = "[SIDECAR CONTEXT]"

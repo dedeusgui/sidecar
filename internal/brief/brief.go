@@ -34,8 +34,34 @@ func RenderForSession(res retrieve.Result, statePath string) string {
 // RenderSession is RenderForSession that also returns the keys of the evidence it sent,
 // so the session observer can count what the agent was given.
 func RenderSession(res retrieve.Result, statePath string) (string, []string) {
+	return renderSession(res, statePath, items(res))
+}
+
+// RenderTaskSession is RenderSession with the Task Evidence Brief (opt-in feature "brief"). When the
+// evidence is too thin for a brief it renders the standard block, so enabling it never removes context.
+func RenderTaskSession(res retrieve.Result, statePath string) (text string, keys []string, briefed bool) {
+	its, ok := TaskItems(res)
+	if !ok {
+		its = items(res)
+	}
+	text, keys = renderSession(res, statePath, its)
+	return text, keys, ok
+}
+
+// RenderTask renders the brief without session memory; ok reports whether a brief applied.
+func RenderTask(res retrieve.Result, seen ctxbuild.Seen) (string, bool) {
+	its, ok := TaskItems(res)
+	if !ok {
+		its = items(res)
+	}
+	text, _ := ctxbuild.Compose(its, res.Trace.Budget, seen)
+	return text, ok
+}
+
+func renderSession(res retrieve.Result, statePath string, its []ctxbuild.Item) (string, []string) {
 	if statePath == "" {
-		return Render(res, nil), nil
+		text, _ := ctxbuild.Compose(its, res.Trace.Budget, nil)
+		return text, nil
 	}
 	st := loadState(statePath)
 	st.Turn++
@@ -43,7 +69,7 @@ func RenderSession(res retrieve.Result, statePath string) (string, []string) {
 		e, ok := st.Emitted[key]
 		return ok && e.Fingerprint == fingerprint && st.Turn-e.Turn < TTLTurns
 	}
-	text, used := ctxbuild.Compose(items(res), res.Trace.Budget, seen)
+	text, used := ctxbuild.Compose(its, res.Trace.Budget, seen)
 	keys := make([]string, 0, len(used))
 	for _, it := range used {
 		st.Emitted[it.Key] = entry{Fingerprint: it.Fingerprint, Turn: st.Turn}

@@ -167,6 +167,7 @@ func main() {
 		{"v2.1 (intent router)", retrieveRunWith(retrieve.Options{IntentRouting: true})},
 		{"v2 (intent + contract + packer)", retrieveRunWith(retrieve.Options{EngineVersion: "v2"})},
 		{"v2 adaptive (policy)", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Adaptive: true})},
+		{"v2 + task brief", retrieveRunRender(retrieve.Options{EngineVersion: "v2"}, true)},
 		{"v2 sem intent", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoIntent: true}})},
 		{"v2 sem contract", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoContract: true}})},
 		{"v2 sem packer", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoPacker: true}})},
@@ -214,7 +215,11 @@ func retrieveRun(ab retrieve.Ablation) runner {
 }
 
 // retrieveRunWith runs the retrieval pipeline with the given options.
-func retrieveRunWith(opts retrieve.Options) runner {
+func retrieveRunWith(opts retrieve.Options) runner { return retrieveRunRender(opts, false) }
+
+// retrieveRunRender is retrieveRunWith that can render the Task Evidence Brief instead of the standard
+// block, so the token cost of the brief is measured on the same retrieval.
+func retrieveRunRender(opts retrieve.Options, taskBrief bool) runner {
 	return func(ix *index.Index, prompt string, seen ctxbuild.Seen) (callResult, error) {
 		t := time.Now()
 		o := opts
@@ -243,7 +248,11 @@ func retrieveRunWith(opts retrieve.Options) runner {
 		for _, f := range res.Trace.Contracts {
 			contracts = append(contracts, string(f.Status))
 		}
-		return callResult{hits: hits, tokens: ctxbuild.EstimateTokens(brief.Render(res, nil)),
+		rendered := brief.Render(res, nil)
+		if taskBrief {
+			rendered, _ = brief.RenderTask(res, nil)
+		}
+		return callResult{hits: hits, tokens: ctxbuild.EstimateTokens(rendered),
 			latencyMS: float64(time.Since(t).Microseconds()) / 1000,
 			notes:     notes, contracts: contracts, keys: keys, cands: res.Trace.Candidates[:min(len(res.Trace.Candidates), 10)]}, nil
 	}
