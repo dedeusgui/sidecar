@@ -22,7 +22,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "Expected: 304\n  Actual: 200\n\n  3) Failure:\nZzSinatraEtagWeakOracleTest#test_if_none_match_weak_comparison_strong_etag [test/zz_oracle_etag_weak_test.rb:21]:\nIf-None-Match usa comparação fraca: W/\"abc\" equivale a \"abc\".\nExpected: 304\n  Actual: 200\n\n7 runs, 9 assertions, 3 failures, 0 errors, 0 skips\n"
+    "detail": ":21]:\nIf-None-Match usa comparação fraca: W/\"abc\" equivale a \"abc\".\nExpected: 304\n  Actual: 200\n\n  3) Failure:\nZzSinatraEtagWeakOracleTest#test_if_none_match_list_with_weak_member [test/zz_oracle_etag_weak_test.rb:36]:\nExpected: 304\n  Actual: 200\n\n7 runs, 9 assertions, 3 failures, 0 errors, 0 skips\n"
   },
   "reference": {
     "kind": "tests",
@@ -49,6 +49,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794162873.6828172,
+  "ts": 1794163640.0800335,
   "base_verdict": "fail"
 }

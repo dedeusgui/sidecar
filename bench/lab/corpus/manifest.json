@@ -1,0 +1,259 @@
+{
+  "schema": "lab-manifest/1",
+  "repos": {
+    "chi": {
+      "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+      "source": "https://github.com/go-chi/chi",
+      "license": "MIT"
+    },
+    "click": {
+      "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+      "source": "https://github.com/pallets/click",
+      "license": "BSD-3-Clause"
+    },
+    "express": {
+      "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+      "source": "https://github.com/expressjs/express",
+      "license": "MIT"
+    },
+    "monolog": {
+      "commit": "3bed304b1905fed5c30d172872f4d890cbb03c6a",
+      "source": "https://github.com/Seldaek/monolog",
+      "license": "MIT"
+    },
+    "sinatra": {
+      "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+      "source": "https://github.com/sinatra/sinatra",
+      "license": "MIT"
+    },
+    "hono": {
+      "commit": "eb754bd5ef22c63f1634a4c374a86be086f85710",
+      "source": "https://github.com/honojs/hono",
+      "license": "MIT"
+    },
+    "serde-json": {
+      "commit": "8c535a260ce561eaab4111aafc29038eb9f77ff3",
+      "source": "https://github.com/serde-rs/json",
+      "license": "MIT OR Apache-2.0"
+    }
+  },
+  "tasks": [
+    {
+      "id": "CHI-CC-01",
+      "split": "validation",
+      "class": "contract-change",
+      "repo": "chi",
+      "task_sha256": "6b3ccee554b6809633d8b28e41b92758ed34f046c674bde17229ed5eb9844ad4",
+      "oracle_sha256": "c29fa2280c371f325cb98c351dffe95b40814b4467017e884e4130b6bb493305",
+      "reference_sha256": "80d21870599309197c3cfc72661daf6cf3137d6a33d8097c59f2fd684d406e71",
+      "validated": true
+    },
+    {
+      "id": "CHI-DBG-01",
+      "split": "development",
+      "class": "debug",
+      "repo": "chi",
+      "task_sha256": "44bf75b6a2425b14bde4534a884e4d9923407983eb72fed9f34778aba3ea92a1",
+      "oracle_sha256": "9a14936a667cf95b205a65a836861679feff470255eec0e0b8dbd86b9dc76d15",
+      "reference_sha256": "fbbc68188c7d6240615993e5fc7bd15114a0314b37da062d46f35368c2b6eb9a",
+      "validated": true
+    },
+    {
+      "id": "CHI-EDIT-01",
+      "split": "development",
+      "class": "edit",
+      "repo": "chi",
+      "task_sha256": "26bf4bc9f6c26988fa7b03502c138a2112b69996b68950763c4bc34fe2147504",
+      "oracle_sha256": "3ce884916640caff9f4848718b550a2d93bb9177a5852f33e8613b5a688cdaf2",
+      "reference_sha256": "a9e14c1ba4711d2df2b1bd362e6ceaaf16fc33fa9a050caa16f6d6d7475db3c0",
+      "validated": true
+    },
+    {
+      "id": "CHI-LOC-01",
+      "split": "development",
+      "class": "locate",
+      "repo": "chi",
+      "task_sha256": "95a2ca5205f1c019d679f80f6de93ce04dff77b0befc4dca2c60ed3e8d298c0e",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "CHI-MF-01",
+      "split": "validation",
+      "class": "multi-file",
+      "repo": "chi",
+      "task_sha256": "65303fdbae2e763561753b657755d9c3f670e05ca0a3088ccb04c0b78dd073bb",
+      "oracle_sha256": "721dcc698827a25c20bfecfc357a18f3619123d40357747aa2121f679b66c207",
+      "reference_sha256": "3f08d61373e055c2cf7aaa0bafdc44758858cddf23376db7bf28bc4f694216f0",
+      "validated": true
+    },
+    {
+      "id": "CHI-NEG-01",
+      "split": "holdout",
+      "class": "negative",
+      "repo": "chi",
+      "task_sha256": "3f478a88722fadc47eb198bbea80e61d94bd1c037890f883bd5107f9693cbca6",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "CHI-VOI-01",
+      "split": "holdout",
+      "class": "voice",
+      "repo": "chi",
+      "task_sha256": "2e8d231a26b132ff3c8afc8c451b02df5ea0c2b5ac0e2bdeede09fb0e8cb8af6",
+      "oracle_sha256": "f25ddff9f9f0991534d557f5299023cbd8401ab4dc54d22f4759315b18065c66",
+      "reference_sha256": "70656275aecab2dfe436864c0e5f6e8d2136caa41c8aeb0947e092166ea1adb8",
+      "validated": true
+    },
+    {
+      "id": "CLK-AMB-01",
+      "split": "development",
+      "class": "ambiguous",
+      "repo": "click",
+      "task_sha256": "2aa15444113172b65e2649abe76229529a20b9b8cfc1fa0cd8f0c8fcfdf6925c",
+      "oracle_sha256": "7bd667cb7c955b9bf5db19a78576ecf117f9c3c3a29f8d7680667569ecff4c56",
+      "reference_sha256": "f9ee666689bb8c12640986ecb0ab231f875d295f4bdda6b0976679b408d830c7",
+      "validated": true
+    },
+    {
+      "id": "CLK-CC-01",
+      "split": "validation",
+      "class": "contract-change",
+      "repo": "click",
+      "task_sha256": "5d551da0921277c3133f87ad97725162e99f65ca149cb8d4bbef71f91e4ad54d",
+      "oracle_sha256": "bfc274c61c15a64af06be56521e77ffb8a250922f46ebaa102acf68667bc15c4",
+      "reference_sha256": "a8f3b12a14a2dbd487df5a3fb23774675e79e12d3fc67eddaea04beaf043e1f5",
+      "validated": true
+    },
+    {
+      "id": "CLK-DBG-01",
+      "split": "development",
+      "class": "debug",
+      "repo": "click",
+      "task_sha256": "15ce241635cf119dd140abbb3c65337543ca3597ba58da262e510f9d266dc90a",
+      "oracle_sha256": "7883a414df7197384efa8c5ee6dab26cf2b1ac443977a0f2808f750aa6ebc3f7",
+      "reference_sha256": "4d56165c85c1c35f3a8d00715cd8141c508afe6b07e345bf17b8cc7e942d5a83",
+      "validated": true
+    },
+    {
+      "id": "CLK-EDIT-01",
+      "split": "development",
+      "class": "edit",
+      "repo": "click",
+      "task_sha256": "9fc8acdc2caee3fe3add2b344d64d897ae85209c2fea46f6b472ba21f672e056",
+      "oracle_sha256": "48b9c9601612d969e7843d50a5a764092731dd72b7b91a6a3eeaaa725b29e2f3",
+      "reference_sha256": "454667a93134110b0303bd582aa25dc7d6658f8bfbe0b891185ebd6969ee509d",
+      "validated": true
+    },
+    {
+      "id": "CLK-LOC-01",
+      "split": "validation",
+      "class": "locate",
+      "repo": "click",
+      "task_sha256": "511d4397155b4290661a08b1cd65a8df8985b4153243ee3ae440c0dbdaade523",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "CLK-MF-01",
+      "split": "holdout",
+      "class": "multi-file",
+      "repo": "click",
+      "task_sha256": "1f5fbbae77ce68954e120c9b461d17548c6579fc501e92ba2c003a4ebbc717b8",
+      "oracle_sha256": "e7e24f3c75758c72f90881f8cfb0b34304e75d15337b488c0241336c86c5dd08",
+      "reference_sha256": "739bdc3be6d48d0228a274436e65db5d6ab7e46fe77131b2d25eb33e96450a1c",
+      "validated": true
+    },
+    {
+      "id": "EXP-CC-01",
+      "split": "holdout",
+      "class": "contract-change",
+      "repo": "express",
+      "task_sha256": "a96f7a9767402b092ea780f9abdabd534958692e594554983c8e096bcd44c7ed",
+      "oracle_sha256": "32ec5ea7ca00e52dfc34417ede0a44a1f0c2ca97b4d802c12087829627e2d50d",
+      "reference_sha256": "dae65490b4975e9555059fe3743cb9391f15f0ccf1bae014e33cba1b4473ab65",
+      "validated": true
+    },
+    {
+      "id": "EXP-DBG-01",
+      "split": "validation",
+      "class": "debug",
+      "repo": "express",
+      "task_sha256": "7f9ac917b3b4e3563c670f6050c62b382287569dbc138e1acabf248b4776e552",
+      "oracle_sha256": "dab9df6d4645fcf5cd9d64bfaa97fd9bef91f985b9582a569fc77019610961ec",
+      "reference_sha256": "8020afb0143c85cdc67810004b6d791ccd6ebdd967fcfeda514934a6b3f8622b",
+      "validated": true
+    },
+    {
+      "id": "EXP-EDIT-01",
+      "split": "development",
+      "class": "edit",
+      "repo": "express",
+      "task_sha256": "8e3c7c69a856b59625b7c491963a79a071b84887effd10959914a3b11208c396",
+      "oracle_sha256": "3eadf9b5b358dc904eb5bfcaa05bb857d1f490f075b7ea3f993fb25aa9e0b8dd",
+      "reference_sha256": "4bcba4fdaeed02be68df83cba035d77feef0a107c706da0eeb24dd2371900e05",
+      "validated": true
+    },
+    {
+      "id": "EXP-NEG-01",
+      "split": "validation",
+      "class": "negative",
+      "repo": "express",
+      "task_sha256": "ffa6c26df292a34ddc38fd4ed9b1357c8716b2c4f29b8d398a067e583ee91606",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "SIN-CC-01",
+      "split": "validation",
+      "class": "contract-change",
+      "repo": "sinatra",
+      "task_sha256": "c9645111e324592dfad7a961ab415dee261c11fbb22c4fbb45abb88ab05ad363",
+      "oracle_sha256": "2be70ffe3138683b274a2b56c9cbf0d7e1051869c45da545261ee95bb7bf5db2",
+      "reference_sha256": "799a1de564375ded6f840ccbd0e7e51eb99897e8ee2f67a511a5d7b728ff9b9d",
+      "validated": true
+    },
+    {
+      "id": "SIN-DBG-01",
+      "split": "development",
+      "class": "debug",
+      "repo": "sinatra",
+      "task_sha256": "2a7c06fe3f206d75bb984a22fdbfc9ecdfe68d5719879094e0357a7d15252c80",
+      "oracle_sha256": "f926c9967690c8a054b1b14a29b43cfb73896ac91e41612eafd35ac7a29dd721",
+      "reference_sha256": "3770411b3cb1e360ef28eaa09ae588cdd3ef6ccab2707ad070230e8d48f4ac43",
+      "validated": true
+    },
+    {
+      "id": "SIN-EDIT-01",
+      "split": "holdout",
+      "class": "edit",
+      "repo": "sinatra",
+      "task_sha256": "448eb5ed713222a5915038615928f1068de65bed78bf408950111be8ac18e0cb",
+      "oracle_sha256": "c7839cd6b649835885defe6a5da1be80c181dfa8dea6a863075430b79e71ff25",
+      "reference_sha256": "16e5c3f7cf2abd08451b2e3f5b691834db94143d4132dbfbb24d1a9c12a71ca6",
+      "validated": true
+    }
+  ],
+  "counts": {
+    "development": 8,
+    "validation": 7,
+    "holdout": 5
+  },
+  "classes": {
+    "locate": 2,
+    "debug": 4,
+    "edit": 4,
+    "multi-file": 2,
+    "contract-change": 4,
+    "negative": 2,
+    "ambiguous": 1,
+    "voice": 1
+  },
+  "holdout_prompts_sha256": "33067134b792ce12a084443bc736895880ed52df28156ce9961e883325d4c1b3",
+  "note": "holdout selado: use --final; acessos ficam em holdout_ledger.jsonl"
+}
