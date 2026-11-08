@@ -1,0 +1,71 @@
+{
+  "schema": "lab-task/1",
+  "id": "EXP-H3",
+  "split": "holdout",
+  "class": "contract-change",
+  "repo": "express",
+  "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+  "prompt": "Com `app.set('trust proxy', true)`, quando o proxy manda X-Forwarded-Host com mais de um valor, o `req.host` do Express pega o primeiro, como deve. Mas se o primeiro valor vem vazio, como em ', b.exemplo.com' ou só com espaços, o `req.host` sai undefined mesmo com o cabeçalho Host presente, e `req.hostname` e `req.subdomains` saem errados junto. Quero que, nesse caso, o `req.host` caia para o cabeçalho Host, e não para os valores seguintes. Os outros comportamentos precisam continuar iguais: valor único, lista com vírgula, porta removida no `req.hostname`, proxy não confiável ignorando o X-Forwarded-Host, e `req.host` indefinido quando não há nenhum dos dois cabeçalhos. A API pública não muda. Ao terminar, me diga quais arquivos alterou.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_exp_h3.js": "forwarded_host_oracle_test.js"
+    },
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "test/zz_oracle_exp_h3.js"
+    ],
+    "require_output": [
+      "(?m)^(ok|not ok) \\d+ - H3 primeiro valor de X-Forwarded-Host com varios valores",
+      "(?m)^(ok|not ok) \\d+ - H3 valor vazio no inicio do X-Forwarded-Host cai para o Host",
+      "(?m)^(ok|not ok) \\d+ - H3 sem proxy confiavel o X-Forwarded-Host e ignorado",
+      "(?m)^(ok|not ok) \\d+ - H3 sem X-Forwarded-Host e sem Host devolve undefined",
+      "(?m)^(ok|not ok) \\d+ - H3 hostname e subdomains seguem o host escolhido",
+      "(?m)^(ok|not ok) \\d+ - H3 hostname continua tirando a porta do host escolhido",
+      "(?m)^(ok|not ok) \\d+ - H3 valor unico do X-Forwarded-Host continua igual"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/request.js",
+      "test/**"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "pattern": "defineGetter\\(req, 'host', function host\\(\\)",
+        "why": "getter req.host preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "pattern": "defineGetter\\(req, 'hostname', function hostname\\(\\)",
+        "why": "getter req.hostname preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "pattern": "X-Forwarded-Host",
+        "why": "cabeçalho lido do mesmo jeito"
+      }
+    ]
+  },
+  "setup": [
+    [
+      "npm",
+      "install",
+      "--no-audit",
+      "--no-fund"
+    ]
+  ],
+  "setup_timeout_s": 600,
+  "notes": "Lacuna real: lib/request.js:418-431 (commit fixado), getter req.host. Com trust proxy ligado, X-Forwarded-Host vazio no primeiro item (', b' ou '   ') passa como valor truthy, o ramo de vírgula devolve '' e o getter retorna undefined em vez de cair para o Host, que existe. Verificado por requisição antes do oráculo. A regra de fallback para Host (e não para o próximo item) é a escolha explícita do enunciado. Teste oculto escrito para este projeto.",
+  "setup_env": {
+    "NODE_EXTRA_CA_CERTS": "/root/.ccr/ca-bundle.crt",
+    "SSL_CERT_FILE": "/root/.ccr/ca-bundle.crt"
+  }
+}

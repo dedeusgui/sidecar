@@ -1,0 +1,66 @@
+{
+  "id": "EXP-H2",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "getter req.protocol preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "getter req.secure preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "cabeçalho lido do mesmo jeito"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "dRejections (node:internal/process/task_queues:103:5)\n    async Test.run (node:internal/test_runner/test:1054:7)\n    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)\n  ...\n1..7\n# tests 7\n# suites 0\n# pass 3\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 143.625714\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "lib/request.js"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "getter req.protocol preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "getter req.secure preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "cabeçalho lido do mesmo jeito"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794175481.950429,
+  "base_verdict": "fail"
+}

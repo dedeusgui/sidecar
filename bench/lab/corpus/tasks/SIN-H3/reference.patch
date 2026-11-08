@@ -1,0 +1,26 @@
+diff --git a/lib/sinatra/base.rb b/lib/sinatra/base.rb
+index 7b26dd4..b81590d 100644
+--- a/lib/sinatra/base.rb
++++ b/lib/sinatra/base.rb
+@@ -538,7 +538,7 @@ module Sinatra
+     def cache_control(*values)
+       if values.last.is_a?(Hash)
+         hash = values.pop
+-        hash.reject! { |_k, v| v == false }
++        hash.reject! { |_k, v| v.nil? || v == false }
+         hash.reject! { |k, v| values << k if v == true }
+       else
+         hash = {}
+@@ -568,10 +568,10 @@ module Sinatra
+ 
+       if amount.is_a? Integer
+         time    = Time.now + amount.to_i
+-        max_age = amount
++        max_age = [amount, 0].max
+       else
+         time    = time_for amount
+-        max_age = time - Time.now
++        max_age = [time - Time.now, 0].max
+       end
+ 
+       values.last.merge!(max_age: max_age) { |_key, v1, v2| v1 || v2 }

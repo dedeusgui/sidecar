@@ -1,0 +1,66 @@
+{
+  "id": "EXP-H3",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "getter req.host preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "getter req.hostname preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "cabeçalho lido do mesmo jeito"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "38793\n  type: 'test'\n  ...\n# Subtest: H3 valor unico do X-Forwarded-Host continua igual\nok 7 - H3 valor unico do X-Forwarded-Host continua igual\n  ---\n  duration_ms: 1.607248\n  type: 'test'\n  ...\n1..7\n# tests 7\n# suites 0\n# pass 5\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 136.377747\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "lib/request.js"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "getter req.host preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "getter req.hostname preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/request.js",
+        "ok": true,
+        "detail": "cabeçalho lido do mesmo jeito"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794175543.7318945,
+  "base_verdict": "fail"
+}

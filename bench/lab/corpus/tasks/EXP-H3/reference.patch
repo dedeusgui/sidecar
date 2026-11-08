@@ -1,0 +1,26 @@
+diff --git a/lib/request.js b/lib/request.js
+index c050633..f3f2160 100644
+--- a/lib/request.js
++++ b/lib/request.js
+@@ -419,15 +419,16 @@ defineGetter(req, 'host', function host(){
+   var trust = this.app.get('trust proxy fn');
+   var val = this.get('X-Forwarded-Host');
+ 
+-  if (!val || !trust(this.socket.remoteAddress, 0)) {
+-    val = this.get('Host');
+-  } else if (val.indexOf(',') !== -1) {
++  if (val && trust(this.socket.remoteAddress, 0)) {
+     // Note: X-Forwarded-Host is normally only ever a
+     //       single value, but this is to be safe.
+-    val = val.substring(0, val.indexOf(',')).trimEnd()
++    val = val.split(',')[0].trim()
++  } else {
++    val = undefined
+   }
+ 
+-  return val || undefined;
++  // empty forwarded values fall back to the Host header
++  return val || this.get('Host') || undefined;
+ });
+ 
+ /**

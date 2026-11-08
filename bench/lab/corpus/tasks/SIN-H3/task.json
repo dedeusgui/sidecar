@@ -1,0 +1,59 @@
+{
+  "schema": "lab-task/1",
+  "id": "SIN-H3",
+  "split": "holdout",
+  "class": "edit",
+  "repo": "sinatra",
+  "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+  "prompt": "No Sinatra, dois casos do Cache-Control saem errados. Primeiro, uma opção com valor `nil` em `cache_control` (ex.: `cache_control :public, max_age: nil`) vira `max-age=0` ou um parâmetro vazio como `foo-bar=`; ela deve ser omitida, do mesmo jeito que `false`. Segundo, `expires` com uma data que já passou, ou com um número negativo de segundos, gera `max-age` negativo; nesse caso o max-age tem que ser 0, e o cabeçalho Expires continua com a data calculada. O resto tem que continuar igual: `true` vira diretiva sem valor, `_` vira `-` nos nomes, `max_age: 0` continua saindo, `max_age` em texto vira inteiro, `s_maxage` decimal é truncado, a ordem das diretivas não muda, `expires` com data futura mantém o tempo restante, e um `max_age:` passado explicitamente vence o calculado. Se nenhuma opção sobrar, não envie o cabeçalho Cache-Control. Mantenha a API pública e não acesse a rede. Ao terminar, resuma em poucas linhas.",
+  "setup": [
+    [
+      "bundle",
+      "_2.5.22_",
+      "install",
+      "--path",
+      "vendor/bundle"
+    ]
+  ],
+  "setup_timeout_s": 900,
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_cache_control_test.rb": "zz_oracle_cache_control_test.rb"
+    },
+    "command": [
+      "bundle",
+      "exec",
+      "ruby",
+      "-Ilib",
+      "test/zz_oracle_cache_control_test.rb",
+      "-v"
+    ],
+    "require_output": [
+      "ZzSinatraCacheControlOracleTest#test_nil_option_is_omitted = [0-9.]+ s = [.FE]",
+      "[0-9]+ runs, [0-9]+ assertions"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/sinatra/base.rb",
+      "test/helpers_test.rb"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "pattern": "def cache_control\\(\\*values\\)",
+        "why": "assinatura pública de cache_control preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "pattern": "def expires\\(amount, \\*values\\)",
+        "why": "assinatura pública de expires preservada"
+      }
+    ]
+  },
+  "notes": "Holdout. Defeitos reais no commit fixado, lib/sinatra/base.rb: cache_control (linha 538) converte nil com to_i (vira max-age=0) e emite parâmetro vazio para outras chaves nil; expires (linhas 566-585) gera max-age negativo quando a data já passou (reproduzido: 'public, max-age=-60'). Contrato preservado: 'expires 500, :public, :must_revalidate' -> 'public, must-revalidate, max-age=500'. Oráculo escrito do zero. Na base: 6 falhas e 8 passam. Holdout selado: não rodar agente nele. Setup: bundler 4 removeu --path; usa-se bundle _2.5.22_."
+}
