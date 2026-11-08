@@ -230,6 +230,7 @@ class RunnerTests(LabCase):
         self.assertEqual(arms[2]["env"], {"SIDECAR_FEATURES": "brief"})
         self.assertEqual(arms[3]["env"], {"SIDECAR_FEATURES": "adaptive,brief"})
         self.assertEqual(arms[3]["engine"], "v2")
+        self.assertEqual(lab.parse_arms("V2+groom+impact")[0]["env"], {"SIDECAR_FEATURES": "groom,impact"})
         with self.assertRaises(lab.LabError):
             lab.parse_arms("V2+nope")
 
@@ -433,6 +434,53 @@ class ComparisonTests(unittest.TestCase):
         md = lab.render_md(lab.build_report(rows))
         self.assertIn("Δ% por métrica", md)
         self.assertIn("V2 vs OFF", md)
+
+
+class TwoTurnTests(unittest.TestCase):
+    def turn(self, **kw):
+        base = {"wall_s": 10.0, "result": "ok", "cost_usd": 0.01, "tokens_in": 100, "tokens_out": 10, "tool_calls": 5, "turns": 3,
+                "served_models": ["m"], "exit": 0, "timed_out": False, "hook_delivered": True, "injected_chars": 300,
+                "incomparable_reasons": [], "stream_error": False, "hook_names": ["UserPromptSubmit"], "tool_events": [{"kind": "read", "key": "a"}],
+                "hook_context": ""}
+        base.update(kw)
+        return base
+
+    def test_merge_sums_cost_tokens_calls_and_keeps_last_result(self):
+        m = lab.merge_turns([self.turn(result="first"), self.turn(result="last", cost_usd=0.02, tool_calls=7)])
+        self.assertEqual((m["cost_usd"], m["tokens_in"], m["tool_calls"], m["n_voltas"]), (0.03, 200, 12, 2))
+        self.assertEqual(m["result"], "last")
+        self.assertEqual(len(m["tool_events"]), 2)
+        self.assertEqual(m["volta_injetada"], [300, 300])
+
+    def test_one_contaminated_or_timed_out_turn_taints_the_run(self):
+        m = lab.merge_turns([self.turn(), self.turn(incomparable_reasons=["modelo servido ausente"], timed_out=True)])
+        self.assertTrue(m["timed_out"])
+        self.assertEqual(m["incomparable_reasons"], ["modelo servido ausente"])
+
+    def test_unknown_cost_in_one_turn_does_not_become_zero_and_notes_are_presence_only(self):
+        m = lab.merge_turns([self.turn(cost_usd=None, hook_context="Open decision (underspecified): x"), self.turn(cost_usd=None, hook_context="Change check on uncommitted edits")])
+        self.assertIsNone(m["cost_usd"])
+        self.assertEqual(m["notas"], {"groom": True, "impact": True, "brief": False})
+        self.assertNotIn("hook_context", m)
+
+    def test_followup_is_defined_by_the_task_not_the_arm(self):
+        self.assertEqual(lab.followup_for({"followup": "faça X"}), "faça X")
+        amb = lab.followup_for({"underspec": {"canned_answer": "usar as opções declaradas"}})
+        self.assertIn("usar as opções declaradas", amb)
+        self.assertEqual(lab.followup_for({"class": "edit"}), lab.DEFAULT_FOLLOWUP)
+
+    def test_session_id_is_read_from_the_stream(self):
+        self.assertEqual(lab.session_id_of('noise\n{"type":"system","session_id":"abc-123"}\n'), "abc-123")
+        self.assertIsNone(lab.session_id_of('{"type":"x"}'))
+
+    def test_command_persists_the_session_only_for_two_turns_and_resumes(self):
+        one = lab.ClaudeAgent("claude-haiku-5-5", "/bin/true", None, 0.1, 10, ["Read"], deny_paths=["/data/x"], turns=1)
+        two = lab.ClaudeAgent("claude-haiku-5-5", "/bin/true", None, 0.1, 10, ["Read"], deny_paths=["/data/x"], turns=2)
+        self.assertIn("--no-session-persistence", one.command("p", None))
+        c = two.command("p", None, resume="sid-1")
+        self.assertNotIn("--no-session-persistence", c)
+        self.assertEqual(c[c.index("--resume") + 1], "sid-1")
+        self.assertIn("--disallowedTools", c)  # a negação do gabarito vale também na segunda volta
 
 
 class HoldoutTests(LabCase):

@@ -513,22 +513,75 @@ def workspace_mentions_benchmark(work, needles):
     return None
 
 
+DEFAULT_FOLLOWUP = ("Revise o que você alterou: confirme que o pedido foi atendido por completo e corrija o que ficou faltando. "
+                    "Responda em uma frase.")
+
+
+def followup_for(task):
+    """Segunda volta do protocolo de duas voltas: a fala do usuário simulado, definida pela tarefa e não pelo braço.
+    Tarefa ambígua: a resposta que o usuário daria se perguntado (`underspec.canned_answer`). Demais: uma revisão genérica,
+    igual para todos os braços (é nela que a nota de impacto aparece, pois há edições não commitadas)."""
+    if task.get("followup"):
+        return task["followup"]
+    u = task.get("underspec")
+    if u:
+        return f"Sobre a sua dúvida de antes, a minha decisão é: {u['canned_answer']} Continue e conclua a tarefa com essa decisão."
+    return DEFAULT_FOLLOWUP
+
+
+def session_id_of(stream_text):
+    for line in stream_text.splitlines():
+        line = line.strip()
+        if line.startswith("{"):
+            try:
+                sid = json.loads(line).get("session_id")
+            except ValueError:
+                continue
+            if isinstance(sid, str) and sid:
+                return sid
+    return None
+
+
+def merge_turns(turns):
+    """Soma as voltas de uma execução: custo, tokens, chamadas, tempo e eventos; o resultado é o da última volta; qualquer
+    volta não comparável, com timeout ou sem modelo servido contamina a execução inteira."""
+    def total(key):
+        vals = [t[key] for t in turns if t.get(key) is not None]
+        return sum(vals) if vals else None
+    last = turns[-1]
+    models = sorted({m for t in turns for m in (t["served_models"] or [])}) or None
+    reasons = [r for t in turns for r in t["incomparable_reasons"]]
+    delivered = [t["hook_delivered"] for t in turns if t["hook_delivered"] is not None]
+    return {"wall_s": round(total("wall_s") or 0, 2), "result": last["result"], "cost_usd": total("cost_usd"), "tokens_in": total("tokens_in"),
+            "tokens_out": total("tokens_out"), "tool_calls": total("tool_calls"), "turns": total("turns"), "served_models": models,
+            "exit": last["exit"], "timed_out": any(t["timed_out"] for t in turns), "hook_delivered": any(delivered) if delivered else None,
+            "injected_chars": total("injected_chars") or 0, "incomparable_reasons": reasons,
+            "stream_error": any(t["stream_error"] for t in turns), "hook_names": sorted({n for t in turns for n in t["hook_names"]}),
+            "first_edit_s": None, "tool_events": [e for t in turns for e in t["tool_events"]], "volta_injetada": [t["injected_chars"] for t in turns],
+            "n_voltas": len(turns),
+            # O que o Sidecar disse de fato (só presença; o texto não é guardado): permite saber se R4/R5 foram exercidos.
+            "notas": {"groom": any("Open decision" in t.get("hook_context", "") for t in turns),
+                      "impact": any("Change check" in t.get("hook_context", "") for t in turns),
+                      "brief": any("TASK BRIEF" in t.get("hook_context", "") for t in turns)}}
+
+
 class ClaudeAgent:
     """Claude Code real: configuração isolada por execução, canário, verificação de init e modelo servido."""
     simulated = False
 
-    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow, deny_paths=()):
+    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow, deny_paths=(), turns=1):
         sys.path.insert(0, str(HERE.parent / "agentic"))
         import real_hook_pilot as rhp
-        self.rhp, self.model, self.sidecar = rhp, model, sidecar
+        self.rhp, self.model, self.sidecar, self.turns = rhp, model, sidecar, turns
         self.credentials, self.max_budget, self.timeout, self.tools_allow = credentials, max_budget, timeout, tools_allow
         # O agente roda como o mesmo usuário e `Read` aceita caminho absoluto: sem estas regras ele LÊ o oráculo
         # oculto. Medido (2026-11-08): sem a regra a leitura funciona; com ela Read, Grep e `ls` são negados.
         self.deny_paths = [str(pathlib.Path(p).resolve()) for p in deny_paths]
 
-    def command(self, prompt, settings):
-        flags = ["--output-format", "stream-json", "--verbose", "--include-hook-events", "--no-session-persistence",
-                 "--permission-mode", "acceptEdits", "--setting-sources", "project,local", "--strict-mcp-config",
+    def command(self, prompt, settings, resume=None):
+        persist = self.turns > 1  # uma segunda volta precisa da sessão do cliente
+        flags = ["--output-format", "stream-json", "--verbose", "--include-hook-events", *([] if persist else ["--no-session-persistence"]),
+                 *(["--resume", resume] if resume else []), "--permission-mode", "acceptEdits", "--setting-sources", "project,local", "--strict-mcp-config",
                  "--disable-slash-commands", "--allowedTools", *self.tools_allow, *deny_flags(self.deny_paths)]
         cmd = ["claude", "-p", prompt, "--model", self.model, *flags, "--max-budget-usd", str(self.max_budget)]
         return cmd + (["--settings", settings] if settings else [])
@@ -544,25 +597,36 @@ class ClaudeAgent:
             if arm["engine"] is not None:
                 subprocess.run([self.sidecar, "index", "--root", str(work)], env=env, capture_output=True, check=True, timeout=300)
                 settings = rhp.hook_settings_json(self.sidecar)
-            t0 = time.perf_counter()
-            code, out, err, to = run(self.command(prompt, settings), cwd=work, env=env, timeout=self.timeout)
-            wall = time.perf_counter() - t0
-            parsed = rhp.parse_stream(out)
-            reasons = rhp.contamination(parsed, os.path.exists(marker), self.model)
-            events = tool_events(out)
-            if touched_benchmark_data(events, self.deny_paths):
-                reasons = list(reasons) + ["o agente tentou acessar dados do benchmark (oráculo, reference.patch ou resultados)"]
+            turns, session, prompts = [], None, [prompt]
+            if self.turns > 1:
+                prompts.append(followup_for(task))
+            for n, text in enumerate(prompts):
+                t0 = time.perf_counter()
+                code, out, err, to = run(self.command(text, settings, resume=session), cwd=work, env=env, timeout=self.timeout)
+                wall = time.perf_counter() - t0
+                parsed = rhp.parse_stream(out)
+                session = session or session_id_of(out)
+                reasons = rhp.contamination(parsed, os.path.exists(marker), self.model)
+                events = tool_events(out)
+                if touched_benchmark_data(events, self.deny_paths):
+                    reasons = list(reasons) + ["o agente tentou acessar dados do benchmark (oráculo, reference.patch ou resultados)"]
+                if n == 0 and self.turns > 1 and not session:
+                    reasons = list(reasons) + ["sessão do cliente ausente: a segunda volta não pôde ser retomada"]
+                turns.append({"wall_s": round(wall, 2), "result": parsed["result"] or "", "cost_usd": parsed["cost_usd"],
+                              "tokens_in": parsed["tokens_in"], "tokens_out": parsed["tokens_out"],
+                              "tool_calls": parsed["tool_calls"], "turns": parsed["turns"], "served_models": parsed["served_models"],
+                              "exit": code, "timed_out": to, "hook_delivered": parsed["hook_delivered"] if arm["engine"] else None,
+                              "injected_chars": len(parsed["hook_context"]), "incomparable_reasons": reasons,
+                              "stream_error": parsed["is_error"] is True or parsed["subtype"] not in (None, "success"),
+                              "hook_names": parsed["hook_names"], "first_edit_s": None, "tool_events": events,
+                              "hook_context": parsed["hook_context"]})
+                if to or code != 0 or not session and self.turns > 1:
+                    break  # sem resposta da primeira volta não há o que continuar
             leaked = workspace_mentions_benchmark(work, self.deny_paths + ["reference.patch", "holdout_ledger"])
+            merged = merge_turns(turns)
             if leaked:
-                reasons = list(reasons) + [f"arquivo escrito pelo agente referencia dados do benchmark: {leaked}"]
-            return {"wall_s": round(wall, 2), "result": parsed["result"] or "", "cost_usd": parsed["cost_usd"],
-                    "tokens_in": parsed["tokens_in"], "tokens_out": parsed["tokens_out"],
-                    "tool_calls": parsed["tool_calls"], "turns": parsed["turns"], "served_models": parsed["served_models"],
-                    "exit": code, "timed_out": to, "hook_delivered": parsed["hook_delivered"] if arm["engine"] else None,
-                    "injected_chars": len(parsed["hook_context"]), "incomparable_reasons": reasons,
-                    "stream_error": parsed["is_error"] is True or parsed["subtype"] not in (None, "success"),
-                    "hook_names": parsed["hook_names"], "first_edit_s": None,
-                    "tool_events": tool_events(out)}
+                merged["incomparable_reasons"] = list(merged["incomparable_reasons"]) + [f"arquivo escrito pelo agente referencia dados do benchmark: {leaked}"]
+            return merged
         finally:
             shutil.rmtree(cfg, ignore_errors=True)
 
@@ -635,7 +699,7 @@ def progress_report(sidecar, events):
 
 # --------------------------------------------------------------------------- runner
 
-KNOWN_FEATURES = {"adaptive", "brief"}  # nomes aceitos em SIDECAR_FEATURES; crescem com R4-R6
+KNOWN_FEATURES = {"adaptive", "brief", "groom", "impact"}  # nomes aceitos em SIDECAR_FEATURES
 
 
 def parse_arms(spec):
@@ -709,7 +773,7 @@ def execute_one(agent, task, tdir, arm, rep, args, home):
             "comparable": comparable, "agent_error": err, "oracle": {k: orc[k] for k in
                 ("tests", "scope_ok", "outside_scope", "invariants", "changed", "isolation", "detail")},
             "oracle_s": round(time.perf_counter() - t0, 2), "task_sha256": sha256_file(tdir / "task.json"),
-            "tool_events": r.get("tool_events", []), "progress": progress_report(args.sidecar if args else None, r.get("tool_events", [])),
+            "n_voltas": r.get("n_voltas", 1), "notas": r.get("notas"), "volta_injetada": r.get("volta_injetada"), "tool_events": r.get("tool_events", []), "progress": progress_report(args.sidecar if args else None, r.get("tool_events", [])),
             **{k: r[k] for k in ("wall_s", "cost_usd", "tokens_in", "tokens_out", "tool_calls", "turns",
                "served_models", "exit", "timed_out", "hook_delivered", "injected_chars", "incomparable_reasons",
                "stream_error", "first_edit_s")},
@@ -749,7 +813,7 @@ def cmd_run(args):
             if d.resolve() == tmp_root or d.resolve() in tmp_root.parents or d.resolve() == pathlib.Path("/"):
                 raise LabError(f"--out-dir/repositório não pode ser {d}: bloquearia o workspace do agente. Use um subdiretório")
         agent = ClaudeAgent(args.model, str(pathlib.Path(args.sidecar).resolve()), args.credentials, args.max_budget,
-                            args.timeout, args.tools_allow.split(","), deny_paths=deny)
+                            args.timeout, args.tools_allow.split(","), deny_paths=deny, turns=getattr(args, "turns", 1))
         est = n * args.max_budget
         if not args.yes_spend:
             print(f"Dry run: {n} execuções ({len(tasks)} tarefas × {len(arms)} braços × {args.reps}); "
@@ -1021,7 +1085,7 @@ def main(argv=None):
     p.add_argument("--max-total-usd", type=float, default=None); p.add_argument("--timeout", type=int, default=600)
     p.add_argument("--tools-allow", default="Read,Grep,Glob,Edit,Write,Bash(go test:*),Bash(ls:*)")
     p.add_argument("--yes-spend", action="store_true"); p.add_argument("--final", action="store_true")
-    p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--rep-offset", type=int, default=0, help="índice da primeira repetição; permite processos paralelos com repetições distintas"); p.add_argument("--scripted-behaviour", default="reference")
+    p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--turns", type=int, choices=(1, 2), default=1, help="2 = protocolo de duas voltas com usuário simulado (R4/R5)"); p.add_argument("--rep-offset", type=int, default=0, help="índice da primeira repetição; permite processos paralelos com repetições distintas"); p.add_argument("--scripted-behaviour", default="reference")
     p = sub.add_parser("report"); p.add_argument("runs", nargs="+", help="um ou mais runs.jsonl (repetições de processos diferentes são juntadas)"); p.add_argument("--md"); p.add_argument("--json"); p.add_argument("--offline")
     a = ap.parse_args(argv)
     try:
