@@ -60,12 +60,25 @@ def est_tokens(s):
 
 
 def load_dictionary(path):
-    """Lê o mapa PT→EN de internal/lexical/dictionary.go; o avaliador e o simulador usam o mesmo dado."""
-    txt = pathlib.Path(path).read_text(encoding="utf-8")
-    block = txt.split("var ptToEn = map[string][]string{", 1)[1].split("\n}\n", 1)[0]
+    """Lê o léxico PT→EN de internal/lexical/lexicon_pt_en.tsv (ou dictionary.go legado)."""
+    p = pathlib.Path(path)
+    if p.name == "dictionary.go":
+        tsv_candidate = p.parent / "lexicon_pt_en.tsv"
+        if tsv_candidate.exists():
+            p = tsv_candidate
+    txt = p.read_text(encoding="utf-8")
     fwd = {}
-    for m in re.finditer(r'"([^"]+)":\s*\{([^}]*)\}', block):
-        fwd[fold(m.group(1))] = [fold(v) for v in re.findall(r'"([^"]+)"', m.group(2))]
+    if "var ptToEn = map[string][]string{" in txt:
+        block = txt.split("var ptToEn = map[string][]string{", 1)[1].split("\n}\n", 1)[0]
+        for m in re.finditer(r'"([^"]+)":\s*\{([^}]*)\}', block):
+            fwd[fold(m.group(1))] = [fold(v) for v in re.findall(r'"([^"]+)"', m.group(2))]
+    else:
+        for line in txt.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "\t" not in line:
+                continue
+            pt, en_csv = line.split("\t", 1)
+            fwd[fold(pt.strip())] = [fold(v.strip()) for v in en_csv.split(",") if v.strip()]
     rev = {}
     for k, vs in fwd.items():
         for v in vs:

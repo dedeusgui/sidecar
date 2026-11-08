@@ -180,7 +180,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	if err != nil {
 		return res, err
 	}
-	if len(concepts) < 2 && len(searchTerms) < len(terms) {
+	if len(concepts) == 0 && len(searchTerms) < len(terms) {
 		concepts, err = buildConcepts(st, terms, res.Trace.Phrases, total, res.Trace.Translations, opts.Ablate.NoTranslation)
 		if err != nil {
 			return res, err
@@ -549,10 +549,16 @@ func splitClauses(s string) []string {
 }
 
 func hasInterrogativeCue(clause string) bool {
-	for _, w := range strings.FieldsFunc(clause, func(r rune) bool {
-		return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && r <= 127
+	folded := lexical.Fold(clause)
+	// Strip comparative "como eu / como tu / como voce" ("as I / like you") so spoken
+	// filler clauses ending with ", sabe?" are not mistaken for "how" questions.
+	for _, comp := range []string{"como eu ", "como tu ", "como voce ", "como to "} {
+		folded = strings.ReplaceAll(folded, comp, " ")
+	}
+	for _, w := range strings.FieldsFunc(folded, func(r rune) bool {
+		return r < 'a' || r > 'z'
 	}) {
-		if interrogativeCues[lexical.Fold(w)] {
+		if interrogativeCues[w] {
 			return true
 		}
 	}
@@ -795,8 +801,18 @@ func idf(df, total int) float64 {
 
 // pickSeeds chooses the strongest matches to expand: exact first, then coverage, then BM25.
 func pickSeeds(cands map[int64]*candidate, n int) []*candidate {
+	hasExact := false
+	for _, c := range cands {
+		if c.exact {
+			hasExact = true
+			break
+		}
+	}
 	var seeds []*candidate
 	for _, c := range cands {
+		if hasExact && !c.exact && c.coverage < 1 {
+			continue
+		}
 		if c.exact || c.coverage > 0 {
 			seeds = append(seeds, c)
 		}
@@ -832,7 +848,15 @@ func rankOrMax(r int) int {
 // the context and the trace can say why an item is there.
 // A nil families map expands every family (v1). Otherwise only the listed families are queried.
 func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate, withHistory bool, families map[string]bool) (int, error) {
+	if len(seeds) == 0 {
+		return 0, nil
+	}
 	want := func(f string) bool { return families == nil || families[f] }
+	if withHistory && want(famHistory) {
+		if n, err := st.CommitCount(); err != nil || n == 0 {
+			withHistory = false
+		}
+	}
 	added := 0
 	addNeighbor := func(seed *candidate, h store.SymbolHit, label, basis string) {
 		c, ok := cands[h.ID]
@@ -857,7 +881,10 @@ func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate, wit
 	}
 	for _, seed := range seeds {
 		id := seed.hit.ID
-		if want(famMembers) {
+		kind := seed.hit.Kind
+		isFileOrSection := kind == "file" || kind == "section"
+		isContainer := !isFileOrSection && kind != "function" && kind != "method" && kind != "constant" && kind != "field"
+		if isContainer && want(famMembers) {
 			members, err := st.MembersOf(id, 6)
 			if err != nil {
 				return added, err
@@ -866,14 +893,14 @@ func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate, wit
 				addNeighbor(seed, m.SymbolHit, "member_of:"+seed.hit.Name, m.Basis)
 			}
 		}
-		if want(famParent) {
+		if !isFileOrSection && want(famParent) {
 			if parent, ok, err := st.ParentOf(id); err != nil {
 				return added, err
 			} else if ok {
 				addNeighbor(seed, parent, "contains:"+seed.hit.Name, "same_file")
 			}
 		}
-		if want(famCallees) {
+		if !isFileOrSection && want(famCallees) {
 			callees, err := st.CalleesOf(id, 6)
 			if err != nil {
 				return added, err
@@ -882,7 +909,7 @@ func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate, wit
 				addNeighbor(seed, r.SymbolHit, fmt.Sprintf("called_by:%s(%s)", seed.hit.Name, r.Basis), r.Basis)
 			}
 		}
-		if want(famCallers) {
+		if !isFileOrSection && want(famCallers) {
 			callers, err := st.CallersOf(id, 4)
 			if err != nil {
 				return added, err
@@ -891,7 +918,7 @@ func expand(st *store.Store, seeds []*candidate, cands map[int64]*candidate, wit
 				addNeighbor(seed, r.SymbolHit, fmt.Sprintf("calls:%s(%s)", seed.hit.Name, r.Basis), r.Basis)
 			}
 		}
-		if want(famTests) {
+		if !isFileOrSection && want(famTests) {
 			tests, err := st.TestFilesReferencing(seed.hit.Name, 2)
 			if err != nil {
 				return added, err

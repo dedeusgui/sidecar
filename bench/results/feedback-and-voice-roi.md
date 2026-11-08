@@ -63,17 +63,27 @@ Na linha de base `5e31e03`, prompts de Voice Mode em português (~200 palavras c
 
 ---
 
-## 3. Matriz Cross-Agent nos Modelos Econômicos (Claude Code, Codex, Antigravity CLI)
+## 3. O Que Foi Executado nos Benchmarks vs. Matriz Multi-Agente
 
-Consolidando o experimento agentic controlado de **90 execuções** em repositórios externos reais ([`bench/results/real-external-benchmark.md`](real-external-benchmark.md)) e os contratos de hook E2E por cliente (`internal/adapter`):
+Para total transparência metodológica (conforme `AGENTS.md` e [`docs/evaluation-plan.md`](../../docs/evaluation-plan.md)), separamos estritamente o que foi **executado e medido deterministicamente** do que depende de execução com modelos de linguagem ao vivo:
 
-| Agente / Modelo Econômico | Hook de Injeção | Taxa de Resolução | Redução Média de Tool Calls | Redução Média de Tempo (Wall-Clock) | Redução Média de Tokens Consumidos | Latência P50 do Hook (`v2.1` / `v2`) | Score Composto (0–100) |
-|---|---|---:|---:|---:|---:|---:|---:|
-| **Baseline (Sem Sidecar — OFF)** | Nenhum | `96,7%` (29/30) | Baseline (`4,0` calls) | Baseline (`9,4 s`) | Baseline (`13.840` tok) | `0 ms` | **62,4 / 100** |
-| **Claude Code (`claude-haiku-5-5`) + Sidecar V2** | `UserPromptSubmit` (`hookSpecificOutput.additionalContext`) | **`100,0%`** | **`-48,5%`** (`2,1` calls) | **`-36,8%`** (`5,9 s`) | **`-52,4%`** (`6.590` tok) | `5,8 ms` / `14,4 ms` | **91,8 / 100** |
-| **Codex CLI (`codex-mini` / `gpt-6.1-terra`) + Sidecar V2** | `UserPromptSubmit` (`additionalContext` JSON) | **`100,0%`** | **`-47,0%`** (`2,1` calls) | **`-34,9%`** (`6,1 s`) | **`-51,2%`** (`6.750` tok) | `5,8 ms` / `14,4 ms` | **91,0 / 100** |
-| **Antigravity CLI (`gemini-flash` / `agy`) + Sidecar V2** | Hook `additionalContext` / `explain` | **`100,0%`** | **`-46,8%`** (`2,1` calls) | **`-34,1%`** (`6,2 s`) | **`-50,9%`** (`6.795` tok) | `5,8 ms` / `14,4 ms` | **90,7 / 100** |
-| **Média Consolidada Sidecar V2 (ON)** | Todos os 3 clientes | **`100,0%` (30/30)** | **`-47,5%`** | **`-35,3%`** | **`-51,6%`** | **`5,8 ms` / `14,4 ms`** | **91,2 / 100** |
+### 3.1 O que foi executado de forma real e determinística nesta suíte
+
+1. **Benchmark de Recuperação Offline em 10 Repositórios Públicos Reais ([`bench/ten_repos_cases.json`](../ten_repos_cases.json) / [`bench/results/ten-repos-benchmark.md`](ten-repos-benchmark.md))**:
+   - **50 cenários reais** (20 diretos EN/PT, 10 PT imperfeito, **10 Voice Mode de ~200 palavras**, 10 negativos de abstenção) executados contra checkouts reais com commit fixado de 10 projetos open-source (`spring-petclinic`, `chi`, `click`, `hono`, `serde-json`, `sinatra`, `monolog`, `kotlinx-datetime`, `dapper`, `express`).
+   - Mede **diretamente o binário Go do Sidecar** sobre o índice SQLite/FTS5 real de cada projeto (por isso cada consulta leva **5,8 ms a 18,2 ms**, sem chamar LLM).
+   - **Resultado medido**: **50/50 cenários aprovados (`100%`)**, **`97,5%` Hit@5**, **`100,0%` Recall@10**, **`0,0%` falsos positivos**, e **Voice Mode `10/10` (`100%` Hit@5)**.
+2. **Benchmark Agêntico Instrumentado A/B em 2 Repositórios Reais ([`bench/agentic/instrumented_sim.py`](../agentic/instrumented_sim.py) / [`bench/results/real-repos-ab-score.md`](real-repos-ab-score.md))**:
+   - **6 tarefas verificadas** (`R01` a `R06` em [`bench/agentic/manifest.jsonl`](../agentic/manifest.jsonl)) × 3 braços (`OFF`, `ON-v1`, `ON-v2`) × 5 repetições = **90 execuções reais de ferramentas** (`grep`, leitura de arquivos e `sidecar explain --json`) sobre `spring-petclinic` e `go-chi/chi`.
+   - Usa uma política determinística fixa (`model = "instrumented-sim"`) para isolar a economia de buscas e tokens sem variância de rede/LLM:
+
+| Braço Medido (`instrumented_sim.py`, 90 execuções) | Taxa de Resolução | Chamadas de Ferramenta até o Gabarito | Rodadas até o Gabarito | Tokens Consumidos de Ferramentas | Tempo de Ferramenta (TTFE, sem LLM) | Score Composto (0–100) |
+|---|---:|---:|---:|---:|---:|---:|
+| **OFF (Sem Sidecar — `grep` + leitura)** | `83,3%` | `18,0` a `19,3` calls | `2,8` a `3,2` rounds | `17.772` a `21.062` tok | `38,7 ms` a `96,1 ms` | **81,5 a 85,5 / 100** |
+| **Sidecar V1 (`ON-v1`)** | `83,3%` | **`11,0` a `13,5` calls (`-35%` a `-43%`)** | **`2,2` a `2,4` rounds** | **`11.523` a `11.816` tok (`-35%` a `-44%`)** | `55,0 ms` a `144,4 ms` | **86,5 a 87,3 / 100** |
+| **Sidecar V2 (`ON-v2`)** | `83,3%` | **`11,0` a `13,5` calls (`-35%` a `-43%`)** | **`2,2` a `2,4` rounds** | **`11.517` a `11.772` tok (`-35%` a `-44%`)** | `55,0 ms` a `142,2 ms` | **86,5 a 87,3 / 100** |
+
+> **Nota sobre tarefas completas com agentes reais (Claude Code Haiku, Codex, Antigravity CLI)**: na simulação instrumentada acima, o tempo medido é apenas o tempo local de execução de `grep`/`read`/`sidecar explain` (dezenas de milissegundos), sem o tempo de inferência do modelo em cada rodada (~2 a 5 segundos por round-trip de LLM). Nas tarefas em que o bloco do Sidecar entrega o gabarito logo no turno 0 (`R01`, `R03`, `R04`), o número de chamadas cai de **16–20 chamadas (`~19.000 tokens`) para 1 única chamada (`~330–480 tokens`, `-97%` de tokens)**. Para medir o tempo de parede real (em segundos) com agentes caixa-preta editando código e rodando testes, o manifesto [`bench/agentic/manifest.jsonl`](../agentic/manifest.jsonl) deve ser executado invocando os CLIs reais (`claude`, `codex`, `agy`) em pares ON/OFF.
 
 ---
 
