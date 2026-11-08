@@ -18,7 +18,7 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 | R4 TaskUncertainty / grooming | — | detector, política, decisões, benchmark | gate R4 | 🟡 [grooming](grooming.md): `SIDECAR_FEATURES=groom` opt-in; 0/17 perguntas desnecessárias, 8/11 corretas (fixture interna); benefício líquido não medido |
 | R5 Impact/Verification | `ContractEvidence` | blast radius, verificações | gate R5 | 🟡 [change-impact](change-impact.md): `sidecar impact` + nota opt-in; histórico real: 46%/63%/49% (chi/click/express) com 3–6 arquivos sinalizados; gate agentic pendente |
 | R6 Session Intelligence | `SessionObserver` passivo | traces, estagnação | gate R6 | 🟡 [session-intelligence](session-intelligence.md): classificação passiva + sombra + `sidecar progress` + métricas no lab; sem transporte de intervenção (gate pendente) |
-| R7 Studio/adapters/release | docs de integração | estático, matriz de suporte | gate R7 | 🟡 [studio](studio.md) (7 vistas, verificado em Chromium); instalação/uninstall/hooks E2E reais com Claude Code ([r7-install-e2e](../bench/results/r7-install-e2e-2026-11-08.md)); Codex/Antigravity/PreCompact/release real não verificados |
+| R7 Studio/adapters/release | docs de integração | estático, matriz de suporte | gate R7 | 🟡 [studio](studio.md) (7 vistas, verificado em Chromium); instalação/uninstall/hooks E2E reais com Claude Code ([r7-install-e2e](../bench/results/r7-install-e2e-2026-11-08.md)); `PreCompact` verificado e registrado; Codex/Antigravity (CLIs indisponíveis aqui) e release real não verificados |
 
 ## Corpus (R1.1)
 

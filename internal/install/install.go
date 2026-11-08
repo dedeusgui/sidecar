@@ -285,11 +285,12 @@ func promptEvent(agent string) string {
 type toolEvent struct{ event, observed string }
 
 // toolEvents lists the tool-event hooks --observe-tools installs for an agent. Codex is not
-// listed: its tool hooks are not verified against a live client yet.
+// listed: its tool hooks are not verified against a live client yet. Claude Code also gets PreCompact: the observer
+// resets the evidence it believes the agent has seen, because compaction made the agent forget it.
 func toolEvents(agent string) []toolEvent {
 	switch agent {
 	case "claude":
-		return []toolEvent{{"PreToolUse", "PreToolUse"}, {"PostToolUse", "PostToolUse"}}
+		return []toolEvent{{"PreToolUse", "PreToolUse"}, {"PostToolUse", "PostToolUse"}, {"PreCompact", "PreCompact"}} // PreCompact verified against Claude Code 2.1.319 (2026-11-08)
 	case "antigravity":
 		return []toolEvent{{"PreTool", "PreToolUse"}, {"PostTool", "PostToolUse"}}
 	}

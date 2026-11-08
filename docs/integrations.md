@@ -63,7 +63,7 @@ Problema: hoje `sidecar doctor` e `sidecar explain` dão diagnóstico, mas o usu
 
 | Cliente | `UserPromptSubmit` (contexto) | Observação de ferramenta | `PreCompact` | Pergunta nativa (R4) | Evidência |
 |---|---|---|---|---|---|
-| Claude Code 2.1.319 | **E2E real**: hook instalado, disparado, contexto entregue | **E2E real**: `PreToolUse`/`PostToolUse` com metadados hasheados; falha de ferramenta não documentada (`result: unknown`) | não registrado pelo instalador; **não verificado** | `AskUserQuestion` (interativo; ausente em `-p`); **E2E interativo não executado** | [r7-install-e2e](../bench/results/r7-install-e2e-2026-11-08.md) |
+| Claude Code 2.1.319 | **E2E real**: hook instalado, disparado, contexto entregue | **E2E real**: `PreToolUse`/`PostToolUse` com metadados hasheados; falha de ferramenta não documentada (`result: unknown`) | **E2E real** (`/compact`): registrado por `--observe-tools`; evidência reenviada depois da compactação | `AskUserQuestion` (interativo; ausente em `-p`); **E2E interativo não executado** | [r7-install-e2e](../bench/results/r7-install-e2e-2026-11-08.md) |
 | Codex | só testes de contrato | não observado | — | nenhuma ferramenta verificada (texto) | CLI não disponível neste ambiente |
 | Antigravity CLI | só testes de contrato (`PreInvocation`, `injectSteps`) | `PreTool`/`PostTool` por contrato | — | nenhuma ferramenta verificada (texto) | CLI não disponível neste ambiente |
 
