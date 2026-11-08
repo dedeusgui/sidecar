@@ -1,0 +1,54 @@
+{
+  "id": "CHI-EDIT-01",
+  "ok": true,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/request_size.go",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/request_size.go",
+        "ok": true,
+        "detail": "limite por leitura preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "t (0.00s)\n    --- FAIL: TestBenchmarkRequestSizeKnownLength/zero_limit (0.00s)\n    --- PASS: TestBenchmarkRequestSizeKnownLength/unknown_and_within_limit (0.00s)\n    --- PASS: TestBenchmarkRequestSizeKnownLength/unknown_and_oversized (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.003s\nFAIL\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "middleware/request_size.go"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "pass",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "middleware/request_size.go",
+        "ok": true,
+        "detail": "API pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "middleware/request_size.go",
+        "ok": true,
+        "detail": "limite por leitura preservado"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": ""
+  },
+  "ts": 1794162055.2475686,
+  "base_verdict": "fail"
+}

@@ -62,9 +62,10 @@ type callResult struct {
 	hits      []store.SymbolHit
 	tokens    int
 	latencyMS float64
-	notes     []string // conflict notes that reached the output
-	contracts []string // contract statuses found, e.g. TEST_EXPECTED
-	keys      []string // keys of the evidence returned, for the seen rerun
+	notes     []string                  // conflict notes that reached the output
+	contracts []string                  // contract statuses found, e.g. TEST_EXPECTED
+	keys      []string                  // keys of the evidence returned, for the seen rerun
+	cands     []retrieve.CandidateTrace // top candidates with their factors, for replay captures
 }
 
 // runner answers one prompt. seen, when set, reports evidence already delivered in the session.
@@ -101,6 +102,9 @@ func main() {
 	agenticDir := flag.String("agentic-report", "", "print the agentic A/B report for the run records in this directory and exit")
 	agenticManifest := flag.String("agentic-manifest", "bench/agentic/manifest.jsonl", "task manifest used by --agentic-report")
 	outPath := flag.String("out", "", "write full results as JSON to this path")
+	replayPath := flag.String("replay", "", "offline replay: run the V2 pipeline over versioned tuning variants (config file) and compare against the active one")
+	replayCheck := flag.String("replay-check", "", "verify the active tuning in this config equals the compiled defaults, then exit")
+	perfRuns := flag.Int("perf", 0, "measure cold/warm latency per pipeline stage with this many warm runs per case (p50/p95/p99)")
 	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
 	reportMD := flag.String("report-md", "", "write a Markdown report to this path (includes the comparison when --compare is set)")
 	flag.Parse()
@@ -115,6 +119,12 @@ func main() {
 		must(printAgenticReport(f, *agenticDir, *agenticManifest))
 		must(f.Close())
 		fmt.Fprintf(os.Stderr, "wrote %s\n", *reportMD)
+		return
+	}
+
+	if *replayCheck != "" {
+		must(checkActiveTuning(*replayCheck))
+		fmt.Println("active tuning matches compiled defaults")
 		return
 	}
 
@@ -138,6 +148,15 @@ func main() {
 			_ = ix.Close()
 		}
 	}()
+
+	if *replayPath != "" {
+		must(runReplay(*replayPath, cf, indexes, *outPath))
+		return
+	}
+	if *perfRuns > 0 {
+		must(runPerf(cf, indexes, *perfRuns, *outPath))
+		return
+	}
 
 	methods := []method{
 		{"textual (substring)", textualRun},
@@ -225,7 +244,7 @@ func retrieveRunWith(opts retrieve.Options) runner {
 		}
 		return callResult{hits: hits, tokens: ctxbuild.EstimateTokens(brief.Render(res, nil)),
 			latencyMS: float64(time.Since(t).Microseconds()) / 1000,
-			notes:     notes, contracts: contracts, keys: keys}, nil
+			notes:     notes, contracts: contracts, keys: keys, cands: res.Trace.Candidates[:min(len(res.Trace.Candidates), 10)]}, nil
 	}
 }
 

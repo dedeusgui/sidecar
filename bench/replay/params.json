@@ -1,0 +1,10 @@
+{
+  "version": "replay-config/1",
+  "note": "active espelha retrieve.DefaultTuning(); variantes e grade são hipóteses. Promover = editar active E os defaults juntos (go test + --replay-check guardam a deriva). Rollback = git revert dos dois.",
+  "active": {"own_cover_cap": 4, "own_alt_weight": 1, "own_conf_base": 0.3, "own_conf_span": 0.6, "min_block_confidence": 0.5},
+  "variants": {
+    "cap3": {"own_cover_cap": 3, "own_alt_weight": 1, "own_conf_base": 0.3, "own_conf_span": 0.6, "min_block_confidence": 0.5},
+    "gate55": {"own_cover_cap": 4, "own_alt_weight": 1, "own_conf_base": 0.3, "own_conf_span": 0.6, "min_block_confidence": 0.55}
+  },
+  "grid": {"own_cover_cap": [4, 5], "own_alt_weight": [0.75, 1]}
+}
