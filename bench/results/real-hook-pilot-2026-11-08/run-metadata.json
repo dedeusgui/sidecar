@@ -1,0 +1,123 @@
+{
+  "repo_commit": "312efd63f0708aeff106417e46b0933f491174b0",
+  "claude_version": "2.1.319 (Claude Code)",
+  "model": "claude-haiku-5-5",
+  "engine": "v2",
+  "sidecar_sha256": "ba8cd9841ee35986188086e1ba63a0e5c2530e643496c7f81a9ed8618159ae64",
+  "pilot_sha256": "8831a406811161c388c94e542f6e8bae53b209f85aa4343ca7c55a9b342563ac",
+  "runner_sha256": "3356166437239d2211469d68ed5a10b79706ebb9ac6f46d0d3afbea587620b11",
+  "cases_sha256": "6278da36d40080e85507474653a5553e294e76ff08fdc002ec6c82d86c04ac41",
+  "reps": 2,
+  "max_budget_usd_per_run": 0.1,
+  "reserved_usd": 2.0,
+  "isolation": [
+    "clone --shared descartável por execução",
+    "SIDECAR_HOME por execução",
+    "--setting-sources project,local",
+    "--strict-mcp-config",
+    "--disable-slash-commands",
+    "Edit/Write/NotebookEdit bloqueados, modo plan"
+  ],
+  "jobs": [
+    {
+      "case": "H01-weight",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "H01-weight",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "H01-weight",
+      "arm": "ON",
+      "rep": 1
+    },
+    {
+      "case": "H01-weight",
+      "arm": "OFF",
+      "rep": 1
+    },
+    {
+      "case": "H02-migration",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "H02-migration",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "H02-migration",
+      "arm": "ON",
+      "rep": 1
+    },
+    {
+      "case": "H02-migration",
+      "arm": "OFF",
+      "rep": 1
+    },
+    {
+      "case": "H03-trace",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "H03-trace",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "H03-trace",
+      "arm": "ON",
+      "rep": 1
+    },
+    {
+      "case": "H03-trace",
+      "arm": "OFF",
+      "rep": 1
+    },
+    {
+      "case": "H04-model",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "H04-model",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "H04-model",
+      "arm": "ON",
+      "rep": 1
+    },
+    {
+      "case": "H04-model",
+      "arm": "OFF",
+      "rep": 1
+    },
+    {
+      "case": "N01-negative",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "N01-negative",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "N01-negative",
+      "arm": "ON",
+      "rep": 1
+    },
+    {
+      "case": "N01-negative",
+      "arm": "OFF",
+      "rep": 1
+    }
+  ]
+}

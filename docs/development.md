@@ -71,7 +71,7 @@ Quem desenvolve o Sidecar deve trabalhar com ele instalado, para que o próprio 
    Ou envie o relatório completo pela entrada padrão, com `schema_version: 1` (ver [agent-feedback.md](agent-feedback.md)).
 4. Conferir com `sidecar feedback list --json`. Remover os obsoletos com `sidecar feedback purge`; `--all` remove tudo do worktree.
 
-Fórmula, em resumo (detalhes e limites em [agent-feedback.md](agent-feedback.md)): pesos 0,45 para o oráculo (`oracle_passed`, por padrão `task_completed`), 0,35 para o rastro do `SessionObserver` (o agente leu ou editou o arquivo?) e 0,20 para o autorrelato, escalado pela confiança. Quando o rastro contradiz um elogio, o peso do autorrelato vale `0,25 ×`. O resultado é limitado a ±0,25 por alvo e decai `0,85^n` com registros mais antigos. Cada registro guarda o hash do arquivo: ao mudar e reindexar o arquivo, ele vira `stale` e deixa de valer. Feedback não gera ganho comprovado: avaliação end-to-end continua em [evaluation-plan.md](evaluation-plan.md).
+Fórmula, em resumo (detalhes e limites em [agent-feedback.md](agent-feedback.md)): o oráculo (0,45) é `passed`/`failed` quando informado e zero quando `unknown`; o rastro do `SessionObserver` (0,35) conta edição (+1), leitura (+0,5) ou nada (0); o autorrelato (0,20) é escalado pela confiança. `task_completed` não é oráculo. Só feedback **forte** (oráculo de execução independente ou humano) ou **médio** (arquivo editado na sessão) altera o ranking, com fatores 1,0 e 0,5. Limite de ±0,25 por alvo, decaimento `0,85^n`, e invalidação por hash de arquivo (schema v6).
 
 ## Contrato de alteração
 
