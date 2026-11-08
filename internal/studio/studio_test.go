@@ -81,6 +81,12 @@ func TestSizeLimits(t *testing.T) {
 	}
 }
 
+func TestHostileArmNamesDoNotNeedPrototypeObjects(t *testing.T) {
+	if !strings.Contains(template, "Object.create(null)") || strings.Contains(template, "const arms = {};") {
+		t.Fatal("run summaries must use prototype-less maps: an arm named __proto__ would corrupt Object.prototype")
+	}
+}
+
 func TestTemplateSlotExists(t *testing.T) {
 	if _, err := os.Stat("template.html"); err != nil {
 		t.Fatal(err)

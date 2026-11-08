@@ -95,8 +95,9 @@ func Build(inputs []Input) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// "</script" inside a string would end the data block early; <!-- and the line separators are escaped too.
-	safe := strings.NewReplacer("<", `<`, ">", `>`, "&", `&`, " ", ` `, " ", ` `).Replace(string(payload))
+	// encoding/json already writes <, >, & and the U+2028/U+2029 separators as \u escapes, so "</script" inside a string
+	// cannot close the data block. TestBuildEmbedsDataAndNeverBreaksOutOfTheDataBlock asserts it, and fails if that changes.
+	safe := string(payload)
 	if !strings.Contains(template, "/*__DATA__*/") {
 		return nil, fmt.Errorf("template has no data slot")
 	}

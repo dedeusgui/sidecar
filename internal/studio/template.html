@@ -83,7 +83,7 @@ function viewExplain(d) {
 }
 
 function summarizeRuns(rows) {
-  const arms = {};
+  const arms = Object.create(null); // an arm named __proto__ must not touch Object.prototype
   for (const r of rows) {
     const a = (arms[r.arm] = arms[r.arm] || { arm: r.arm, runs: 0, comparable: 0, pass: 0, hidden: 0, cost: 0, costN: 0, calls: 0, callsN: 0, red: 0, redN: 0 });
     a.runs++; if (!r.comparable) continue; a.comparable++;
@@ -102,7 +102,7 @@ function viewRuns(d) {
   out.push(el("p", { class: "note" }, "Evidence level: " + [...ev].join(", ") + ". Small N is descriptive; no row here is a proven gain. Simulated runs test the infrastructure, not the product."));
   out.push(sec("By arm", table(["arm", "runs", "comparable", "pass", "pass rate", "hidden tests ok", "mean cost USD", "mean tool calls", "mean redundant calls"], summarizeRuns(rows), ["runs", "comparable", "pass", "pass rate", "hidden tests ok", "mean cost USD", "mean tool calls", "mean redundant calls"])));
   const arms = [...new Set(rows.map((r) => r.arm))], tasks = [...new Set(rows.map((r) => r.task))].sort();
-  const by = {}; for (const r of rows) by[r.task + "|" + r.arm] = r;
+  const by = Object.create(null); for (const r of rows) by[r.task + "|" + r.arm] = r;
   out.push(sec("Per task (verdict · cost · wall s)", table(["task", "class", "split", ...arms], tasks.map((t) => {
     const any = rows.find((r) => r.task === t), row = { task: t, class: any.class, split: any.split };
     for (const a of arms) { const r = by[t + "|" + a]; row[a] = r ? el("span", {}, verdict(r.verdict), " ", el("span", { class: "muted" }, fmt(r.cost_usd, 4) + " · " + fmt(r.wall_s, 0))) : "–"; }

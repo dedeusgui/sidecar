@@ -20,9 +20,9 @@ import (
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/progress"
 	"github.com/dedeusgui/sidecar/internal/repo"
-	"github.com/dedeusgui/sidecar/internal/studio"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
+	"github.com/dedeusgui/sidecar/internal/studio"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
