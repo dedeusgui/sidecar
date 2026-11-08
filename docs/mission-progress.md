@@ -18,7 +18,7 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 | R4 TaskUncertainty / grooming | — | detector, política, decisões, benchmark | gate R4 | ⬜ |
 | R5 Impact/Verification | `ContractEvidence` | blast radius, verificações | gate R5 | ⬜ |
 | R6 Session Intelligence | `SessionObserver` passivo | traces, estagnação | gate R6 | ⬜ |
-| R7 Studio/adapters/release | docs de integração | estático, matriz de suporte | gate R7 | ⬜ |
+| R7 Studio/adapters/release | docs de integração | estático, matriz de suporte | gate R7 | 🟡 [studio](studio.md) (7 vistas, verificado em Chromium); instalação/uninstall/hooks E2E reais com Claude Code ([r7-install-e2e](../bench/results/r7-install-e2e-2026-11-08.md)); Codex/Antigravity/PreCompact/release real não verificados |
 
 ## Corpus (R1.1)
 
