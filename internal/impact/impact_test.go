@@ -129,7 +129,7 @@ func TestAnalyzeIsBoundedAndSkipsNonCodeAndUnindexed(t *testing.T) {
 	if len(rep.Findings) == 0 {
 		t.Fatal("the cleaned path billing/charge.go must still be analysed")
 	}
-	if rep.Findings != nil && len(rep.Findings) > maxFindings {
+	if len(rep.Findings) > maxFindings {
 		t.Fatalf("unbounded findings: %d", len(rep.Findings))
 	}
 }
