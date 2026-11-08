@@ -456,20 +456,40 @@ class ScriptedAgent:
                 "stream_error": False, "first_edit_s": None}
 
 
+def deny_flags(paths):
+    """Regras de negação do Claude Code para dados do benchmark (oráculo, reference.patch, resultados dos outros braços).
+    `//` marca caminho absoluto. Cobre leitura, busca, listagem e escrita; NÃO cobre código executado por `go test`."""
+    rules = []
+    for p in paths:
+        for tool in ("Read", "Grep", "Glob", "Edit", "Write"):
+            rules.append(f"{tool}(/{p}/**)")
+    return ["--disallowedTools", *rules] if rules else []
+
+
+def touched_benchmark_data(events, deny_paths):
+    """True se algum evento de ferramenta menciona dados do benchmark. Uma tentativa negada também conta:
+    o braço sondou o gabarito, então a execução deixa de ser comparável."""
+    needles = [str(pathlib.Path(p).resolve()) for p in deny_paths] + ["reference.patch", "/oracle/", "validation.json", "holdout_ledger"]
+    return any(n in (e.get("key") or "") for e in events for n in needles)
+
+
 class ClaudeAgent:
     """Claude Code real: configuração isolada por execução, canário, verificação de init e modelo servido."""
     simulated = False
 
-    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow):
+    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow, deny_paths=()):
         sys.path.insert(0, str(HERE.parent / "agentic"))
         import real_hook_pilot as rhp
         self.rhp, self.model, self.sidecar = rhp, model, sidecar
         self.credentials, self.max_budget, self.timeout, self.tools_allow = credentials, max_budget, timeout, tools_allow
+        # O agente roda como o mesmo usuário e `Read` aceita caminho absoluto: sem estas regras ele LÊ o oráculo
+        # oculto. Medido (2026-11-08): sem a regra a leitura funciona; com ela Read, Grep e `ls` são negados.
+        self.deny_paths = [str(pathlib.Path(p).resolve()) for p in deny_paths]
 
     def command(self, prompt, settings):
         flags = ["--output-format", "stream-json", "--verbose", "--include-hook-events", "--no-session-persistence",
                  "--permission-mode", "acceptEdits", "--setting-sources", "project,local", "--strict-mcp-config",
-                 "--disable-slash-commands", "--allowedTools", *self.tools_allow]
+                 "--disable-slash-commands", "--allowedTools", *self.tools_allow, *deny_flags(self.deny_paths)]
         cmd = ["claude", "-p", prompt, "--model", self.model, *flags, "--max-budget-usd", str(self.max_budget)]
         return cmd + (["--settings", settings] if settings else [])
 
@@ -489,6 +509,9 @@ class ClaudeAgent:
             wall = time.perf_counter() - t0
             parsed = rhp.parse_stream(out)
             reasons = rhp.contamination(parsed, os.path.exists(marker), self.model)
+            events = tool_events(out)
+            if touched_benchmark_data(events, self.deny_paths):
+                reasons = list(reasons) + ["o agente tentou acessar dados do benchmark (oráculo, reference.patch ou resultados)"]
             return {"wall_s": round(wall, 2), "result": parsed["result"] or "", "cost_usd": parsed["cost_usd"],
                     "tokens_in": parsed["tokens_in"], "tokens_out": parsed["tokens_out"],
                     "tool_calls": parsed["tool_calls"], "turns": parsed["turns"], "served_models": parsed["served_models"],
@@ -607,8 +630,13 @@ def cmd_run(args):
                 raise LabError(f"comando ausente: {need}")
         if not args.sidecar or not pathlib.Path(args.sidecar).is_file():
             raise LabError("--sidecar (binário) obrigatório para o agente claude")
+        deny = [HERE.parent.parent, out_dir]
+        tmp_root = pathlib.Path(tempfile.gettempdir()).resolve()
+        for d in deny:
+            if d.resolve() == tmp_root or d.resolve() in tmp_root.parents or d.resolve() == pathlib.Path("/"):
+                raise LabError(f"--out-dir/repositório não pode ser {d}: bloquearia o workspace do agente. Use um subdiretório")
         agent = ClaudeAgent(args.model, str(pathlib.Path(args.sidecar).resolve()), args.credentials, args.max_budget,
-                            args.timeout, args.tools_allow.split(","))
+                            args.timeout, args.tools_allow.split(","), deny_paths=deny)
         est = n * args.max_budget
         if not args.yes_spend:
             print(f"Dry run: {n} execuções ({len(tasks)} tarefas × {len(arms)} braços × {args.reps}); "

@@ -269,6 +269,31 @@ class RunnerTests(LabCase):
             lab.cmd_run(self.run_args(allow_unvalidated=False))
 
 
+class IsolationTests(unittest.TestCase):
+    def test_deny_flags_cover_read_search_list_and_write_with_absolute_paths(self):
+        flags = lab.deny_flags(["/data/bench/lab", "/data/out"])
+        self.assertEqual(flags[0], "--disallowedTools")
+        for tool in ("Read", "Grep", "Glob", "Edit", "Write"):
+            self.assertIn(f"{tool}(//data/bench/lab/**)", flags)
+            self.assertIn(f"{tool}(//data/out/**)", flags)
+        self.assertEqual(lab.deny_flags([]), [])
+
+    def test_touching_benchmark_data_is_detected_even_when_denied(self):
+        deny = ["/data/bench/lab"]
+        self.assertTrue(lab.touched_benchmark_data([{"kind": "read", "key": "/data/bench/lab/corpus/tasks/T/oracle/o.go"}], deny))
+        self.assertTrue(lab.touched_benchmark_data([{"kind": "search", "key": "grep -r Test reference.patch"}], deny))
+        self.assertTrue(lab.touched_benchmark_data([{"kind": "other", "key": "cat /x/oracle/a.py"}], deny))
+        self.assertFalse(lab.touched_benchmark_data([{"kind": "read", "key": "/tmp/lab-run-1/work/main.go"}], deny))
+
+    def test_run_refuses_a_deny_path_that_would_block_the_workspace(self):
+        with self.assertRaises(lab.LabError):
+            args = SimpleNamespace(agent="claude", model="claude-haiku-5-5", sidecar=sys.executable, yes_spend=True,
+                                   out_dir=tempfile.gettempdir(), tasks=None, splits="development,validation", arms="OFF",
+                                   allow_unvalidated=True, reps=1, seed=1, credentials=None, max_budget=0.1, timeout=10,
+                                   tools_allow="Read", final=False, max_total_usd=None, scripted_behaviour="reference")
+            lab.cmd_run(args)
+
+
 class HoldoutTests(LabCase):
     def test_holdout_sealed_without_final_and_ledgered_with_final(self):
         self.make_task("T-EDIT-H1", split="holdout")
