@@ -307,6 +307,11 @@ class ToolTraceTests(unittest.TestCase):
         self.assertEqual([e["kind"] for e in ev], ["read", "search", "edit", "test", "search", "read", "other"])
         self.assertEqual(ev[-1]["err"], "fail line #")
 
+    def test_tool_events_tolerates_unexpected_stream_shapes(self):
+        s = self.stream({"type": "system", "message": "text instead of an object"}, {"type": "user", "message": {"content": "plain string"}},
+                        {"type": "assistant", "message": {"content": ["not a block", None]}})
+        self.assertEqual(lab.tool_events(s), [])
+
     def test_summarize_reports_redundancy_only_when_progress_exists(self):
         base = {"comparable": True, "success": True, "cost_usd": 0.1, "wall_s": 1.0, "tool_calls": 1, "injected_chars": 0,
                 "served_models": ["m"], "verdict": "pass", "oracle": {"scope_ok": True, "invariants": [], "tests": "pass", "outside_scope": []}}

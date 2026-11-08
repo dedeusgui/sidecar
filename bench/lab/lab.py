@@ -544,8 +544,11 @@ def tool_events(stream_text):
             d = json.loads(line)
         except ValueError:
             continue
-        msg = d.get("message") or {}
-        for block in msg.get("content") or []:
+        msg = d.get("message")
+        if not isinstance(msg, dict):
+            continue
+        content = msg.get("content")
+        for block in content if isinstance(content, list) else []:
             if not isinstance(block, dict):
                 continue
             if d.get("type") == "assistant" and block.get("type") == "tool_use":
