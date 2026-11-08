@@ -44,7 +44,10 @@ type caseSpec struct {
 	ExpectConflict bool     `json:"expect_conflict,omitempty"` // a CONFLICT_CANDIDATE note reaches the output
 	ExpectContract string   `json:"expect_contract,omitempty"` // a contract finding with this status exists
 	MustNot        []string `json:"must_not,omitempty"`        // these paths must not appear in the top 10
-	SeenRerun      bool     `json:"seen_rerun,omitempty"`      // a second pass with the first pass's evidence must not repeat gold
+	SeenRerun      bool     `json:"seen_rerun,omitempty"`
+	// Clarification benchmark (--groom): the label is set by reading the repository before running anything.
+	ExpectAsk   *bool  `json:"expect_ask,omitempty"`   // a careful engineer would interrupt the user
+	ExpectState string `json:"expect_state,omitempty"` // the primary open-decision state, when asking      // a second pass with the first pass's evidence must not repeat gold
 }
 
 type repoSpec struct {
@@ -104,6 +107,7 @@ func main() {
 	outPath := flag.String("out", "", "write full results as JSON to this path")
 	replayPath := flag.String("replay", "", "offline replay: run the V2 pipeline over versioned tuning variants (config file) and compare against the active one")
 	replayCheck := flag.String("replay-check", "", "verify the active tuning in this config equals the compiled defaults, then exit")
+	groomFlag := flag.Bool("groom", false, "clarification benchmark: run the V2 pipeline and the ask/assume policy over cases with expect_ask labels")
 	perfRuns := flag.Int("perf", 0, "measure cold/warm latency per pipeline stage with this many warm runs per case (p50/p95/p99)")
 	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
 	reportMD := flag.String("report-md", "", "write a Markdown report to this path (includes the comparison when --compare is set)")
@@ -149,6 +153,10 @@ func main() {
 		}
 	}()
 
+	if *groomFlag {
+		must(runGroomEval(cf, indexes, *outPath))
+		return
+	}
 	if *replayPath != "" {
 		must(runReplay(*replayPath, cf, indexes, *outPath))
 		return

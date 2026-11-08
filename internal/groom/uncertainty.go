@@ -54,9 +54,10 @@ type Report struct {
 }
 
 var (
-	editVerbs = regexp.MustCompile(`\b(adicion\w*|acrescent\w*|cri(e|ar|a)|implement\w*|alter(e|ar|a)|mud(e|ar|a)|modific\w*|troc(e|ar|a)|substitu\w*|remov\w*|exclu\w*|refator\w*|corrij\w*|conserte|migr(e|ar|a)|renome\w*|permit\w*|habilit\w*|desabilit\w*|add|create|implement|change|update|modify|replace|remove|delete|refactor|fix|migrate|rename|support|enable|disable|make|allow)\b`)
+	editVerbs = regexp.MustCompile(`\b(adicion\w*|acrescent\w*|cri(e|ar|a)|implement\w*|alter(e|ar|a)|mud(e|ar|a)|modific\w*|troc(e|ar|a)|substitu\w*|remov\w*|exclu\w*|refator\w*|corrij\w*|conserte|migr(e|ar|a)|renome\w*|permit\w*|habilit\w*|desabilit\w*|aument\w*|reduz\w*|diminu\w*|ajust\w*|increase|decrease|raise|lower|adjust|bump|add|create|implement|change|update|modify|replace|remove|delete|refactor|fix|migrate|rename|support|enable|disable|make|allow)\b`)
 	// numbers, durations and sizes: a stated value for a limit
 	hasNumber  = regexp.MustCompile(`\d`)
+	changeVerb = regexp.MustCompile(`\b(aument\w*|reduz\w*|diminu\w*|mud(e|ar|a)|alter(e|ar|a)|troc(e|ar|a)|ajust\w*|increase|decrease|raise|lower|change|update|adjust|bump)\b`)
 	limitWords = regexp.MustCompile(`\b(limite|limit|maximo|max|minimo|min|timeout|ttl|quota|cota|tamanho|size|taxa|rate|intervalo|interval|tentativas|retries|retry|expir\w*)\b`)
 	// Explicit opt-outs and urgency, in the user's own words.
 	noAsk  = regexp.MustCompile(`\b(nao pergunte|sem perguntar|sem precisar perguntar|nao precisa perguntar|don'?t ask|do not ask|no questions|just do it|so faca|apenas faca)\b`)
@@ -74,7 +75,7 @@ func Analyze(prompt string, res retrieve.Result) Report {
 		return rep
 	}
 	var gaps []Gap
-	if g := contractConflict(res); g != nil {
+	if g := contractConflict(text, res); g != nil {
 		gaps = append(gaps, *g)
 	}
 	if g := contradiction(text); g != nil {
@@ -83,7 +84,7 @@ func Analyze(prompt string, res retrieve.Result) Report {
 	if g := ambiguousTarget(res); g != nil {
 		gaps = append(gaps, *g)
 	}
-	if g := missingLimit(text, res); g != nil {
+	if g := missingLimit(prompt, text, res); g != nil {
 		gaps = append(gaps, *g)
 	}
 	for i := range gaps {
@@ -125,7 +126,7 @@ func loc(ev retrieve.Evidence) string { return fmt.Sprintf("%s:%d", ev.Hit.Path,
 
 // contractConflict: the definition the request touches is described differently by code and by a document
 // or test. Sidecar cites both and does not choose an authority.
-func contractConflict(res retrieve.Result) *Gap {
+func contractConflict(text string, res retrieve.Result) *Gap {
 	top := map[string]retrieve.Evidence{}
 	n := 0
 	for _, ev := range res.Evidence {
@@ -148,6 +149,12 @@ func contractConflict(res retrieve.Result) *Gap {
 			continue
 		}
 		where := fmt.Sprintf("%s:%d", f.Path, f.Line)
+		// A value stated in the request settles a numeric conflict: both sides are updated to it, and
+		// which source was right no longer changes the patch.
+		uncertainty := 1.0
+		if hasNumber.MatchString(text) && hasNumber.MatchString(f.Claim) {
+			uncertainty = 0.2
+		}
 		return &Gap{State: ContractConflict,
 			Decision: fmt.Sprintf("which source is authoritative for %s: the code or %s", fields[1], f.Path),
 			Evidence: []string{loc(ev), where},
@@ -155,7 +162,7 @@ func contractConflict(res retrieve.Result) *Gap {
 				{Label: "follow the code", Consequence: "keep " + loc(ev) + " as is; update " + f.Path + " and its claim (" + f.Claim + ")"},
 				{Label: "follow the document", Consequence: "change " + loc(ev) + " to match " + f.Path + " (" + f.Claim + "); tests that encode the old value change too"},
 			},
-			Impact: 1.0, Uncertainty: 1.0, Rework: 0.5, ChangesTests: true}
+			Impact: 1.0, Uncertainty: uncertainty, Rework: 0.5, ChangesTests: true}
 	}
 	return nil
 }
@@ -195,8 +202,8 @@ func ambiguousTarget(res retrieve.Result) *Gap {
 
 // missingLimit: the request introduces or changes a limit but states no value. If the repository already
 // carries a constant for it, the repository answers and nothing is asked.
-func missingLimit(text string, res retrieve.Result) *Gap {
-	m := limitWords.FindString(text)
+func missingLimit(prompt, text string, res retrieve.Result) *Gap {
+	m := limitTerm(prompt, text)
 	if m == "" || hasNumber.MatchString(text) {
 		return nil
 	}
@@ -206,7 +213,17 @@ func missingLimit(text string, res retrieve.Result) *Gap {
 			{Label: "you give the value", Consequence: "implement with that value and test its boundaries"},
 			{Label: "conservative default", Consequence: "add a named constant with a default; tests pin the default, easy to change later"},
 		}, Impact: 0.7, Uncertainty: 1.0, Rework: 0.5, ChangesTests: true}
+	changing := changeVerb.MatchString(text)
 	for _, ev := range res.Evidence {
+		if changing {
+			// The request changes an existing limit without saying the new value: the constant in the code is the
+			// old value and cannot answer it. Cite it so the question can state where things stand.
+			if ev.Note == "" && (ev.Hit.Kind == "constant" || ev.Hit.Kind == "field") && ev.Hit.Value != "" && nameIsLimit(ev.Hit.Name) {
+				g.Evidence = append(g.Evidence, fmt.Sprintf("current: %s = %s (%s)", ev.Hit.Name, ev.Hit.Value, loc(ev)))
+				break
+			}
+			continue
+		}
 		if ev.Note == "" && (ev.Hit.Kind == "constant" || ev.Hit.Kind == "field") && ev.Hit.Value != "" && nameIsLimit(ev.Hit.Name) {
 			g.ResolvedByRepo = fmt.Sprintf("%s = %s (%s)", ev.Hit.Name, ev.Hit.Value, loc(ev))
 			g.Uncertainty = 0
@@ -287,4 +304,18 @@ func nameIsLimit(name string) bool {
 		}
 	}
 	return false
+}
+
+// limitTerm finds a limit word in the prompt, also inside identifiers (SessionTTL, MaxRetries), which the
+// folded text keeps as one word.
+func limitTerm(prompt, text string) string {
+	if m := limitWords.FindString(text); m != "" {
+		return m
+	}
+	for _, t := range lexical.Analyze(prompt) {
+		if limitWords.MatchString(t) {
+			return t
+		}
+	}
+	return ""
 }
