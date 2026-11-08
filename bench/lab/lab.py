@@ -727,7 +727,8 @@ def cmd_run(args):
     if unvalidated and not args.allow_unvalidated:
         raise LabError("tarefas sem validation.json ok (rode validate-task): " + ", ".join(unvalidated))
     arms = parse_arms(args.arms)
-    order = schedule([t["id"] for t in tasks], arms, args.reps, args.seed)
+    offset = getattr(args, "rep_offset", 0)
+    order = [(t, a, r + offset) for t, a, r in schedule([t["id"] for t in tasks], arms, args.reps, args.seed + offset)]
     n = len(order)
     out_dir = pathlib.Path(args.out_dir)
     if args.agent == "scripted":
@@ -839,6 +840,76 @@ def summarize(rows):
     }
 
 
+METRICS = (("pass_rate", "taxa de aprovação", "pass"), ("tool_calls", "chamadas de ferramenta", "calls"), ("tokens", "tokens (entrada+saída)", "tok"),
+           ("cost_usd", "custo US$", "cost"), ("wall_s", "tempo s", "wall"), ("redundant", "chamadas redundantes", "red"))
+
+
+def run_metrics(r):
+    prog = r.get("progress") or {}
+    tin, tout = r.get("tokens_in"), r.get("tokens_out")
+    return {"pass_rate": 1.0 if r["success"] else 0.0, "tool_calls": r.get("tool_calls"),
+            "tokens": (tin + tout) if isinstance(tin, int) and isinstance(tout, int) else None,
+            "cost_usd": r.get("cost_usd"), "wall_s": r.get("wall_s"), "redundant": prog.get("redundant")}
+
+
+def compare_arms(rows, arm, base, n_boot=2000, seed=7):
+    """Δ% de `arm` contra `base`, pareando por (tarefa, repetição) entre execuções comparáveis dos dois braços.
+    IC95 por bootstrap sobre as TAREFAS (as repetições de uma tarefa não são independentes). Métrica sem dado em
+    algum lado do par fica de fora, e a contagem de pares é reportada."""
+    idx = {}
+    for r in rows:
+        if r["comparable"]:
+            idx.setdefault(r["arm"], {})[(r["task"], r["rep"])] = r
+    pairs = [(k, idx[arm][k], idx[base][k]) for k in idx.get(arm, {}) if k in idx.get(base, {})]
+    out = {"arm": arm, "base": base, "pairs": len(pairs), "tasks": len({k[0] for k, _, _ in pairs}), "metrics": {}}
+    rnd = random.Random(seed)
+    for key, label, _ in METRICS:
+        by_task = {}
+        for k, a, b in pairs:
+            va, vb = run_metrics(a)[key], run_metrics(b)[key]
+            if va is not None and vb is not None:
+                by_task.setdefault(k[0], []).append((va, vb))
+        tasks = list(by_task)
+        if not tasks:
+            out["metrics"][key] = None
+            continue
+        ma = lambda ts: statistics.mean(statistics.mean(x for x, _ in by_task[t]) for t in ts)
+        mb = lambda ts: statistics.mean(statistics.mean(y for _, y in by_task[t]) for t in ts)
+        base_mean, arm_mean = mb(tasks), ma(tasks)
+        entry = {"label": label, "base": round(base_mean, 4), "arm": round(arm_mean, 4), "n_tasks": len(tasks),
+                 "delta_pct": round(100 * (arm_mean - base_mean) / base_mean, 1) if base_mean else None, "ci95_pct": None}
+        if len(tasks) >= 5 and base_mean:
+            boots = []
+            for _ in range(n_boot):
+                sample = rnd.choices(tasks, k=len(tasks))
+                bm = mb(sample)
+                if bm:
+                    boots.append(100 * (ma(sample) - bm) / bm)
+            boots.sort()
+            if boots:
+                entry["ci95_pct"] = [round(boots[int(0.025 * len(boots))], 1), round(boots[int(0.975 * len(boots)) - 1], 1)]
+        lo_hi = entry["ci95_pct"]
+        entry["reading"] = "inconclusivo" if (lo_hi is None or (lo_hi[0] <= 0 <= lo_hi[1]) or len(tasks) < 10) else ("melhor/menor" if entry["delta_pct"] < 0 else "maior")
+        out["metrics"][key] = entry
+    return out
+
+
+def comparison_plan(arms):
+    """Pares (braço, referência) que respondem a uma pergunta: tudo contra OFF; V2 e seus componentes contra V1; componentes
+    contra o V2 puro. Nunca OFF como braço (seria o inverso de outro par) nem um braço contra si mesmo."""
+    plan = []
+    for a in arms:
+        if a != "OFF" and "OFF" in arms:
+            plan.append((a, "OFF"))
+    for a in arms:
+        if a.startswith("V2") and "V1" in arms:
+            plan.append((a, "V1"))
+    for a in arms:
+        if a.startswith("V2+") and "V2" in arms:
+            plan.append((a, "V2"))
+    return plan
+
+
 def build_report(rows, offline=None):
     """Scorecard unificado. Evidências simuladas/offline/agentic ficam em seções separadas, nunca somadas."""
     rep = {"schema": "lab-scorecard/1", "sections": {}, "limits": [
@@ -874,6 +945,7 @@ def build_report(rows, offline=None):
                 "d_pass_ci95": boot_ci(d_pass), "d_cost_mean": round(statistics.mean(d_cost), 4) if d_cost else None,
                 "d_cost_ci95": boot_ci(d_cost),
                 "conclusion": "inconclusivo" if len(d_pass) < 20 else "ver IC"}
+        sec["comparisons"] = [compare_arms(sel, a, b) for a, b in comparison_plan(list(sec["arms"]))]
         rep["sections"][ev] = sec
     if offline:
         rep["sections"]["offline_retrieval"] = {"source": "sidecar-eval", "note": "não é resultado agentic", **offline}
@@ -896,6 +968,19 @@ def render_md(rep):
         for a, p in sec["paired_vs_OFF"].items():
             L.append(f"- {a} vs OFF: {p['pairs']} pares, Δpass {p['d_pass_mean']} IC95 {p['d_pass_ci95']}, Δcusto {p['d_cost_mean']} → **{p['conclusion']}**")
         L.append("")
+    for ev, sec in rep["sections"].items():
+        if ev == "offline_retrieval" or not sec.get("comparisons"):
+            continue
+        L += [f"## Δ% por métrica ({ev}): braço contra referência, pareado por tarefa e repetição", "",
+              "Negativo em tool calls/tokens/custo/tempo/redundantes = menos. `inconclusivo` = IC95 cruza zero ou menos de 10 tarefas.", ""]
+        for c in sec["comparisons"]:
+            L += [f"### {c['arm']} vs {c['base']} ({c['pairs']} pares, {c['tasks']} tarefas)", "",
+                  "| métrica | referência | braço | Δ% | IC95 Δ% | leitura |", "|---|---:|---:|---:|---|---|"]
+            for key, label, _ in METRICS:
+                m = c["metrics"].get(key)
+                if m:
+                    L.append(f"| {m['label']} | {m['base']} | {m['arm']} | {m['delta_pct']} | {m['ci95_pct']} | {m['reading']} |")
+            L.append("")
     L += ["## Limites", ""] + [f"- {x}" for x in rep["limits"]]
     return "\n".join(L) + "\n"
 
@@ -932,7 +1017,7 @@ def main(argv=None):
     p.add_argument("--max-total-usd", type=float, default=None); p.add_argument("--timeout", type=int, default=600)
     p.add_argument("--tools-allow", default="Read,Grep,Glob,Edit,Write,Bash(go test:*),Bash(ls:*)")
     p.add_argument("--yes-spend", action="store_true"); p.add_argument("--final", action="store_true")
-    p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--scripted-behaviour", default="reference")
+    p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--rep-offset", type=int, default=0, help="índice da primeira repetição; permite processos paralelos com repetições distintas"); p.add_argument("--scripted-behaviour", default="reference")
     p = sub.add_parser("report"); p.add_argument("runs"); p.add_argument("--md"); p.add_argument("--json"); p.add_argument("--offline")
     a = ap.parse_args(argv)
     try:

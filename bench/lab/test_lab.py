@@ -387,6 +387,54 @@ class ReviewFixTests(LabCase):
         self.assertTrue(lab.touched_benchmark_data([{"kind": "test", "key": "test", "cmd": "go test -exec 'cat /data/bench/lab/x' ./..."}], ["/data/bench/lab"]))
 
 
+class ComparisonTests(unittest.TestCase):
+    def row(self, task, arm, rep, ok, calls, tin, tout, cost, wall):
+        return {"task": task, "arm": arm, "rep": rep, "comparable": True, "success": ok, "cost_usd": cost, "wall_s": wall, "tool_calls": calls,
+                "tokens_in": tin, "tokens_out": tout, "evidence": "agentic", "split": "development", "class": "edit", "verdict": "pass" if ok else "fail",
+                "injected_chars": 0, "served_models": ["m"], "oracle": {"scope_ok": True, "invariants": [], "tests": "pass", "outside_scope": []}}
+
+    def test_delta_percent_is_paired_by_task_and_flags_noise(self):
+        rows = []
+        for i in range(12):
+            rows.append(self.row(f"T{i}", "OFF", 0, i % 2 == 0, 10, 1000, 100, 0.10, 20.0))
+            rows.append(self.row(f"T{i}", "V2", 0, i % 2 == 0, 8, 800, 100, 0.08, 15.0))
+        c = lab.compare_arms(rows, "V2", "OFF")
+        self.assertEqual(c["pairs"], 12)
+        self.assertEqual(c["metrics"]["tool_calls"]["delta_pct"], -20.0)
+        self.assertEqual(c["metrics"]["tokens"]["delta_pct"], -18.2)
+        self.assertEqual(c["metrics"]["pass_rate"]["delta_pct"], 0.0)
+        self.assertEqual(c["metrics"]["tool_calls"]["reading"], "melhor/menor")  # a constant -20% has a CI that excludes zero
+        self.assertEqual(c["metrics"]["pass_rate"]["reading"], "inconclusivo")
+
+    def test_missing_metrics_and_few_tasks_are_inconclusive_not_invented(self):
+        rows = [self.row("T1", "OFF", 0, True, 10, None, None, None, 5.0), self.row("T1", "V2", 0, True, 9, None, None, None, 5.0)]
+        c = lab.compare_arms(rows, "V2", "OFF")
+        self.assertIsNone(c["metrics"]["tokens"])
+        self.assertIsNone(c["metrics"]["cost_usd"])
+        self.assertEqual(c["metrics"]["tool_calls"]["reading"], "inconclusivo")
+        self.assertIsNone(c["metrics"]["tool_calls"]["ci95_pct"])
+
+    def test_only_pairs_where_both_arms_are_comparable_count(self):
+        rows = [self.row("T1", "OFF", 0, True, 10, 1, 1, 1, 1), self.row("T2", "OFF", 0, True, 10, 1, 1, 1, 1), self.row("T1", "V2", 0, True, 5, 1, 1, 1, 1)]
+        self.assertEqual(lab.compare_arms(rows, "V2", "OFF")["pairs"], 1)
+
+    def test_comparison_plan_has_no_inverse_or_self_pairs(self):
+        plan = lab.comparison_plan(["OFF", "V1", "V2", "V2+adaptive", "V2+brief"])
+        self.assertNotIn(("OFF", "V1"), plan)
+        self.assertIn(("V1", "OFF"), plan)  # V1 contra a referência é legítimo; o inverso não
+        self.assertTrue(all(a != b for a, b in plan))
+        self.assertIn(("V2", "OFF"), plan)
+        self.assertIn(("V2", "V1"), plan)
+        self.assertIn(("V2+brief", "V2"), plan)
+        self.assertEqual(len(plan), len(set(plan)))
+
+    def test_report_renders_the_percentage_table(self):
+        rows = [self.row(f"T{i}", a, 0, True, 10 if a == "OFF" else 8, 100, 10, 0.1, 1.0) for i in range(6) for a in ("OFF", "V2")]
+        md = lab.render_md(lab.build_report(rows))
+        self.assertIn("Δ% por métrica", md)
+        self.assertIn("V2 vs OFF", md)
+
+
 class HoldoutTests(LabCase):
     def test_holdout_sealed_without_final_and_ledgered_with_final(self):
         self.make_task("T-EDIT-H1", split="holdout")
