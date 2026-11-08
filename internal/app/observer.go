@@ -188,6 +188,10 @@ func recordEvidence(root string, agent adapter.Agent, session string, sent []str
 		if len(parts) == 3 && parts[0] != "file" {
 			addBounded(s.Symbols, hashID(root, key))
 		}
+		addBounded(s.Presented, presentedPathKey(root, parts[1]))
+		if len(parts) == 3 {
+			addBounded(s.Presented, presentedSymbolKey(root, parts[1], parts[2]))
+		}
 	}
 	_ = brief.SaveSignals(statePath, s)
 }
@@ -269,4 +273,14 @@ func addCount(m map[string]int, key string) {
 	if _, ok := m[key]; ok || len(m) < brief.MaxSignalEntries {
 		m[key]++
 	}
+}
+
+// presentedPathKey and presentedSymbolKey are the observer-state keys of evidence the hook delivered.
+// They are hashes, like every other identifier in the state, so no path or name is stored in clear.
+func presentedPathKey(root, path string) string {
+	return hashID(root, "presented", "path", path)
+}
+
+func presentedSymbolKey(root, path, name string) string {
+	return hashID(root, "presented", "symbol", path, name)
 }

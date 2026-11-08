@@ -40,6 +40,9 @@ type SessionSignals struct {
 	Searches     map[string]bool `json:"searches"`
 	Errors       map[string]int  `json:"errors"`
 	Signals      map[string]int  `json:"signals"`
+	// Presented holds hashes of the evidence the hook actually injected into this session: one per
+	// path and one per path and symbol. Feedback is only attributed to evidence found here.
+	Presented map[string]bool `json:"evidence_presented,omitempty"`
 }
 
 // NewSignals returns empty signals for version, valid until now plus SessionTTL.
@@ -107,6 +110,9 @@ func (s *SessionSignals) ClearEpoch() {
 }
 
 func (s *SessionSignals) initMaps() {
+	if s.Presented == nil {
+		s.Presented = map[string]bool{}
+	}
 	if s.Symbols == nil {
 		s.Symbols = map[string]bool{}
 	}

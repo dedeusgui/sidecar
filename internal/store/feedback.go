@@ -104,26 +104,32 @@ type AgentFeedbackReport struct {
 
 // FeedbackRecord is one judged evidence item of one report.
 type FeedbackRecord struct {
-	ID                int64   `json:"id"`
-	Worktree          string  `json:"worktree"`
-	SessionID         string  `json:"session_id,omitempty"`
-	EvidenceID        string  `json:"evidence_id"`
-	FilePath          string  `json:"file_path"`
-	Symbol            string  `json:"symbol,omitempty"`
-	FileHash          string  `json:"file_hash"`
-	Polarity          int     `json:"polarity"` // feedback_label: +1 helpful, -1 misleading
-	ReasonCode        string  `json:"reason_code"`
-	AgentConfidence   string  `json:"agent_confidence"`
-	AgentCompleted    bool    `json:"agent_reported_completion"`
-	TraceCorroborated int     `json:"trace_corroborated"` // see TraceEdited, TraceRead, TraceNotObserved, TraceUntouched
-	OracleStatus      string  `json:"oracle_status"`      // passed | failed | unknown
-	Provenance        string  `json:"feedback_provenance"`
-	OraclePassed      int     `json:"oracle_passed"` // oracle outcome: +1 passed, -1 failed, 0 unknown
-	EvidenceUsed      string  `json:"evidence_used"` // confirmed | inferred | unknown
-	Tier              string  `json:"feedback_confidence"`
-	ReconciledWeight  float64 `json:"reconciled_weight"` // bounded delta in [-0.25, +0.25], before the tier factor
-	CreatedAt         int64   `json:"created_at"`
-	Status            string  `json:"status"` // valid | stale (computed on read by comparing FileHash with files.hash)
+	ID                int64  `json:"id"`
+	Worktree          string `json:"worktree"`
+	SessionID         string `json:"session_id,omitempty"`
+	EvidenceID        string `json:"evidence_id"`
+	FilePath          string `json:"file_path"`
+	Symbol            string `json:"symbol,omitempty"`
+	FileHash          string `json:"file_hash"`
+	Polarity          int    `json:"polarity"` // feedback_label: +1 helpful, -1 misleading
+	ReasonCode        string `json:"reason_code"`
+	AgentConfidence   string `json:"agent_confidence"`
+	AgentCompleted    bool   `json:"agent_reported_completion"`
+	TraceCorroborated int    `json:"trace_corroborated"` // see TraceEdited, TraceRead, TraceNotObserved, TraceUntouched
+	OracleStatus      string `json:"oracle_status"`      // passed | failed | unknown
+	Provenance        string `json:"feedback_provenance"`
+	OraclePassed      int    `json:"oracle_passed"` // oracle outcome: +1 passed, -1 failed, 0 unknown
+	// Presented is true only when the evidence was injected into the session this report names.
+	// Feedback on evidence the agent never received is kept for diagnosis, never applied.
+	Presented        bool    `json:"evidence_presented"`
+	OracleRunID      string  `json:"oracle_run_id,omitempty"`
+	OracleCommit     string  `json:"oracle_commit,omitempty"`
+	OracleSHA256     string  `json:"oracle_sha256,omitempty"`
+	EvidenceUsed     string  `json:"evidence_used"` // confirmed | inferred | unknown
+	Tier             string  `json:"feedback_confidence"`
+	ReconciledWeight float64 `json:"reconciled_weight"` // bounded delta in [-0.25, +0.25], before the tier factor
+	CreatedAt        int64   `json:"created_at"`
+	Status           string  `json:"status"` // valid | stale (computed on read by comparing FileHash with files.hash)
 }
 
 // OracleOutcome maps an oracle status to +1 passed, -1 failed or 0 unknown.
@@ -208,10 +214,14 @@ func ComputeReconciledWeight(polarity int, confidence string, trace int, oracle 
 	return clamp(raw*0.25, -feedbackMaxDelta, feedbackMaxDelta)
 }
 
-// ClassifyFeedback assigns the tier of one record. Strong needs a known oracle outcome from an
-// independent run or a person. Medium needs the file edited in the session. Everything else,
-// including every self-report without that edit, is weak and is never applied to the ranking.
-func ClassifyFeedback(oracle int, provenance string, trace int) string {
+// ClassifyFeedback assigns the tier of one record. Nothing is strong or medium unless the evidence
+// was presented to the session: attribution to evidence the agent never received is unsound. Strong
+// then needs a known oracle outcome from an independent run or a person. Medium needs the file
+// edited in the session. Everything else is weak and is never applied to the ranking.
+func ClassifyFeedback(oracle int, provenance string, presented bool, trace int) string {
+	if !presented {
+		return TierWeak
+	}
 	if oracle != 0 && (provenance == ProvenanceHarness || provenance == ProvenanceHuman) {
 		return TierStrong
 	}
@@ -251,21 +261,25 @@ func (s *Store) InsertFeedback(rec FeedbackRecord) (int64, error) {
 	if rec.Tier == "" {
 		rec.Tier = TierWeak
 	}
-	agentCompleted := 0
+	agentCompleted, presented := 0, 0
 	if rec.AgentCompleted {
 		agentCompleted = 1
+	}
+	if rec.Presented {
+		presented = 1
 	}
 	var id int64
 	err := s.withWriteTx(func(tx execer) error {
 		res, err := tx.Exec(`INSERT INTO evidence_feedback (worktree, session_id, evidence_id, file_path, symbol,
 			file_hash, polarity, reason_code, agent_confidence, trace_corroborated, oracle_passed,
 			reconciled_weight, created_at, agent_completed, oracle_status, feedback_provenance, evidence_used,
-			feedback_confidence)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			feedback_confidence, evidence_presented, oracle_run_id, oracle_commit, oracle_sha256)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			rec.Worktree, rec.SessionID, rec.EvidenceID, rec.FilePath, rec.Symbol, rec.FileHash,
 			rec.Polarity, rec.ReasonCode, rec.AgentConfidence, rec.TraceCorroborated, rec.OraclePassed,
 			clamp(rec.ReconciledWeight, -feedbackMaxDelta, feedbackMaxDelta), rec.CreatedAt,
-			agentCompleted, rec.OracleStatus, rec.Provenance, rec.EvidenceUsed, rec.Tier)
+			agentCompleted, rec.OracleStatus, rec.Provenance, rec.EvidenceUsed, rec.Tier,
+			presented, rec.OracleRunID, rec.OracleCommit, rec.OracleSHA256)
 		if err != nil {
 			return err
 		}
@@ -281,7 +295,8 @@ func (s *Store) ListFeedback(worktree string) ([]FeedbackRecord, error) {
 	rows, err := s.db.Query(`SELECT ef.id, ef.worktree, ef.session_id, ef.evidence_id, ef.file_path, ef.symbol,
 		ef.file_hash, ef.polarity, ef.reason_code, ef.agent_confidence, ef.agent_completed,
 		ef.trace_corroborated, ef.oracle_status, ef.feedback_provenance, ef.oracle_passed, ef.evidence_used,
-		ef.feedback_confidence, ef.reconciled_weight, ef.created_at,
+		ef.feedback_confidence, ef.reconciled_weight, ef.created_at, ef.evidence_presented, ef.oracle_run_id,
+		ef.oracle_commit, ef.oracle_sha256,
 		f.path IS NOT NULL AND (ef.file_hash = '' OR ef.file_hash = f.hash)
 		FROM evidence_feedback ef LEFT JOIN files f ON f.path = ef.file_path
 		WHERE ef.worktree = ? ORDER BY ef.id`, worktree)
@@ -293,14 +308,16 @@ func (s *Store) ListFeedback(worktree string) ([]FeedbackRecord, error) {
 	for rows.Next() {
 		var r FeedbackRecord
 		var valid bool
-		var agentCompleted int
+		var agentCompleted, presented int
 		if err := rows.Scan(&r.ID, &r.Worktree, &r.SessionID, &r.EvidenceID, &r.FilePath, &r.Symbol,
 			&r.FileHash, &r.Polarity, &r.ReasonCode, &r.AgentConfidence, &agentCompleted,
 			&r.TraceCorroborated, &r.OracleStatus, &r.Provenance, &r.OraclePassed, &r.EvidenceUsed,
-			&r.Tier, &r.ReconciledWeight, &r.CreatedAt, &valid); err != nil {
+			&r.Tier, &r.ReconciledWeight, &r.CreatedAt, &presented, &r.OracleRunID, &r.OracleCommit,
+			&r.OracleSHA256, &valid); err != nil {
 			return nil, err
 		}
 		r.AgentCompleted = agentCompleted == 1
+		r.Presented = presented == 1
 		r.Status = FeedbackStale
 		if valid {
 			r.Status = FeedbackValid

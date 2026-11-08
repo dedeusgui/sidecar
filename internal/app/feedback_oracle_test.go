@@ -2,11 +2,7 @@ package app
 
 import (
 	"testing"
-	"time"
 
-	"github.com/dedeusgui/sidecar/internal/adapter"
-	"github.com/dedeusgui/sidecar/internal/brief"
-	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/store"
 )
 
@@ -39,53 +35,6 @@ func TestCompletionClaimIsNotAnOracle(t *testing.T) {
 	}
 	if want := store.ComputeReconciledWeight(1, "high", r.TraceCorroborated, 0, false); r.ReconciledWeight != want {
 		t.Fatalf("weight = %v, want the unknown-oracle weight %v", r.ReconciledWeight, want)
-	}
-}
-
-// Who ran the oracle and whether the file was edited decide the tier: a self-reported pass is weak
-// without an edit, medium with one, and strong only when an independent run reported it.
-func TestOracleProvenanceAndPatchDecideTier(t *testing.T) {
-	root := indexedFeedbackProject(t)
-	passed := true
-	const evidence = "release/handler.go#Release"
-
-	recs, err := RecordFeedback(root, store.AgentFeedbackReport{
-		SchemaVersion: 1, OraclePassed: &passed, Confidence: "high", HelpfulEvidenceIDs: []string{evidence},
-	})
-	if err != nil || len(recs) != 1 {
-		t.Fatalf("self-report: %d records (%v)", len(recs), err)
-	}
-	if r := recs[0]; r.Tier != store.TierWeak || r.Provenance != store.ProvenanceAgentReport || r.OracleStatus != store.OraclePassed {
-		t.Fatalf("self-reported pass without edit = tier %q, provenance %q, status %q; want weak, agent_report, passed",
-			r.Tier, r.Provenance, r.OracleStatus)
-	}
-
-	s := brief.NewSignals(worktreeVersion(root), time.Now())
-	s.Edits[hashID(root, "release/handler.go")] = 1
-	if err := brief.SaveSignals(paths.ObserverState(root, string(adapter.Claude), "edit-session"), s); err != nil {
-		t.Fatal(err)
-	}
-	recs, err = RecordFeedback(root, store.AgentFeedbackReport{
-		SchemaVersion: 1, SessionID: "edit-session", OraclePassed: &passed, Confidence: "high", HelpfulEvidenceIDs: []string{evidence},
-	})
-	if err != nil || len(recs) != 1 {
-		t.Fatalf("edited report: %d records (%v)", len(recs), err)
-	}
-	if r := recs[0]; r.Tier != store.TierMedium || r.EvidenceUsed != store.EvidenceConfirmed || r.TraceCorroborated != store.TraceEdited {
-		t.Fatalf("edited file = tier %q, used %q, trace %d; want medium, confirmed, %d",
-			r.Tier, r.EvidenceUsed, r.TraceCorroborated, store.TraceEdited)
-	}
-
-	recs, err = RecordFeedback(root, store.AgentFeedbackReport{
-		SchemaVersion: 1, OracleStatus: "failed", OracleProvenance: "harness", Confidence: "high",
-		MisleadingEvidenceIDs: []string{evidence},
-	})
-	if err != nil || len(recs) != 1 {
-		t.Fatalf("harness report: %d records (%v)", len(recs), err)
-	}
-	if r := recs[0]; r.Tier != store.TierStrong || r.Provenance != store.ProvenanceHarness || r.OraclePassed != -1 {
-		t.Fatalf("independent failed run = tier %q, provenance %q, outcome %d; want strong, harness, -1",
-			r.Tier, r.Provenance, r.OraclePassed)
 	}
 }
 

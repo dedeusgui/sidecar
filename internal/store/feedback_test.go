@@ -75,22 +75,26 @@ func TestComputeReconciledWeightSignals(t *testing.T) {
 // medium; a self-report alone is weak.
 func TestClassifyFeedbackTiers(t *testing.T) {
 	cases := []struct {
+		name       string
 		oracle     int
 		provenance string
+		presented  bool
 		trace      int
 		want       string
 	}{
-		{1, ProvenanceHarness, TraceNotObserved, TierStrong},
-		{-1, ProvenanceHuman, TraceUntouched, TierStrong},
-		{0, ProvenanceHarness, TraceEdited, TierMedium},        // no outcome: not strong
-		{1, ProvenanceAgentReport, TraceNotObserved, TierWeak}, // self-reported oracle, no edit
-		{1, ProvenanceAgentReport, TraceEdited, TierMedium},    // self-reported, but tied to the patch
-		{0, ProvenanceNone, TraceRead, TierWeak},               // opening a file is not use
-		{1, ProvenanceLegacy, TraceRead, TierWeak},             // rows from before v6
+		{"independent pass on delivered evidence", 1, ProvenanceHarness, true, TraceNotObserved, TierStrong},
+		{"human failure on delivered evidence", -1, ProvenanceHuman, true, TraceUntouched, TierStrong},
+		{"independent oracle on evidence never delivered", 1, ProvenanceHarness, false, TraceEdited, TierWeak},
+		{"no outcome from a harness is not strong", 0, ProvenanceHarness, true, TraceEdited, TierMedium},
+		{"self-reported pass without edit", 1, ProvenanceAgentReport, true, TraceNotObserved, TierWeak},
+		{"self-reported pass with an edit of delivered evidence", 1, ProvenanceAgentReport, true, TraceEdited, TierMedium},
+		{"edit of evidence never delivered", 1, ProvenanceAgentReport, false, TraceEdited, TierWeak},
+		{"opening a file is not use", 0, ProvenanceNone, true, TraceRead, TierWeak},
+		{"rows from before v6", 1, ProvenanceLegacy, true, TraceRead, TierWeak},
 	}
 	for _, c := range cases {
-		if got := ClassifyFeedback(c.oracle, c.provenance, c.trace); got != c.want {
-			t.Errorf("ClassifyFeedback(%d, %q, %d) = %q, want %q", c.oracle, c.provenance, c.trace, got, c.want)
+		if got := ClassifyFeedback(c.oracle, c.provenance, c.presented, c.trace); got != c.want {
+			t.Errorf("%s: ClassifyFeedback = %q, want %q", c.name, got, c.want)
 		}
 	}
 }

@@ -418,6 +418,8 @@ func cmdFeedback(args []string, in io.Reader, out, errOut io.Writer) int {
 	oracleProvenance := fs.String("oracle-provenance", "", "who ran the oracle: harness, human or agent_report; default agent_report when --oracle is known (record)")
 	additional := fs.Bool("additional-search", false, "the agent needed another search (record)")
 	session := fs.String("session", "", "agent session ID, to read the observer trace (record)")
+	oracleArtifact := fs.String("oracle-artifact", "", "oracle artifact written by the harness; records an independent outcome (record)")
+	harnessKey := fs.String("harness-key", "", "file with the harness signing key, kept outside the agent workspace (record with --oracle-artifact)")
 	all := fs.Bool("all", false, "purge every record, not only stale ones (purge)")
 	if err := fs.Parse(rest); err != nil {
 		return 2
@@ -445,7 +447,16 @@ func cmdFeedback(args []string, in io.Reader, out, errOut io.Writer) int {
 			break
 		}
 		var recs []store.FeedbackRecord
-		if recs, err = app.RecordFeedback(rootDir, report); err == nil {
+		if *oracleArtifact != "" {
+			var art app.OracleArtifact
+			var key []byte
+			if art, key, err = readOracleArtifact(*oracleArtifact, *harnessKey); err == nil {
+				recs, err = app.RecordFeedbackWithOracle(rootDir, report, art, key)
+			}
+		} else {
+			recs, err = app.RecordFeedback(rootDir, report)
+		}
+		if err == nil {
 			err = printFeedback(out, recs, *asJSON)
 		}
 	case "list":
@@ -497,4 +508,28 @@ func isTerminal(r io.Reader) bool {
 	}
 	info, err := f.Stat()
 	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
+// readOracleArtifact reads an oracle artifact and the harness key that signed it. Both are read with a
+// size limit, and unknown fields are refused: a misspelt field must not pass silently.
+func readOracleArtifact(path, keyPath string) (app.OracleArtifact, []byte, error) {
+	var art app.OracleArtifact
+	if keyPath == "" {
+		return art, nil, errors.New("--oracle-artifact needs --harness-key")
+	}
+	key, err := os.ReadFile(keyPath)
+	if err != nil {
+		return art, nil, err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return art, nil, err
+	}
+	defer func() { _ = f.Close() }()
+	dec := json.NewDecoder(io.LimitReader(f, maxFeedbackBytes))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&art); err != nil {
+		return art, nil, fmt.Errorf("oracle artifact: %w", err)
+	}
+	return art, key, nil
 }
