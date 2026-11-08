@@ -286,3 +286,16 @@ class IsolationTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ModelIdentityTests(unittest.TestCase):
+    def test_served_model_is_read_from_model_usage(self):
+        out = json.dumps({"type": "result", "result": '{"files": []}', "total_cost_usd": 0.01,
+                          "modelUsage": {"claude-haiku-5-5": {"inputTokens": 2, "outputTokens": 66}}})
+        self.assertEqual(runner.parse_output("claude", out)["served_models"], ["claude-haiku-5-5"])
+
+    def test_claude_alias_is_rejected_and_explicit_id_accepted(self):
+        with self.assertRaises(ValueError):
+            runner.validate_model("claude", "haiku")
+        runner.validate_model("claude", "claude-haiku-5-5")
+        runner.validate_model("codex", "gpt-6-luna")  # other clients keep their own names
