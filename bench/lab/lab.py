@@ -131,8 +131,10 @@ def validate_task_schema(task, tdir):
         if not o.get("files"):
             errs.append("oracle.files vazio (teste oculto necessário)")
         for dest, src in (o.get("files") or {}).items():
-            if dest.startswith("/") or ".." in pathlib.PurePosixPath(dest).parts:
+            if dest.startswith("/") or ".." in pathlib.PurePosixPath(dest).parts or ".git" in pathlib.PurePosixPath(dest).parts:
                 errs.append(f"destino inseguro do oráculo: {dest}")
+            if str(src).startswith("/") or ".." in pathlib.PurePosixPath(str(src)).parts:
+                errs.append(f"origem insegura do oráculo (fora de oracle/): {src}")
             if not (tdir / "oracle" / src).is_file():
                 errs.append(f"arquivo do oráculo ausente: oracle/{src}")
         if not o.get("require_output"):
@@ -188,13 +190,15 @@ def build_manifest():
     }
 
 
-def holdout_guard(tasks, final, purpose):
+def holdout_guard(tasks, final, purpose, repeat=False):
     """Bloqueia holdout fora de --final e registra qualquer uso no ledger (append-only)."""
     held = [t for t in tasks if t["split"] == "holdout"]
     if not held:
         return
     if not final:
         raise LabError("holdout selado: use --final (uma única avaliação final, sem tuning depois)")
+    if holdout_burned() and not repeat:
+        raise LabError("o holdout já foi consumido (ver holdout_ledger.jsonl); repetir exige --allow-repeat-final e invalida o nome 'cego'")
     with LEDGER.open("a") as f:
         f.write(json.dumps({"ts": time.time(), "purpose": purpose, "tasks": [t["id"] for t in held]}) + "\n")
 
@@ -244,6 +248,13 @@ def materialize(task, dest):
     return dest
 
 
+def setup_paths_file(work):
+    """Linha de base dos artefatos de setup. Fica FORA do workspace: um arquivo dentro de .git poderia ser reescrito
+    pelo agente para esconder alterações do cálculo de escopo."""
+    work = pathlib.Path(work)
+    return work.parent / (work.name + ".lab_setup_paths.json")
+
+
 def status_paths(work):
     out = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all", "--ignored"],
                          cwd=work, capture_output=True, text=True, check=True).stdout
@@ -260,7 +271,7 @@ def status_paths(work):
 def changed_paths(work):
     """Caminhos alterados contra o commit-base, incluindo untracked e ignorados.
     Artefatos criados pela fase `setup` (dependências) são a linha de base e não contam como alteração."""
-    base_file = pathlib.Path(work) / ".git" / "lab_setup_paths.json"
+    base_file = setup_paths_file(work)
     setup = set(json.loads(base_file.read_text())) if base_file.is_file() else set()
     return sorted(p for p in status_paths(work) if not any(p == s or p.startswith(s) for s in setup))
 
@@ -284,7 +295,7 @@ def prepare_workspace(task, dest):
         top = p.split("/")[0]
         tracked = subprocess.run(["git", "ls-files", "--", top], cwd=work, capture_output=True, text=True).stdout.strip()
         entries.add(top + "/" if "/" in p and not tracked else p)  # pasta nova do setup (node_modules, .venv...) inteira
-    (work / ".git" / "lab_setup_paths.json").write_text(json.dumps(sorted(entries)))
+    setup_paths_file(work).write_text(json.dumps(sorted(entries)))
     return work
 
 
@@ -307,9 +318,23 @@ def oracle_env(task):
 
 # --------------------------------------------------------------------------- oracle
 
+def glob_re(g):
+    """Glob com `*` dentro de um segmento, `**` entre segmentos e `?` de um caractere (fnmatch deixaria `*` cruzar `/`)."""
+    out, i = "", 0
+    while i < len(g):
+        if g.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif g[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif g[i] == "?":
+            out, i = out + "[^/]", i + 1
+        else:
+            out, i = out + re.escape(g[i]), i + 1
+    return re.compile("^" + out + "$")
+
+
 def in_scope(path, allowed):
-    return any(fnmatch.fnmatch(path, g) or path == g.rstrip("/") or path.startswith(g.rstrip("/") + "/")
-               for g in allowed)
+    return any(glob_re(g).match(path) or path == g.rstrip("/") or path.startswith(g.rstrip("/") + "/") for g in allowed)
 
 
 def check_invariants(task, work):
@@ -324,7 +349,7 @@ def check_invariants(task, work):
             elif kind == "regex_present":
                 ok = text is not None and re.search(inv["pattern"], text, re.M) is not None
             elif kind == "regex_absent":
-                ok = text is None or re.search(inv["pattern"], text, re.M) is None
+                ok = text is not None and re.search(inv["pattern"], text, re.M) is None  # arquivo apagado não prova ausência
             else:
                 detail = f"tipo desconhecido {kind}"
         except re.error as e:
@@ -456,20 +481,55 @@ class ScriptedAgent:
                 "stream_error": False, "first_edit_s": None, "tool_events": []}
 
 
+def deny_flags(paths):
+    """Regras de negação do Claude Code para dados do benchmark (oráculo, reference.patch, resultados dos outros braços).
+    `//` marca caminho absoluto. Cobre leitura, busca, listagem e escrita; NÃO cobre código executado por `go test`."""
+    rules = []
+    for p in paths:
+        for tool in ("Read", "Grep", "Glob", "Edit", "Write"):
+            rules.append(f"{tool}(/{p}/**)")
+    return ["--disallowedTools", *rules] if rules else []
+
+
+def touched_benchmark_data(events, deny_paths):
+    """True se algum evento de ferramenta menciona dados do benchmark. Uma tentativa negada também conta:
+    o braço sondou o gabarito, então a execução deixa de ser comparável."""
+    needles = [str(pathlib.Path(p).resolve()) for p in deny_paths] + ["reference.patch", "/oracle/", "validation.json", "holdout_ledger"]
+    return any(n in (e.get(f) or "") for e in events for n in needles for f in ("key", "cmd"))
+
+
+def workspace_mentions_benchmark(work, needles):
+    """Código escrito pelo agente (ex.: um teste Go) pode ler o oráculo mesmo com Read negado, porque `go test` roda como o
+    mesmo usuário. Procura nos arquivos alterados qualquer referência ao caminho do benchmark."""
+    for rel in changed_paths(work):
+        p = pathlib.Path(work) / rel
+        try:
+            if p.is_file() and p.stat().st_size < 1 << 20:
+                text = p.read_text(errors="replace")
+                if any(n in text for n in needles):
+                    return rel
+        except OSError:
+            continue
+    return None
+
+
 class ClaudeAgent:
     """Claude Code real: configuração isolada por execução, canário, verificação de init e modelo servido."""
     simulated = False
 
-    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow):
+    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow, deny_paths=()):
         sys.path.insert(0, str(HERE.parent / "agentic"))
         import real_hook_pilot as rhp
         self.rhp, self.model, self.sidecar = rhp, model, sidecar
         self.credentials, self.max_budget, self.timeout, self.tools_allow = credentials, max_budget, timeout, tools_allow
+        # O agente roda como o mesmo usuário e `Read` aceita caminho absoluto: sem estas regras ele LÊ o oráculo
+        # oculto. Medido (2026-11-08): sem a regra a leitura funciona; com ela Read, Grep e `ls` são negados.
+        self.deny_paths = [str(pathlib.Path(p).resolve()) for p in deny_paths]
 
     def command(self, prompt, settings):
         flags = ["--output-format", "stream-json", "--verbose", "--include-hook-events", "--no-session-persistence",
                  "--permission-mode", "acceptEdits", "--setting-sources", "project,local", "--strict-mcp-config",
-                 "--disable-slash-commands", "--allowedTools", *self.tools_allow]
+                 "--disable-slash-commands", "--allowedTools", *self.tools_allow, *deny_flags(self.deny_paths)]
         cmd = ["claude", "-p", prompt, "--model", self.model, *flags, "--max-budget-usd", str(self.max_budget)]
         return cmd + (["--settings", settings] if settings else [])
 
@@ -489,6 +549,12 @@ class ClaudeAgent:
             wall = time.perf_counter() - t0
             parsed = rhp.parse_stream(out)
             reasons = rhp.contamination(parsed, os.path.exists(marker), self.model)
+            events = tool_events(out)
+            if touched_benchmark_data(events, self.deny_paths):
+                reasons = list(reasons) + ["o agente tentou acessar dados do benchmark (oráculo, reference.patch ou resultados)"]
+            leaked = workspace_mentions_benchmark(work, self.deny_paths + ["reference.patch", "holdout_ledger"])
+            if leaked:
+                reasons = list(reasons) + [f"arquivo escrito pelo agente referencia dados do benchmark: {leaked}"]
             return {"wall_s": round(wall, 2), "result": parsed["result"] or "", "cost_usd": parsed["cost_usd"],
                     "tokens_in": parsed["tokens_in"], "tokens_out": parsed["tokens_out"],
                     "tool_calls": parsed["tool_calls"], "turns": parsed["turns"], "served_models": parsed["served_models"],
@@ -521,8 +587,11 @@ def tool_events(stream_text):
             d = json.loads(line)
         except ValueError:
             continue
-        msg = d.get("message") or {}
-        for block in msg.get("content") or []:
+        msg = d.get("message")
+        if not isinstance(msg, dict):
+            continue
+        content = msg.get("content")
+        for block in content if isinstance(content, list) else []:
             if not isinstance(block, dict):
                 continue
             if d.get("type") == "assistant" and block.get("type") == "tool_use":
@@ -537,7 +606,7 @@ def tool_events(stream_text):
                 elif name == "Bash":
                     cmd = inp.get("command", "")
                     kind = "test" if TEST_CMD.match(cmd) else "search" if SEARCH_CMD.match(cmd) else "read" if READ_CMD.match(cmd) else "other"
-                    ev = {"kind": kind, "key": cmd if kind != "test" else "test"}
+                    ev = {"kind": kind, "key": cmd if kind != "test" else "test", "cmd": cmd}
                 if ev is not None:
                     events.append(ev)
                     pending[block.get("id")] = ev
@@ -631,11 +700,12 @@ def execute_one(agent, task, tdir, arm, rep, args, home):
         t0 = time.perf_counter()
         orc = run_oracle(task, tdir, work, answer_text=r["result"])
         v = verdict(orc)
-        comparable = not r["incomparable_reasons"] and err is None and not r["timed_out"]
+        # Timeout é falha do braço, não contaminação: continua nas taxas (com custo possivelmente desconhecido).
+        comparable = not r["incomparable_reasons"] and err is None
         return {
             "schema": RUN_SCHEMA, "task": task["id"], "split": task["split"], "class": task["class"], "repo": task["repo"],
             "commit": task["commit"], "arm": arm["name"], "rep": rep, "model": getattr(agent, "model", "scripted"),
-            "evidence": "simulated" if agent.simulated else "agentic", "verdict": v, "success": v == "pass" and comparable,
+            "evidence": "simulated" if agent.simulated else "agentic", "verdict": v, "success": v == "pass" and comparable and not r["timed_out"],
             "comparable": comparable, "agent_error": err, "oracle": {k: orc[k] for k in
                 ("tests", "scope_ok", "outside_scope", "invariants", "changed", "isolation", "detail")},
             "oracle_s": round(time.perf_counter() - t0, 2), "task_sha256": sha256_file(tdir / "task.json"),
@@ -672,14 +742,19 @@ def cmd_run(args):
                 raise LabError(f"comando ausente: {need}")
         if not args.sidecar or not pathlib.Path(args.sidecar).is_file():
             raise LabError("--sidecar (binário) obrigatório para o agente claude")
+        deny = [HERE.parent.parent, out_dir]
+        tmp_root = pathlib.Path(tempfile.gettempdir()).resolve()
+        for d in deny:
+            if d.resolve() == tmp_root or d.resolve() in tmp_root.parents or d.resolve() == pathlib.Path("/"):
+                raise LabError(f"--out-dir/repositório não pode ser {d}: bloquearia o workspace do agente. Use um subdiretório")
         agent = ClaudeAgent(args.model, str(pathlib.Path(args.sidecar).resolve()), args.credentials, args.max_budget,
-                            args.timeout, args.tools_allow.split(","))
+                            args.timeout, args.tools_allow.split(","), deny_paths=deny)
         est = n * args.max_budget
         if not args.yes_spend:
             print(f"Dry run: {n} execuções ({len(tasks)} tarefas × {len(arms)} braços × {args.reps}); "
                   f"teto teórico US$ {est:.2f}; modelo {args.model}. Use --yes-spend para executar.")
             return 0
-    holdout_guard(tasks, args.final, "run:" + args.arms)
+    holdout_guard(tasks, args.final, "run:" + args.arms, getattr(args, "allow_repeat_final", False))
     out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     runs, spend = out_dir / "runs.jsonl", out_dir / "spend.jsonl"
     meta = {"schema": "lab-meta/1", "manifest": manifest, "arms": [a["name"] for a in arms], "seed": args.seed,
@@ -703,7 +778,10 @@ def cmd_run(args):
             with runs.open("a") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             with spend.open("a") as f:
-                f.write(json.dumps({"task": tid, "arm": arm["name"], "model": rec["model"], "cost_usd": rec["cost_usd"]}) + "\n")
+                known = rec["cost_usd"] is not None
+                # Custo desconhecido (timeout, exceção) conta como o teto por execução: o teto total é conservador.
+                f.write(json.dumps({"task": tid, "arm": arm["name"], "model": rec["model"],
+                                    "cost_usd": rec["cost_usd"] if known else args.max_budget, "estimated": not known}) + "\n")
             print(f"{tid:24s} {arm['name']:4s} r{rep} {rec['verdict']:5s} wall={rec['wall_s']}s cost={rec['cost_usd']}")
     return 0
 
@@ -854,7 +932,7 @@ def main(argv=None):
     p.add_argument("--max-total-usd", type=float, default=None); p.add_argument("--timeout", type=int, default=600)
     p.add_argument("--tools-allow", default="Read,Grep,Glob,Edit,Write,Bash(go test:*),Bash(ls:*)")
     p.add_argument("--yes-spend", action="store_true"); p.add_argument("--final", action="store_true")
-    p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--scripted-behaviour", default="reference")
+    p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--scripted-behaviour", default="reference")
     p = sub.add_parser("report"); p.add_argument("runs"); p.add_argument("--md"); p.add_argument("--json"); p.add_argument("--offline")
     a = ap.parse_args(argv)
     try:

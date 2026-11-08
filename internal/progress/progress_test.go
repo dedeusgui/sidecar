@@ -94,3 +94,10 @@ func TestEmptyAndUnobservedSequencesAreNotFindings(t *testing.T) {
 		t.Fatalf("%+v", r)
 	}
 }
+
+func TestEmptyKeysAreUnobservedNotRepeats(t *testing.T) {
+	r := Analyze([]Event{ev("search", ""), ev("search", ""), ev("search", ""), ev("read", ""), ev("read", "")})
+	if r.Redundant != 0 || r.StagnantWindows != 0 || len(r.Shadows) != 0 {
+		t.Fatalf("empty keys carry no information: %+v", r)
+	}
+}

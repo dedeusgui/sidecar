@@ -110,6 +110,7 @@ func main() {
 	impactHistory := flag.String("impact-history", "", "evaluate change-impact analysis on the Git history of this repository (needs history)")
 	impactN := flag.Int("impact-commits", 40, "commits to use with --impact-history")
 	groomFlag := flag.Bool("groom", false, "clarification benchmark: run the V2 pipeline and the ask/assume policy over cases with expect_ask labels")
+	includeHoldout := flag.Bool("include-holdout", false, "with --replay: also run the holdout split (a final report; never used to choose variants)")
 	perfRuns := flag.Int("perf", 0, "measure cold/warm latency per pipeline stage with this many warm runs per case (p50/p95/p99)")
 	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
 	reportMD := flag.String("report-md", "", "write a Markdown report to this path (includes the comparison when --compare is set)")
@@ -165,7 +166,7 @@ func main() {
 		return
 	}
 	if *replayPath != "" {
-		must(runReplay(*replayPath, cf, indexes, *outPath))
+		must(runReplay(*replayPath, cf, indexes, *outPath, *includeHoldout))
 		return
 	}
 	if *perfRuns > 0 {

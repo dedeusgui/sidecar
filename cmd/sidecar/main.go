@@ -605,10 +605,17 @@ func cmdImpact(args []string, out, errOut io.Writer) int {
 		_, _ = fmt.Fprintf(out, "  [%s] %-8s %s\n", f.Status, f.Kind, f.Text)
 	}
 	if len(rep.Findings) == 0 {
-		_, _ = fmt.Fprintln(out, "  nothing else in the index depends on this change")
+		note := "  no consumer, importer, test or document in the index depends on this change"
+		if !rep.HistoryIndexed {
+			note += " (Git history is not indexed here, so co-change was not checked)"
+		}
+		_, _ = fmt.Fprintln(out, note)
 	}
 	if len(rep.Skipped) > 0 {
 		_, _ = fmt.Fprintf(out, "skipped: %s\n", strings.Join(rep.Skipped, "; "))
+	}
+	if rep.Truncated {
+		_, _ = fmt.Fprintln(out, "truncated: more related files exist than are listed")
 	}
 	return 0
 }

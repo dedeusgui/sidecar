@@ -100,6 +100,9 @@ func Analyze(events []Event) Report {
 		case "test":
 			label = Progress
 		case "search":
+			if e.Key == "" {
+				break // a query with no usable terms says nothing: unobserved, never a repeat
+			}
 			exploratory++
 			terms := termSet(e.Key)
 			switch {
@@ -114,6 +117,9 @@ func Analyze(events []Event) Report {
 			seenSearch[e.Key] = true
 			searchSets = append(searchSets, terms)
 		case "read":
+			if e.Key == "" {
+				break
+			}
 			exploratory++
 			if reads[e.Key] {
 				label = Revisit

@@ -54,9 +54,11 @@ type Report struct {
 }
 
 var (
-	editVerbs = regexp.MustCompile(`\b(adicion\w*|acrescent\w*|cri(e|ar|a)|implement\w*|alter(e|ar|a)|mud(e|ar|a)|modific\w*|troc(e|ar|a)|substitu\w*|remov\w*|exclu\w*|refator\w*|corrij\w*|conserte|migr(e|ar|a)|renome\w*|permit\w*|habilit\w*|desabilit\w*|aument\w*|reduz\w*|diminu\w*|ajust\w*|increase|decrease|raise|lower|adjust|bump|add|create|implement|change|update|modify|replace|remove|delete|refactor|fix|migrate|rename|support|enable|disable|make|allow)\b`)
 	// numbers, durations and sizes: a stated value for a limit
-	hasNumber  = regexp.MustCompile(`\d`)
+	hasNumber     = regexp.MustCompile(`\d`)
+	introduceVerb = regexp.MustCompile(`\b(adicion\w*|acrescent\w*|cri(e|ar|a)|introduz\w*|implement\w*|add|create|introduce|implement|impor|impose|limite|limit)\b`)
+	// A noun that makes "timeout"/"max"/"size" a name rather than a quantity to set.
+	notAValue  = regexp.MustCompile(`\b(campo|field|coluna|column|parametro|parameter|param|flag|opcao|option|variavel|variable|renome\w*|rename|handling|tratamento|mensagem|message)\b`)
 	changeVerb = regexp.MustCompile(`\b(aument\w*|reduz\w*|diminu\w*|mud(e|ar|a)|alter(e|ar|a)|troc(e|ar|a)|ajust\w*|increase|decrease|raise|lower|change|update|adjust|bump)\b`)
 	limitWords = regexp.MustCompile(`\b(limite|limit|maximo|max|minimo|min|timeout|ttl|quota|cota|tamanho|size|taxa|rate|intervalo|interval|tentativas|retries|retry|expir\w*)\b`)
 	// Explicit opt-outs and urgency, in the user's own words.
@@ -70,7 +72,7 @@ var (
 func Analyze(prompt string, res retrieve.Result) Report {
 	text := lexical.Fold(prompt)
 	var rep Report
-	if !editVerbs.MatchString(text) {
+	if !retrieve.IsEditRequest(prompt) {
 		rep.States = []State{Clear} // questions, locating and explaining need no decision
 		return rep
 	}
@@ -207,6 +209,14 @@ func missingLimit(prompt, text string, res retrieve.Result) *Gap {
 	if m == "" || hasNumber.MatchString(text) {
 		return nil
 	}
+	// Only a request that introduces or changes a limit needs its value. Renaming the thing, fixing how it is handled,
+	// or adding a field called "timeout" does not.
+	if !changeVerb.MatchString(text) && !introduceVerb.MatchString(text) {
+		return nil
+	}
+	if notAValue.MatchString(text) {
+		return nil
+	}
 	g := &Gap{State: Underspecified, Decision: fmt.Sprintf("the value of the %s the request refers to is not stated", m),
 		Evidence: []string{"prompt words: " + m + " (no number given)"},
 		Options: []Option{
@@ -264,8 +274,17 @@ func contradiction(text string) *Gap {
 	return nil
 }
 
+var (
+	negatedRemoval = regexp.MustCompile(`\b(nao|not|never|nunca|don'?t|do not)\s+(\w+\s+)?(remov\w*|exclu\w*|delet\w*|drop|tire|retire|desabilit\w*|disable)`)
+	replacement    = regexp.MustCompile(`\b(antig[oa]s?|velh[oa]s?|old|legacy|anterior|deprecated|obsolet\w*|existente|existing|previous)\b`)
+)
+
 func polarity(c string) int {
 	switch {
+	case negatedRemoval.MatchString(c):
+		return 1 // "do not remove X" keeps X
+	case removePolarity.MatchString(c) && replacement.MatchString(c):
+		return 0 // "remove the old X" next to "add X" is a replacement, not a contradiction
 	case removePolarity.MatchString(c):
 		return -1
 	case addPolarity.MatchString(c):
@@ -283,7 +302,7 @@ func sharedTerm(a, b string) string {
 	}
 	best := ""
 	for _, t := range lexical.Analyze(b) {
-		if set[t] && len(t) > len(best) && !editVerbs.MatchString(t) && !addPolarity.MatchString(t) && !removePolarity.MatchString(t) {
+		if set[t] && len(t) > len(best) && !retrieve.IsEditRequest(t) && !addPolarity.MatchString(t) && !removePolarity.MatchString(t) {
 			best = t
 		}
 	}

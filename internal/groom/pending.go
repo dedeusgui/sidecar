@@ -3,6 +3,7 @@ package groom
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -45,10 +46,21 @@ func SaveState(path string, s SessionState) {
 		return
 	}
 	data, err := json.Marshal(s)
-	if err == nil {
-		_ = os.WriteFile(path, data, 0o600)
+	if err != nil {
+		return
+	}
+	// Temporary file + rename: two hooks of one session must never leave a torn file that loads as "nothing asked".
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return
+	}
+	_, werr := tmp.Write(data)
+	if cerr := tmp.Close(); werr != nil || cerr != nil || os.Rename(tmp.Name(), path) != nil {
+		_ = os.Remove(tmp.Name())
 	}
 }
+
+var negation = regexp.MustCompile(`\b(nao|nunca|sem|jamais|not|never|no|without|don'?t|dont|except|exceto)\b`)
 
 var orWord = regexp.MustCompile(`\b(ou|or|talvez|maybe)\b`)
 
@@ -71,9 +83,17 @@ func MatchAnswer(prompt string, opts []Option) int {
 		}
 		return -1
 	}
+	if negation.MatchString(text) {
+		return -1 // "do not use X" is not a choice of X
+	}
 	hit := -1
 	for i, o := range opts {
-		if l := lexical.Fold(o.Label); l != "" && strings.Contains(text, l) {
+		l := lexical.Fold(o.Label)
+		if l == "" {
+			continue
+		}
+		// Whole words only: the label "user" must not match "username".
+		if regexp.MustCompile(`(^|[^a-z0-9_])` + regexp.QuoteMeta(l) + `($|[^a-z0-9_])`).MatchString(text) {
 			if hit >= 0 {
 				return -1
 			}

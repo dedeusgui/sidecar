@@ -28,7 +28,7 @@ func Impact(root string, files []string) (impact.Report, error) {
 	defer func() { _ = ix.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if _, err := ix.Sync(ctx, index.Options{}); err != nil {
+	if _, err := ix.Sync(ctx, index.Options{WithHistory: true}); err != nil {
 		return impact.Report{}, err
 	}
 	if len(files) == 0 {

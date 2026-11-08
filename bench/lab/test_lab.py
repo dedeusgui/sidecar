@@ -269,6 +269,30 @@ class RunnerTests(LabCase):
             lab.cmd_run(self.run_args(allow_unvalidated=False))
 
 
+class IsolationTests(unittest.TestCase):
+    def test_deny_flags_cover_read_search_list_and_write_with_absolute_paths(self):
+        flags = lab.deny_flags(["/data/bench/lab", "/data/out"])
+        self.assertEqual(flags[0], "--disallowedTools")
+        for tool in ("Read", "Grep", "Glob", "Edit", "Write"):
+            self.assertIn(f"{tool}(//data/bench/lab/**)", flags)
+            self.assertIn(f"{tool}(//data/out/**)", flags)
+        self.assertEqual(lab.deny_flags([]), [])
+
+    def test_touching_benchmark_data_is_detected_even_when_denied(self):
+        deny = ["/data/bench/lab"]
+        self.assertTrue(lab.touched_benchmark_data([{"kind": "read", "key": "/data/bench/lab/corpus/tasks/T/oracle/o.go"}], deny))
+        self.assertTrue(lab.touched_benchmark_data([{"kind": "search", "key": "grep -r Test reference.patch"}], deny))
+        self.assertTrue(lab.touched_benchmark_data([{"kind": "other", "key": "cat /x/oracle/a.py"}], deny))
+        self.assertFalse(lab.touched_benchmark_data([{"kind": "read", "key": "/tmp/lab-run-1/work/main.go"}], deny))
+
+    def test_run_refuses_a_deny_path_that_would_block_the_workspace(self):
+        with self.assertRaises(lab.LabError):
+            args = SimpleNamespace(agent="claude", model="claude-haiku-5-5", sidecar=sys.executable, yes_spend=True,
+                                   out_dir=tempfile.gettempdir(), tasks=None, splits="development,validation", arms="OFF",
+                                   allow_unvalidated=True, reps=1, seed=1, credentials=None, max_budget=0.1, timeout=10,
+                                   tools_allow="Read", final=False, max_total_usd=None, scripted_behaviour="reference")
+            lab.cmd_run(args)
+
 class ToolTraceTests(unittest.TestCase):
     def stream(self, *blocks):
         return "\n".join(json.dumps(b) for b in blocks)
@@ -283,6 +307,11 @@ class ToolTraceTests(unittest.TestCase):
         self.assertEqual([e["kind"] for e in ev], ["read", "search", "edit", "test", "search", "read", "other"])
         self.assertEqual(ev[-1]["err"], "fail line #")
 
+    def test_tool_events_tolerates_unexpected_stream_shapes(self):
+        s = self.stream({"type": "system", "message": "text instead of an object"}, {"type": "user", "message": {"content": "plain string"}},
+                        {"type": "assistant", "message": {"content": ["not a block", None]}})
+        self.assertEqual(lab.tool_events(s), [])
+
     def test_summarize_reports_redundancy_only_when_progress_exists(self):
         base = {"comparable": True, "success": True, "cost_usd": 0.1, "wall_s": 1.0, "tool_calls": 1, "injected_chars": 0,
                 "served_models": ["m"], "verdict": "pass", "oracle": {"scope_ok": True, "invariants": [], "tests": "pass", "outside_scope": []}}
@@ -291,6 +320,71 @@ class ToolTraceTests(unittest.TestCase):
         s = lab.summarize([dict(base, progress={"redundant": 2, "stagnant_windows": 0}), with_p])
         self.assertEqual(s["redundant_calls_mean"], 3)
         self.assertEqual(s["stagnant_runs"], 1)
+
+
+class ReviewFixTests(LabCase):
+    def test_glob_star_does_not_cross_directories_and_deleted_file_fails_regex_absent(self):
+        self.assertTrue(lab.in_scope("src/x.go", ["src/*.go"]))
+        self.assertFalse(lab.in_scope("src/deep/x.go", ["src/*.go"]))
+        self.assertTrue(lab.in_scope("src/deep/x.go", ["src/**"]))
+        self.assertTrue(lab.in_scope("src/deep/x.go", ["src/"]))  # prefixo de diretório continua valendo
+        d = self.make_task(scope={"allowed_paths": ["calc.py"], "invariants": [{"type": "regex_absent", "path": "calc.py", "pattern": "TODO"}]})
+        task = json.loads((d / "task.json").read_text())
+        with tempfile.TemporaryDirectory() as w:
+            work = lab.prepare_workspace(task, pathlib.Path(w) / "w")
+            self.assertTrue(lab.check_invariants(task, work)[0]["ok"])
+            (work / "calc.py").unlink()
+            self.assertFalse(lab.check_invariants(task, work)[0]["ok"])
+
+    def test_setup_baseline_lives_outside_the_workspace_so_the_agent_cannot_hide_changes(self):
+        d = self.make_task()
+        task = json.loads((d / "task.json").read_text())
+        with tempfile.TemporaryDirectory() as w:
+            work = lab.prepare_workspace(task, pathlib.Path(w) / "w")
+            self.assertFalse(str(lab.setup_paths_file(work)).startswith(str(work) + os.sep))
+            (work / "STRAY.txt").write_text("x")
+            (work / ".git" / "lab_setup_paths.json").write_text(json.dumps(["STRAY.txt"]))  # tentativa de esconder
+            self.assertEqual(lab.changed_paths(work), ["STRAY.txt"])
+
+    def test_oracle_source_and_dest_are_confined(self):
+        d = self.make_task()
+        task = json.loads((d / "task.json").read_text())
+        for files in ({"zz.py": "../../../../etc/hostname"}, {"zz.py": "/etc/hostname"}, {".git/hooks/pre-commit": "o.py"}):
+            task["oracle"]["files"] = files
+            self.assertTrue(any("insegur" in e for e in lab.validate_task_schema(task, d)), files)
+
+    def test_timeout_stays_in_the_rates_as_a_failure(self):
+        row = lambda ok, cost, to: {"comparable": True, "success": ok and not to, "cost_usd": cost, "wall_s": 1.0, "tool_calls": 1,
+                                    "injected_chars": 0, "served_models": ["m"], "verdict": "pass",
+                                    "oracle": {"scope_ok": True, "invariants": [], "tests": "pass", "outside_scope": []}}
+        s = lab.summarize([row(True, 1.0, False), row(True, 5.0, True)])
+        self.assertEqual(s["pass_rate"], 0.5)
+        self.assertEqual(s["cost_per_success"], 6.0)
+
+    def test_unknown_cost_counts_as_the_per_run_budget_in_the_cap(self):
+        self.make_task()
+        args = self.run_args(max_budget=0.25, max_total_usd=100.0)
+        lab.cmd_run(args)
+        rows = [json.loads(l) for l in (pathlib.Path(args.out_dir) / "spend.jsonl").read_text().splitlines()]
+        self.assertTrue(rows and all("estimated" in r for r in rows))
+
+    def test_holdout_final_is_single_shot(self):
+        self.make_task("T-EDIT-H1", split="holdout")
+        lab.cmd_run(self.run_args(splits="holdout", final=True, arms="OFF"))
+        with self.assertRaises(lab.LabError):
+            lab.cmd_run(self.run_args(splits="holdout", final=True, arms="OFF", out_dir=str(pathlib.Path(self.tmp.name) / "out2")))
+        lab.cmd_run(self.run_args(splits="holdout", final=True, arms="OFF", allow_repeat_final=True, out_dir=str(pathlib.Path(self.tmp.name) / "out3")))
+
+    def test_agent_written_code_that_reads_the_benchmark_is_detected(self):
+        d = self.make_task()
+        task = json.loads((d / "task.json").read_text())
+        with tempfile.TemporaryDirectory() as w:
+            work = lab.prepare_workspace(task, pathlib.Path(w) / "w")
+            (work / "leak_test.go").write_text('os.ReadFile("/data/bench/lab/corpus/tasks/T/reference.patch")')
+            self.assertEqual(lab.workspace_mentions_benchmark(work, ["/data/bench/lab"]), "leak_test.go")
+            (work / "leak_test.go").write_text("package x")
+            self.assertIsNone(lab.workspace_mentions_benchmark(work, ["/data/bench/lab"]))
+        self.assertTrue(lab.touched_benchmark_data([{"kind": "test", "key": "test", "cmd": "go test -exec 'cat /data/bench/lab/x' ./..."}], ["/data/bench/lab"]))
 
 
 class HoldoutTests(LabCase):

@@ -48,7 +48,7 @@ func Render(a adapter.Agent, d Decision) string {
 			if i >= maxOpts {
 				break
 			}
-			opts = append(opts, fmt.Sprintf("%c) %s — %s", 'A'+rune(i), clip(o.Label, label), clip(o.Consequence, consequence)))
+			opts = append(opts, fmt.Sprintf("%c) %q — %s", 'A'+rune(i), clip(o.Label, label), clip(o.Consequence, consequence)))
 		}
 		out := lead + " Open decision (" + string(g.State) + "): " + clip(g.Decision, decision) + "."
 		if len(opts) > 0 {

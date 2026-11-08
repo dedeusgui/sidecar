@@ -18,6 +18,9 @@ import (
 
 // AnswerDecisionTTL is how long a user's answer to a clarification stays valid. It is short on purpose:
 // the answer settles one task, not a standing rule. A changed file or an expired TTL invalidates it.
+// groomFrameTokens is the block frame (markers and preamble) that a note needs when there is no other evidence.
+const groomFrameTokens = 48
+
 const AnswerDecisionTTL = 48 * time.Hour
 
 // groomNonInteractive reports a session where nobody can answer a question (CI, cloud automation).
@@ -56,6 +59,12 @@ func applyGroom(st *store.Store, root, statePath string, agent adapter.Agent, se
 	pol := groom.DefaultPolicy()
 	pol.NonInteractive = groomNonInteractive()
 	d := groom.Decide(rep, prompt, state.Asked, pol)
+	if p := state.Pending; p != nil && d.Gap != nil && p.Decision == d.Gap.Decision {
+		// The same question is still waiting for its answer: do not repeat it and do not spend the session quota.
+		rec["groom_action"] = "pending"
+		groom.SaveState(gpath, state)
+		return nil
+	}
 	rec["groom_states"] = rep.States
 	rec["groom_action"] = d.Action
 	if d.Action != groom.None && d.Gap != nil {
@@ -66,7 +75,9 @@ func applyGroom(st *store.Store, root, statePath string, agent adapter.Agent, se
 			Verdict: "INFERRED", Section: ctxbuild.TaskCheck, Source: "groom", Confidence: 1,
 			ID: "groom|" + fp, Note: text, TokenEstimate: ctxbuild.EstimateTokens(text),
 		})
-		res.Trace.Budget += ctxbuild.EstimateTokens(text) + 8
+		// The note is allowed beyond the profile budget by its own size plus the block frame (about 40 tokens): without the
+		// frame a prompt with no other evidence (budget 0) would drop the question while still spending the quota.
+		res.Trace.Budget += ctxbuild.EstimateTokens(text) + groomFrameTokens
 		if d.Action == groom.Ask {
 			state.Asked++
 			state.Pending = &groom.Pending{Decision: d.Gap.Decision, Options: d.Gap.Options, Path: primaryPath(*d.Gap, *res), Turn: state.Turn}
@@ -116,5 +127,7 @@ func awaitingAnswer(opts HookOptions, in adapter.Input) bool {
 	if statePath == "" {
 		return false
 	}
-	return groom.LoadState(statePath+".groom.json").Pending != nil
+	st := groom.LoadState(statePath + ".groom.json")
+	// The pending question expires after PendingTurns prompts; this prompt would be turn st.Turn+1.
+	return st.Pending != nil && st.Turn+1-st.Pending.Turn <= groom.PendingTurns
 }

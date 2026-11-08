@@ -353,7 +353,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 // sent under the budget. It returns the evidence to send and, per excluded item, the reason.
 func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evidence, opts Options, budget int, tr *Trace) ([]Evidence, map[string]string, error) {
 	var concerns []Evidence
-	skip := opts.Adaptive && PolicyFor(tr.Intent).SkipContracts
+	skip := opts.Adaptive && PolicyFor(tr.Intent, prompt).SkipContracts
 	tr.PolicySkipped = nil
 	if skip {
 		tr.PolicySkipped = []string{"contracts", "docs"}
