@@ -207,6 +207,7 @@ func hookRetrieveOptions(root, statePath string) retrieve.Options {
 	o := retrieve.Options{Root: root, Profile: os.Getenv("SIDECAR_PROFILE")}
 	if os.Getenv("SIDECAR_ENGINE") == "v2" {
 		o.EngineVersion = "v2"
+		o.Adaptive = retrieve.FeatureEnabled("adaptive")
 		o.Seen = brief.SeenFor(statePath)
 		o.LSPTrusted = lsp.Trusted
 		o.LSPServer = lspServerForFile

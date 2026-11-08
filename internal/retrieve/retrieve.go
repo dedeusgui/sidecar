@@ -42,6 +42,9 @@ type Options struct {
 	Ablate Ablation
 	// Tuning overrides the V2 ranking/abstention parameters for offline replay; nil means DefaultTuning.
 	Tuning *Tuning
+	// Adaptive enables the context policy (see policy.go): analyses that cannot change a clear,
+	// narrow request are skipped. Off by default; SIDECAR_FEATURES=adaptive turns it on in the hook.
+	Adaptive bool
 	// LSPTrusted and LSPServer are the opt-in language-server hooks. The lsp package imports
 	// retrieve, so the caller supplies them. Notes need SIDECAR_LSP=1 and LSPTrusted(Root); LSPServer
 	// returns the server name that can confirm rel, or "" for none.
@@ -121,6 +124,7 @@ type Trace struct {
 	Fingerprint   *repo.Fingerprint `json:"repo_fingerprint,omitempty"` // set by the caller that has the root
 	Contracts     []Finding         `json:"contracts,omitempty"`        // v2: every checked contract link
 	Packing       *PackTrace        `json:"packing,omitempty"`          // v2: why the final set was chosen
+	PolicySkipped []string          `json:"policy_skipped,omitempty"`   // adaptive: analyses the context policy skipped
 }
 
 // Result is the outcome of Search.
@@ -349,7 +353,12 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 // sent under the budget. It returns the evidence to send and, per excluded item, the reason.
 func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evidence, opts Options, budget int, tr *Trace) ([]Evidence, map[string]string, error) {
 	var concerns []Evidence
-	if !opts.Ablate.NoContract {
+	skip := opts.Adaptive && PolicyFor(tr.Intent).SkipContracts
+	tr.PolicySkipped = nil
+	if skip {
+		tr.PolicySkipped = []string{"contracts", "docs"}
+	}
+	if !opts.Ablate.NoContract && !skip {
 		findings, err := ContractEvidence(st, opts.Root, subjectsOf(pool))
 		if err != nil {
 			return nil, nil, err
@@ -369,7 +378,9 @@ func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evid
 		if top == 0 {
 			top = 1.0
 		}
-		concerns = append(concerns, docEvidence(ctx, tr.Fingerprint, prompt, top)...)
+		if !skip {
+			concerns = append(concerns, docEvidence(ctx, tr.Fingerprint, prompt, top)...)
+		}
 		lspNotes(ctx, opts, pool)
 	}
 	if budget == 0 && len(concerns) > 0 {
@@ -1236,7 +1247,14 @@ func ownTextConfidence(c *candidate) float64 {
 	support := float64(c.directMatches) + t.OwnAltWeight*float64(c.altMatches)
 	denom := math.Min(float64(max(c.promptTerms, 1)), t.OwnCoverCap)
 	cover := math.Min(support/denom, 1)
-	return t.OwnConfBase + t.OwnConfSpan*cover
+	conf := t.OwnConfBase + t.OwnConfSpan*cover
+	// Length-aware specificity: a long prompt explained by only a couple of its terms is weak evidence,
+	// so it stays below the block gate and can only appear next to a stronger item.
+	if t.LongPromptTerms > 0 && float64(c.promptTerms) >= t.LongPromptTerms && support < t.LongPromptMinSupport &&
+		(t.LongPromptExemptCoverage <= 0 || c.coverage < t.LongPromptExemptCoverage) {
+		conf = math.Min(conf, t.MinBlockConfidence-0.05)
+	}
+	return conf
 }
 
 // tokensOf estimates the metadata line that the brief renders for the item.
