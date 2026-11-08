@@ -278,3 +278,44 @@ func (s *Store) DocstringOwners(name string, limit int) ([]SymbolHit, error) {
 	}
 	return collectHits(rows)
 }
+
+// SymbolsInFile returns the definitions of one file, excluding the file and section rows, in source order.
+func (s *Store) SymbolsInFile(path string, limit int) ([]SymbolHit, error) {
+	rows, err := s.db.Query(`SELECT `+symbolColumns("sym")+` FROM symbols sym JOIN files f ON f.id = sym.file_id
+		WHERE f.path = ? AND sym.kind NOT IN ('file', 'section')
+		ORDER BY sym.line, sym.id LIMIT ?`, path, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []SymbolHit
+	for rows.Next() {
+		h, err := scanHit(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
+// ImportersOf returns the paths of files whose imports resolve to path. An import that did not resolve
+// to a file in the repository is not listed: absence here is not proof that nobody imports the file.
+func (s *Store) ImportersOf(path string, limit int) ([]string, error) {
+	rows, err := s.db.Query(`SELECT DISTINCT f.path FROM imports i
+		JOIN files f ON f.id = i.file_id JOIN files t ON t.id = i.resolved_file_id
+		WHERE t.path = ? AND f.id <> t.id ORDER BY f.path LIMIT ?`, path, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}

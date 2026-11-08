@@ -51,6 +51,8 @@ func run(args []string, in io.Reader, out, errOut io.Writer) int {
 		return cmdDoctor(out, errOut)
 	case "explain":
 		return cmdExplain(rest, in, out, errOut)
+	case "impact":
+		return cmdImpact(rest, out, errOut)
 	case "observe":
 		return cmdObserve(rest, in)
 	case "memory":
@@ -533,4 +535,48 @@ func readOracleArtifact(path, keyPath string) (app.OracleArtifact, []byte, error
 		return art, nil, fmt.Errorf("oracle artifact: %w", err)
 	}
 	return art, key, nil
+}
+
+// cmdImpact prints what the current change touches: unchanged consumers, tests that name the changed
+// symbols, stated values the change may contradict, and gaps. It reads Git state and the index; it runs no
+// repository code. Verification commands are candidates for the agent or the user to run.
+func cmdImpact(args []string, out, errOut io.Writer) int {
+	fs := flag.NewFlagSet("impact", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	root := fs.String("root", ".", "folder inside the repository")
+	files := fs.String("files", "", "comma-separated changed paths (default: uncommitted changes)")
+	asJSON := fs.Bool("json", false, "print the report as JSON")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	abs, _ := filepath.Abs(*root)
+	rootDir, _ := repo.FindRoot(abs)
+	var list []string
+	for _, f := range strings.Split(*files, ",") {
+		if f = strings.TrimSpace(f); f != "" {
+			list = append(list, f)
+		}
+	}
+	rep, err := app.Impact(rootDir, list)
+	if err != nil {
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	if *asJSON {
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(rep)
+		return 0
+	}
+	_, _ = fmt.Fprintf(out, "changed (%d): %s\n", len(rep.Changed), strings.Join(rep.Changed, ", "))
+	for _, f := range rep.Findings {
+		_, _ = fmt.Fprintf(out, "  [%s] %-8s %s\n", f.Status, f.Kind, f.Text)
+	}
+	if len(rep.Findings) == 0 {
+		_, _ = fmt.Fprintln(out, "  nothing else in the index depends on this change")
+	}
+	if len(rep.Skipped) > 0 {
+		_, _ = fmt.Fprintf(out, "skipped: %s\n", strings.Join(rep.Skipped, "; "))
+	}
+	return 0
 }
