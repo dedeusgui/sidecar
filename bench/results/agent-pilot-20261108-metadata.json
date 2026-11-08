@@ -1,0 +1,139 @@
+{
+  "manifest_sha256": "e8227c5ac8d2d8d9d365a2b164a32dec054dfda4f0032e5e7abc1bfc34495967",
+  "sidecar_sha256": "4d8746a707caf96bd6f6e9e5eab8bac8045b3751c5eb7f62d061488c76286ff0",
+  "clients": {
+    "claude": "2.1.319 (Claude Code)",
+    "codex": "codex-cli 0.167.0"
+  },
+  "models": [
+    "claude:haiku",
+    "codex:gpt-6-luna"
+  ],
+  "reps": 1,
+  "timeout_s": 180,
+  "max_budget_usd_claude": 0.3,
+  "total_budget_usd": 8.0,
+  "claude_reserved_usd": 2.4,
+  "seed": 11,
+  "raw_saved": true,
+  "repos": {
+    "chi": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+    "click": "8abb77a8432e03ed14a95f972b44f905279415a7",
+    "hono": "eb754bd5ef22c63f1634a4c374a86be086f85710",
+    "spring-petclinic": "500158f732419217507c7656904b8e6aa1bcc0d6"
+  },
+  "jobs": [
+    {
+      "case": "R01-1",
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R01-1",
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R01-1",
+      "agent": "claude",
+      "model": "haiku",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R01-1",
+      "agent": "claude",
+      "model": "haiku",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R02-3",
+      "agent": "claude",
+      "model": "haiku",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R02-3",
+      "agent": "claude",
+      "model": "haiku",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-4",
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-4",
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R02-3",
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R02-3",
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-4",
+      "agent": "claude",
+      "model": "haiku",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-4",
+      "agent": "claude",
+      "model": "haiku",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R04-5",
+      "agent": "claude",
+      "model": "haiku",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R04-5",
+      "agent": "claude",
+      "model": "haiku",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R04-5",
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R04-5",
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "arm": "OFF",
+      "rep": 0
+    }
+  ]
+}

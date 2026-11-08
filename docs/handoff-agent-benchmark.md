@@ -1,6 +1,8 @@
 # Handoff: benchmark de agentes reais e estado do Sidecar (2026-11-08)
 
-Documento para quem continuar o trabalho (outro agente ou pessoa). Tudo aqui foi verificado em `main`; o que **não** foi feito está marcado. Contrato de engenharia: [AGENTS.md](../AGENTS.md).
+Atualização: consulte [benchmark-consolidation.md](benchmark-consolidation.md) para o inventário e bloqueios atuais; `--real-hooks` está desativado até validar o isolamento.
+
+Documento histórico para quem continuar o trabalho. Os relatos abaixo descrevem a rodada original; estado e restrições atuais estão na consolidação. Contrato de engenharia: [AGENTS.md](../AGENTS.md).
 
 ## 1. Onde estamos
 
@@ -11,10 +13,10 @@ Documento para quem continuar o trabalho (outro agente ou pessoa). Tudo aqui foi
 | Relatório consolidado (voz, feedback, limites) | Pronto, revisado sem números inventados | [feedback-and-voice-roi.md](../bench/results/feedback-and-voice-roi.md) |
 | Dicionário PT-BR→EN algorítmico | Pronto | `internal/lexical/cognates.go`, `lexicon_pt_en.tsv`, `$SIDECAR_HOME/lexicon.json` |
 | Feedback pós-tarefa (`sidecar feedback record/list/purge`) | Implementado e testado; ROI **não** medido com agente real | `internal/store/feedback.go`, `internal/retrieve` (`FeedbackMultipliers`) |
-| **Benchmark de agentes reais (Claude Code, Codex, Antigravity CLI)** | **Runner pronto; matriz completa NÃO executada** | [bench/agent/run_agents.py](../bench/agent/run_agents.py) (seção 3) |
+| **Benchmark de agentes reais** | Runner em qualificação; matriz completa não executada | [bench/agent/run_agents.py](../bench/agent/run_agents.py) e [consolidação](benchmark-consolidation.md) |
 
 > [!WARNING]
-> Não existe ainda nenhum score por cliente. Qualquer tabela "Claude vs Codex vs Antigravity" anterior a este documento era inventada e foi removida. Só vale o que sair de `run_agents.py --yes-spend`.
+> Os smokes históricos abaixo não constituem score por cliente. Para comparações, conferir isolamento, dados, falhas e limitações no relatório de cada rodada.
 
 ## 2. O que cada benchmark prova (e não prova)
 
@@ -30,36 +32,37 @@ Arquivo: `bench/agent/run_agents.py` (Python stdlib). Gasta dinheiro; sem `--yes
 - Casos: `bench/ten_repos_cases.json` (categorias `direct`, `messy_pt`, `voice_mode`, `negative`), checkouts fixos criados por `bench/agentic/setup_10_repos.sh /tmp/sidecar-real-bench`.
 - Tarefa: localização somente leitura. O agente recebe o prompt do caso mais um sufixo fixo e deve terminar com uma linha `{"files": [...]}`. Oráculo = gold de arquivo do manifesto (`success` = Hit@5; negativos exigem `{"files": []}`). O agente não vê o gold.
 - Isolamento: `git clone --shared` + checkout do commit fixado em diretório temporário por execução; detecta edição acidental (`edited_files`).
-- Braço ON: contexto do binário real `sidecar hook --agent claude`, alimentado com payload `UserPromptSubmit`, **prefixado ao prompt** nos três clientes (mesmo canal, comparação justa). **Não** é o hook instalado do cliente e não toca em settings do usuário. O índice é quente (`index` antes das medições); `sidecar_ms` registra o custo do hook.
-- Ordem das execuções embaralhada (seed fixa) para reduzir viés de carga e cache.
-- Modos: Claude `-p --output-format json --permission-mode plan --disallowedTools Edit Write NotebookEdit --max-budget-usd`; Codex `exec --json --ephemeral --ignore-user-config -s read-only`; Antigravity `--print --output-format json --mode plan`.
-- Saídas: `runs.jsonl` (um registro por execução), `raw/` (stdout/stderr por execução), `agent-benchmark.md` (relatório: resumo por agente/braço, por categoria, diferença pareada ON−OFF com IC 95% por bootstrap só com 3+ pares).
+- Braço ON: contexto do binário real `sidecar hook --agent claude`, alimentado com payload `UserPromptSubmit`, **prefixado ao prompt**. **Não** é o hook instalado do cliente. O índice é quente (`index` antes das medições); `sidecar_ms` registra o custo do hook.
+- Pares adjacentes em ordem AB/BA balanceada, com semente fixa. Falhas interrompem a rodada e pares incompletos são registrados.
+- Modos: Claude `-p --output-format json --permission-mode plan --disallowedTools Edit Write NotebookEdit --max-budget-usd`, com settings globais excluídos; Codex `exec --json --ephemeral --ignore-user-config -s read-only`. Antigravity está bloqueado até qualificar isolamento.
+- Saídas: `run-metadata.json`, `runs.jsonl` e `agent-benchmark.md`; `raw/` é opcional com `--save-raw` e pode conter dados sensíveis. O bootstrap agrupa repetições por tarefa e requer pelo menos três tarefas pareadas.
 
 **Modelos econômicos usados nos exemplos** (verifique com `agy models`, `codex` config e `claude --model`): Claude `haiku`, Codex `gpt-6-luna`, Antigravity `gemini-3.8-flash-low`. O nome "Codex Mini" não existe nesta instalação.
 
 **Comandos**
 ```bash
 bash bench/agentic/setup_10_repos.sh /tmp/sidecar-real-bench      # clona os 10 repositórios fixados
-go build -o ~/.local/bin/sidecar ./cmd/sidecar
+go build -o /tmp/sidecar-agent-bench ./cmd/sidecar
 # plano (sem gastar):
 python3 bench/agent/run_agents.py --manifest /tmp/sidecar-real-bench/ten-repos-manifest.json
-# rodada piloto (gasta; começar pequeno):
+# exemplo de piloto pago: pré-registrar protocolo e conferir isolamento antes
 python3 bench/agent/run_agents.py --manifest /tmp/sidecar-real-bench/ten-repos-manifest.json \
-  --agents claude:haiku codex:gpt-6-luna agy:gemini-3.8-flash-low \
-  --per-category 2 --reps 1 --out-dir /tmp/agent-bench --yes-spend
-# relatório a partir de runs.jsonl (copiar para o repo ao final):
-python3 bench/agent/run_agents.py --report /tmp/agent-bench/runs.jsonl --report-md bench/results/agent-benchmark.md
+  --sidecar /tmp/sidecar-agent-bench --agents claude:haiku codex:gpt-6-luna \
+  --per-category 1 --reps 1 --max-budget 0.3 --total-budget 8 \
+  --out-dir /tmp/agent-bench --yes-spend
+# relatório a partir de runs.jsonl:
+python3 bench/agent/run_agents.py --report /tmp/agent-bench/runs.jsonl --report-md /tmp/agent-benchmark.md
 ```
 
 **Smoke executado (1 caso `R01-1`, ON e OFF)**
-- Claude Haiku: OFF 12,7 s, 74.579 tokens de entrada (com cache), US$ 0,129; ON 14,8 s, 76.768 tokens, US$ 0,133; ambos acertaram em 2 turnos; hook ~47 ms. Conclusão: em tarefa trivial o Sidecar não ajuda (e custa um pouco) — esperado; um caso não é resultado.
+- Claude Haiku: OFF 12,7 s, 74.579 tokens de entrada (com cache), US$ 0,129; ON 14,8 s, 76.768 tokens, US$ 0,133; ambos acertaram em 2 turnos; hook ~47 ms. O OFF pode ter sido contaminado por hooks globais; não é comparação válida.
 - Codex e Antigravity: ver seção 6.
 
 ## 4. Próximos passos, em ordem
 
-1. Corrigir o que o smoke de Codex/Antigravity apontar (parsers de tokens/chamadas; `tool_calls` é `n/d` no Claude porque o JSON não expõe a contagem — usar `--output-format stream-json` se for necessário).
-2. Rodada piloto: `--per-category 2 --reps 1` (48 execuções; Claude custa ~US$ 0,13 por execução, então ~US$ 2 só nele). Conferir `raw/` por falhas de formato.
-3. Rodada de medição: `--per-category 5 --reps 3`+ (IC exige 3+ pares). Pré-registrar versões dos clientes, modelos e preços no relatório.
+1. Auditar o piloto pré-registrado e seus pares, custos, isolamento e falhas conforme a [consolidação](benchmark-consolidation.md).
+2. Corrigir limitações do instrumento antes de expandir; qualificar Antigravity separadamente.
+3. Planejar nova rodada de medição com orçamento e desenho adequados; pré-registrar versões dos clientes, modelos e preços no relatório.
 4. Adicionar **tarefas mais difíceis que localização** (multi-arquivo, edição com oráculo de teste independente do repositório do agente). O manifesto `bench/agentic/manifest.jsonl` tem rascunhos `A01`–`A0x` e `R01`–`R06` verificadas; os 10 repositórios têm apenas gold de localização.
 5. Adicionar prompts de voz **independentes** (gravados/transcritos por outra pessoa) e congelar um **holdout** antes de olhar resultados.
 6. Medir o hook real instalado de cada cliente (variante `--real-hooks`, hoje ausente) em vez do prefixo de prompt, com `sidecar install` em HOME isolado (consentimento e backup conforme AGENTS.md).

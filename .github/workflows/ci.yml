@@ -74,6 +74,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
+      - name: Agent benchmark harness tests (offline)
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s bench/agent -p 'test_*.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s bench/agentic -p 'test_*.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s bench -p 'test_scorecard.py' -v
       - name: Retrieval benchmark (tune / eval / holdout)
         run: go run ./cmd/sidecar-eval --cases bench/cases.json --out bench/results/ci.json
       - uses: actions/upload-artifact@v4

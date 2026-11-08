@@ -1,0 +1,19 @@
+{
+  "task": "CHI-EDIT-01",
+  "repo_commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+  "prompt_sha256": "1aa3b46b60a81fd3acaf444687c52fa3308924f7bafa9861e7f5f998607e0784",
+  "oracle_sha256": "e093d16ef7e000c8c9128bf6e6a9e17fc78912e11cfa2b7f0dcd407fbd629b55",
+  "sidecar_sha256": "4d8746a707caf96bd6f6e9e5eab8bac8045b3751c5eb7f62d061488c76286ff0",
+  "runner_sha256": "5a11d51bf118102baddc1f50776682fa402da542bcfbacd3b03ee2538ecccc37",
+  "codex_version": "codex-cli 0.167.0",
+  "model": "gpt-6-luna",
+  "order": [
+    "OFF",
+    "ON"
+  ],
+  "timeout_s": 180,
+  "oracle_timeout_s": 120,
+  "transport": "prompt_prefix",
+  "estimated_cost_usd": null,
+  "raw_saved": true
+}

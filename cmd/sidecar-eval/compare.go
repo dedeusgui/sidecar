@@ -57,6 +57,7 @@ type comparison struct {
 	Hardware     map[string]any
 	Rows         []deltaRow
 	Skipped      []string // methods absent from the baseline, so not compared
+	Incomparable []string // method/split with missing, duplicate or inconsistent cases
 	Regressions  []caseChange
 	Improvements []caseChange
 }
@@ -90,12 +91,28 @@ func compareRuns(base baseline, cur []caseOutcome, methods []string) comparison 
 	for _, o := range base.Outcomes {
 		inBase[o.Method] = true
 	}
+	allOutcomes := make([]caseOutcome, 0, len(base.Outcomes)+len(cur))
+	allOutcomes = append(allOutcomes, base.Outcomes...)
+	allOutcomes = append(allOutcomes, cur...)
+	validGroups := make(map[string]map[string]bool)
 	for _, m := range methods {
 		if !inBase[m] {
 			c.Skipped = append(c.Skipped, m)
 			continue
 		}
-		for _, split := range splits {
+		for _, split := range splitsOf(allOutcomes) {
+			ok, nonempty := comparableCases(m, split, base.Outcomes, cur)
+			if !nonempty {
+				continue
+			}
+			if !ok {
+				c.Incomparable = append(c.Incomparable, m+" / "+split)
+				continue
+			}
+			if validGroups[m] == nil {
+				validGroups[m] = make(map[string]bool)
+			}
+			validGroups[m][split] = true
 			c.Rows = append(c.Rows, deltaRow{
 				Split: split, Method: m,
 				Cur:  summarize(m, split, cur),
@@ -103,8 +120,45 @@ func compareRuns(base baseline, cur []caseOutcome, methods []string) comparison 
 			})
 		}
 	}
-	c.Regressions, c.Improvements = detectChanges(base.Outcomes, cur)
+	var comparableCurrent []caseOutcome
+	for _, o := range cur {
+		if validGroups[o.Method][o.Split] {
+			comparableCurrent = append(comparableCurrent, o)
+		}
+	}
+	c.Regressions, c.Improvements = detectChanges(base.Outcomes, comparableCurrent)
 	return c
+}
+
+// comparableCases requires the same unique case IDs and polarity in both runs.
+func comparableCases(method, split string, base, cur []caseOutcome) (ok, nonempty bool) {
+	collect := func(outs []caseOutcome) (map[string]bool, bool) {
+		cases := make(map[string]bool)
+		for _, o := range outs {
+			if o.Method != method || o.Split != split {
+				continue
+			}
+			if _, exists := cases[o.Case]; exists {
+				return cases, false
+			}
+			cases[o.Case] = o.Negative
+		}
+		return cases, true
+	}
+	b, bUnique := collect(base)
+	c, cUnique := collect(cur)
+	if len(b) == 0 && len(c) == 0 {
+		return false, false
+	}
+	if !bUnique || !cUnique || len(b) != len(c) {
+		return false, true
+	}
+	for id, negative := range b {
+		if currentNegative, found := c[id]; !found || currentNegative != negative {
+			return false, true
+		}
+	}
+	return true, true
 }
 
 // detectChanges lists positive cases that lost Hit@5 and negative cases that started
@@ -210,6 +264,9 @@ func printComparison(w io.Writer, c comparison) {
 	}
 	if len(c.Skipped) > 0 {
 		_, _ = fmt.Fprintf(w, "\nMétodos sem baseline (não comparados): %v\n", c.Skipped)
+	}
+	if len(c.Incomparable) > 0 {
+		_, _ = fmt.Fprintf(w, "\nConjuntos de casos incompatíveis (não comparados; excluídos também das mudanças por caso): %v\n", c.Incomparable)
 	}
 	printChanges(w, fmt.Sprintf("Regressões (%d)", len(c.Regressions)), "Nenhuma regressão.", c.Regressions)
 	printChanges(w, fmt.Sprintf("Melhorias (%d)", len(c.Improvements)), "Nenhuma melhoria.", c.Improvements)

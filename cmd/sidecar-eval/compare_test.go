@@ -61,8 +61,8 @@ func TestCompareRunsReportsCurrentMinusBaseline(t *testing.T) {
 		{Method: "m", Split: "tune", Case: "N1", Negative: true, Empty: false, LatencyMS: 5},
 	}
 	c := compareRuns(base, cur, []string{"m"})
-	if len(c.Rows) != len(splits) {
-		t.Fatalf("rows = %d, want one per split", len(c.Rows))
+	if len(c.Rows) != 1 {
+		t.Fatalf("rows = %d, want one nonempty comparable split", len(c.Rows))
 	}
 	row := c.Rows[0]
 	if row.Split != "tune" {
@@ -80,9 +80,6 @@ func TestCompareRunsReportsCurrentMinusBaseline(t *testing.T) {
 		if !near(d[0], d[1]) {
 			t.Errorf("Δ %s = %v, want %v", name, d[0], d[1])
 		}
-	}
-	if eval := c.Rows[1]; eval.Split != "eval" || eval.Cur.Hit5 != 0 || eval.Base.Hit5 != 0 {
-		t.Errorf("split without cases should compare as zeros, got %+v", eval)
 	}
 }
 
@@ -194,5 +191,42 @@ func TestMarkdownReportHasSplitsAndComparison(t *testing.T) {
 	printTables(&plain, methods, cur)
 	if strings.Contains(plain.String(), "Comparação") {
 		t.Error("tables alone must not contain the comparison")
+	}
+}
+
+func TestCompareRunsIncludesExternalSplit(t *testing.T) {
+	base := baseline{Outcomes: []caseOutcome{{Method: "m", Split: "development", Case: "one", Hit5: true}}}
+	current := []caseOutcome{{Method: "m", Split: "development", Case: "one", Hit5: false}}
+	got := compareRuns(base, current, []string{"m"})
+	for _, row := range got.Rows {
+		if row.Split == "development" {
+			if row.Base.Hit5 != 100 || row.Cur.Hit5 != 0 {
+				t.Fatalf("incorrect development comparison: %+v", row)
+			}
+			return
+		}
+	}
+	t.Fatal("development split omitted from comparison")
+}
+
+func TestComparisonRejectsIncompatibleCaseSets(t *testing.T) {
+	baselineCase := caseOutcome{Method: "m", Split: "development", Case: "a", Hit5: true}
+	for name, current := range map[string][]caseOutcome{
+		"missing":   nil,
+		"different": {{Method: "m", Split: "development", Case: "b"}},
+		"duplicate": {baselineCase, baselineCase},
+		"polarity":  {{Method: "m", Split: "development", Case: "a", Negative: true}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := compareRuns(baseline{Outcomes: []caseOutcome{baselineCase}}, current, []string{"m"})
+			if len(got.Rows) != 0 || len(got.Incomparable) != 1 {
+				t.Fatalf("incompatible cases compared: %+v", got)
+			}
+			var out bytes.Buffer
+			printComparison(&out, got)
+			if !strings.Contains(out.String(), "Conjuntos de casos incompatíveis") {
+				t.Fatal("missing incompatibility warning")
+			}
+		})
 	}
 }
