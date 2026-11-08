@@ -21,7 +21,7 @@ func TestRecordFeedbackGoesStaleWhenFileChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	recs, err := RecordFeedback(root, store.AgentFeedbackReport{
-		SchemaVersion: 1, TaskCompleted: true, Confidence: "high", ReasonCode: "wrong_file",
+		SchemaVersion: 1, TaskCompleted: true, OracleStatus: store.OraclePassed, Confidence: "high", ReasonCode: "wrong_file",
 		HelpfulEvidenceIDs:    []string{"release/handler.go#method:Release@6"},
 		MisleadingEvidenceIDs: []string{"queue/limits.go#constant:MaxActiveTickets@3"},
 	})
@@ -32,8 +32,13 @@ func TestRecordFeedbackGoesStaleWhenFileChanges(t *testing.T) {
 	if helpful.Polarity != 1 || helpful.FilePath != "release/handler.go" || helpful.Symbol != "Release" || helpful.FileHash == "" {
 		t.Fatalf("helpful record = %+v", helpful)
 	}
-	if helpful.ReconciledWeight <= 0 || misleading.ReconciledWeight >= -0.15 {
-		t.Fatalf("weights helpful=%v misleading=%v, want positive and below -0.15", helpful.ReconciledWeight, misleading.ReconciledWeight)
+	// The oracle is reported as passed, so helpful is positive and misleading negative. Both are
+	// self-reports with no edit in the trace, so they are weak and do not reach the ranking.
+	if helpful.ReconciledWeight <= 0 || misleading.ReconciledWeight >= 0 {
+		t.Fatalf("weights helpful=%v misleading=%v, want helpful > 0 and misleading < 0", helpful.ReconciledWeight, misleading.ReconciledWeight)
+	}
+	if helpful.Tier != store.TierWeak || misleading.Tier != store.TierWeak {
+		t.Fatalf("self-reported records without an edit = tiers %q, %q; want weak", helpful.Tier, misleading.Tier)
 	}
 	if list, _ := ListFeedback(root); len(list) != 2 || list[0].Status != store.FeedbackValid || list[1].Status != store.FeedbackValid {
 		t.Fatalf("fresh feedback = %+v, want two valid records", list)

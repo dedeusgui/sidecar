@@ -413,7 +413,9 @@ func cmdFeedback(args []string, in io.Reader, out, errOut io.Writer) int {
 	fs.Var(&misleading, "misleading", "evidence ID the agent found misleading (record; repeatable)")
 	reason := fs.String("reason", "other", "exact_match, wrong_file, stale_context, missing_caller, noisy_neighbor or other (record)")
 	confidence := fs.String("confidence", "medium", "high, medium or low (record)")
-	completed := fs.Bool("completed", false, "the task was completed (record)")
+	completed := fs.Bool("completed", false, "the agent says the task was completed; this is a claim, not an oracle (record)")
+	oracle := fs.String("oracle", "unknown", "outcome of a test or build run: passed, failed or unknown (record)")
+	oracleProvenance := fs.String("oracle-provenance", "", "who ran the oracle: harness, human or agent_report; default agent_report when --oracle is known (record)")
 	additional := fs.Bool("additional-search", false, "the agent needed another search (record)")
 	session := fs.String("session", "", "agent session ID, to read the observer trace (record)")
 	all := fs.Bool("all", false, "purge every record, not only stale ones (purge)")
@@ -430,6 +432,7 @@ func cmdFeedback(args []string, in io.Reader, out, errOut io.Writer) int {
 		case len(helpful) > 0 || len(misleading) > 0:
 			report = store.AgentFeedbackReport{
 				SchemaVersion: 1, SessionID: *session, TaskCompleted: *completed,
+				OracleStatus: *oracle, OracleProvenance: *oracleProvenance,
 				HelpfulEvidenceIDs: helpful, MisleadingEvidenceIDs: misleading,
 				ReasonCode: *reason, Confidence: *confidence, AdditionalSearchNeeded: *additional,
 			}

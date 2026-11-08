@@ -57,7 +57,14 @@ func dispatchPaths(t *testing.T, st *store.Store, root string, prompt string, no
 	return out
 }
 
+// recordDispatchFeedback stores feedback that the tests treat as strong, so it applies to the ranking.
 func recordDispatchFeedback(t *testing.T, st *store.Store, root, path string, polarity int, weight float64) {
+	t.Helper()
+	recordDispatchFeedbackAs(t, st, root, path, polarity, weight, store.TierStrong)
+}
+
+// recordDispatchFeedbackAs stores one feedback record of the given tier on Dispatch in path.
+func recordDispatchFeedbackAs(t *testing.T, st *store.Store, root, path string, polarity int, weight float64, tier string) {
 	t.Helper()
 	files, err := st.FileRecords()
 	if err != nil {
@@ -65,7 +72,7 @@ func recordDispatchFeedback(t *testing.T, st *store.Store, root, path string, po
 	}
 	if _, err := st.InsertFeedback(store.FeedbackRecord{
 		Worktree: root, EvidenceID: path + "#Dispatch", FilePath: path, Symbol: "Dispatch",
-		FileHash: files[path].Hash, Polarity: polarity, ReconciledWeight: weight, CreatedAt: 1,
+		FileHash: files[path].Hash, Polarity: polarity, ReconciledWeight: weight, Tier: tier, CreatedAt: 1,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -82,8 +89,8 @@ func TestFeedbackPromotesHelpfulAndDemotesMisleading(t *testing.T) {
 		t.Fatalf("want both Dispatch copies retrieved, got %v", base)
 	}
 	misleading, helpful := base[0], base[1]
-	recordDispatchFeedback(t, st, root, misleading, -1, store.ComputeReconciledWeight(-1, "high", 0, false, true))
-	recordDispatchFeedback(t, st, root, helpful, 1, store.ComputeReconciledWeight(1, "high", 1, true, false))
+	recordDispatchFeedback(t, st, root, misleading, -1, store.ComputeReconciledWeight(-1, "high", store.TraceEdited, -1, true))
+	recordDispatchFeedback(t, st, root, helpful, 1, store.ComputeReconciledWeight(1, "high", store.TraceEdited, 1, false))
 
 	if on := dispatchPaths(t, st, root, dispatchPrompt, false); !slices.Equal(on, []string{helpful, misleading}) {
 		t.Fatalf("feedback did not reorder the copies: got %v, want [%s %s]", on, helpful, misleading)
@@ -97,7 +104,7 @@ func TestFeedbackInvalidatedByReindexRestoresRanking(t *testing.T) {
 	st := ix.Store()
 	base := dispatchPaths(t, st, root, dispatchPrompt, true)
 	misleading := base[0]
-	recordDispatchFeedback(t, st, root, misleading, -1, store.ComputeReconciledWeight(-1, "high", 0, false, true))
+	recordDispatchFeedback(t, st, root, misleading, -1, store.ComputeReconciledWeight(-1, "high", store.TraceEdited, -1, true))
 	if on := dispatchPaths(t, st, root, dispatchPrompt, false); on[0] == misleading {
 		t.Fatalf("penalty had no effect before the change: %v", on)
 	}
@@ -120,5 +127,18 @@ func TestFeedbackInvalidatedByReindexRestoresRanking(t *testing.T) {
 	}
 	if got, want := dispatchPaths(t, st, root, dispatchPrompt, false), dispatchPaths(t, st, root, dispatchPrompt, true); !slices.Equal(got, want) {
 		t.Fatalf("ranking after re-index = %v, want the feedback-free ranking %v", got, want)
+	}
+}
+
+// Weak feedback (a self-report with no edit in the trace) is stored but never reorders the copies,
+// however strongly the agent worded it.
+func TestWeakFeedbackDoesNotReorderRanking(t *testing.T) {
+	root, ix := dispatchFixture(t)
+	st := ix.Store()
+	base := dispatchPaths(t, st, root, dispatchPrompt, true)
+	recordDispatchFeedbackAs(t, st, root, base[0], -1, store.ComputeReconciledWeight(-1, "high", store.TraceNotObserved, 0, true), store.TierWeak)
+	recordDispatchFeedbackAs(t, st, root, base[1], 1, store.ComputeReconciledWeight(1, "high", store.TraceNotObserved, 1, false), store.TierWeak)
+	if on := dispatchPaths(t, st, root, dispatchPrompt, false); !slices.Equal(on, base) {
+		t.Fatalf("weak feedback changed the ranking: got %v, want the feedback-free order %v", on, base)
 	}
 }

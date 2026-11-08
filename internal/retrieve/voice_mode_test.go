@@ -82,8 +82,8 @@ func TestVoiceFeedbackPromotesHelpfulAndDemotesMisleading(t *testing.T) {
 		t.Fatalf("want both Dispatch copies retrieved for the voice prompt, got %v", base)
 	}
 	misleading, helpful := base[0], base[1]
-	recordDispatchFeedback(t, st, root, misleading, -1, store.ComputeReconciledWeight(-1, "high", 0, false, true))
-	recordDispatchFeedback(t, st, root, helpful, 1, store.ComputeReconciledWeight(1, "high", 1, true, false))
+	recordDispatchFeedback(t, st, root, misleading, -1, store.ComputeReconciledWeight(-1, "high", store.TraceEdited, -1, true))
+	recordDispatchFeedback(t, st, root, helpful, 1, store.ComputeReconciledWeight(1, "high", store.TraceEdited, 1, false))
 
 	if on := dispatchPaths(t, st, root, voiceDispatch, false); !slices.Equal(on, []string{helpful, misleading}) {
 		t.Fatalf("feedback did not reorder the copies for the voice prompt: got %v, want [%s %s]", on, helpful, misleading)

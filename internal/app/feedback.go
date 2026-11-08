@@ -42,14 +42,9 @@ func RecordFeedback(root string, report store.AgentFeedbackReport) ([]store.Feed
 	if err != nil {
 		return nil, err
 	}
-	oracle := report.TaskCompleted
-	if report.OraclePassed != nil {
-		oracle = *report.OraclePassed
-	}
-	oracleOutcome := -1
-	if oracle {
-		oracleOutcome = 1
-	}
+	// The oracle is the outcome of a test or build run. The agent's completion claim is recorded
+	// on its own and never used as the outcome: an unknown oracle contributes nothing.
+	oracle := store.OracleOutcome(report.OracleStatus)
 	now := time.Now()
 	traces := map[string]int{}
 	var out []store.FeedbackRecord
@@ -73,7 +68,10 @@ func RecordFeedback(root string, report store.AgentFeedbackReport) ([]store.Feed
 			rec := store.FeedbackRecord{
 				Worktree: root, SessionID: report.SessionID, EvidenceID: id, FilePath: path, Symbol: symbol,
 				FileHash: file.Hash, Polarity: group.polarity, ReasonCode: report.ReasonCode,
-				AgentConfidence: report.Confidence, TraceCorroborated: trace, OraclePassed: oracleOutcome,
+				AgentConfidence: report.Confidence, AgentCompleted: report.TaskCompleted,
+				TraceCorroborated: trace, OracleStatus: report.OracleStatus, Provenance: report.OracleProvenance,
+				OraclePassed: oracle, EvidenceUsed: store.EvidenceUse(trace),
+				Tier:             store.ClassifyFeedback(oracle, report.OracleProvenance, trace),
 				ReconciledWeight: store.ComputeReconciledWeight(group.polarity, report.Confidence, trace, oracle, report.AdditionalSearchNeeded),
 				CreatedAt:        now.Unix(), Status: store.FeedbackStale,
 			}
@@ -125,6 +123,9 @@ func normalizeReport(r *store.AgentFeedbackReport) error {
 	if r.Confidence == "" {
 		r.Confidence = "medium"
 	}
+	if err := normalizeOracle(r); err != nil {
+		return err
+	}
 	for _, check := range []struct {
 		field, value string
 		allowed      []string
@@ -157,10 +158,54 @@ func sessionTrace(root, session, file string) int {
 			return 0
 		}
 		h := hashID(root, file)
-		if s.Reads[h] > 0 || s.Edits[h] > 0 {
-			return 1
+		switch {
+		case s.Edits[h] > 0:
+			return store.TraceEdited
+		case s.Reads[h] > 0:
+			return store.TraceRead
 		}
-		return -1
+		return store.TraceUntouched
 	}
-	return 0
+	return store.TraceNotObserved
+}
+
+// normalizeOracle reads the oracle outcome of a report. Only an explicit oracle_status or
+// oracle_passed sets it: the agent's task_completed is a claim about the task, not a test result,
+// so it never becomes the oracle.
+func normalizeOracle(r *store.AgentFeedbackReport) error {
+	switch r.OracleStatus {
+	case "":
+		switch {
+		case r.OraclePassed == nil:
+			r.OracleStatus = store.OracleUnknown
+		case *r.OraclePassed:
+			r.OracleStatus = store.OraclePassed
+		default:
+			r.OracleStatus = store.OracleFailed
+		}
+	case store.OraclePassed, store.OracleFailed, store.OracleUnknown:
+		if r.OraclePassed != nil {
+			want := store.OracleFailed
+			if *r.OraclePassed {
+				want = store.OraclePassed
+			}
+			if r.OracleStatus != want {
+				return fmt.Errorf("oracle_status %q contradicts oracle_passed %v", r.OracleStatus, *r.OraclePassed)
+			}
+		}
+	default:
+		return fmt.Errorf("oracle_status %q is not one of passed, failed, unknown", r.OracleStatus)
+	}
+	if r.OracleStatus == store.OracleUnknown {
+		r.OracleProvenance = store.ProvenanceNone
+		return nil
+	}
+	if r.OracleProvenance == "" {
+		r.OracleProvenance = store.ProvenanceAgentReport
+	}
+	switch r.OracleProvenance {
+	case store.ProvenanceHarness, store.ProvenanceHuman, store.ProvenanceAgentReport:
+		return nil
+	}
+	return fmt.Errorf("oracle_provenance %q is not one of harness, human, agent_report", r.OracleProvenance)
 }
