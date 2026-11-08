@@ -1,0 +1,42 @@
+{
+  "id": "EXP-DBG-01",
+  "ok": false,
+  "base": {
+    "kind": "tests",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "API pública preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "nect (node:net:1111:16)\n    defaultTriggerAsyncIdScope (node:internal/async_hooks:472:18)\n    node:net:1357:9\n    process.processTicksAndRejections (node:internal/process/task_queues:84:11)\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 0\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 144.051885\n"
+  },
+  "reference": {
+    "kind": "tests",
+    "changed": [
+      "lib/response.js"
+    ],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "ok": true,
+        "detail": "API pública preservada"
+      }
+    ],
+    "isolation": "unshare-net",
+    "detail": "nect (node:net:1111:16)\n    defaultTriggerAsyncIdScope (node:internal/async_hooks:472:18)\n    node:net:1357:9\n    process.processTicksAndRejections (node:internal/process/task_queues:84:11)\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 0\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 116.993673\n"
+  },
+  "ts": 1794162403.8334274,
+  "base_verdict": "fail"
+}

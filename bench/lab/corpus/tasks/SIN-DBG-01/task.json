@@ -1,0 +1,59 @@
+{
+  "schema": "lab-task/1",
+  "id": "SIN-DBG-01",
+  "split": "development",
+  "class": "debug",
+  "repo": "sinatra",
+  "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+  "prompt": "Estou com um problema de cache condicional no Sinatra. Quando uso `etag` numa rota, um cliente que manda If-None-Match com um ETag equivalente ao da resposta, mesmo que a única diferença seja o prefixo W/, continua recebendo 200 em vez de 304. Esperava 304 nos dois sentidos (resposta forte com requisição fraca e o contrário). Dá uma olhada no código, corrige e me diz o que mudou. Não mexa na API pública e não acesse a rede.",
+  "setup": [
+    [
+      "bundle",
+      "_2.5.22_",
+      "install",
+      "--path",
+      "vendor/bundle"
+    ]
+  ],
+  "setup_timeout_s": 900,
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_etag_weak_test.rb": "zz_oracle_etag_weak_test.rb"
+    },
+    "command": [
+      "bundle",
+      "exec",
+      "ruby",
+      "-Ilib",
+      "test/zz_oracle_etag_weak_test.rb",
+      "-v"
+    ],
+    "require_output": [
+      "ZzSinatraEtagWeakOracleTest#test_if_none_match_weak_comparison_strong_etag = [0-9.]+ s = [.FE]",
+      "[0-9]+ runs, [0-9]+ assertions"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/sinatra/base.rb",
+      "test/helpers_test.rb"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "pattern": "def etag\\(value, options = \\{\\}\\)",
+        "why": "assinatura pública de etag preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/sinatra/base.rb",
+        "pattern": "etag_matches\\?\\(env\\['HTTP_IF_MATCH'\\], new_resource\\)",
+        "why": "If-Match continua usando comparação forte (RFC 9110 13.1.1)"
+      }
+    ]
+  },
+  "notes": "Dev. Defeito real no commit fixado: lib/sinatra/base.rb, helper etag (~linha 637) chama etag_matches? para If-None-Match, e etag_matches? (~linhas 709-714) compara com include? (igualdade exata), sem a comparação fraca de RFC 9110 13.1.2 (If-None-Match deve ignorar o prefixo W/). Reproduzido com Rack::MockRequest: resposta etag 'abc' + If-None-Match W/\"abc\" -> 200 (esperado 304); etag 'abc', :weak + If-None-Match \"abc\" -> 200 (esperado 304). Oráculo oculto escrito do zero (não copiado de test/helpers_test.rb). Setup: bundler 4 removeu --path; usa-se bundle _2.5.22_ (o setup roda em cada checkout). Suíte completa do commit (test/*_test.rb) passa na base; falha só o oráculo."
+}

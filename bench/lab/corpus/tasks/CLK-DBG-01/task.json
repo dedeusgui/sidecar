@@ -1,0 +1,56 @@
+{
+  "schema": "lab-task/1",
+  "id": "CLK-DBG-01",
+  "split": "development",
+  "class": "debug",
+  "repo": "click",
+  "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+  "prompt": "O --help de um comando do click está saindo com espaços sobrando dentro dos parágrafos do texto de ajuda. No docstring eu escrevi 'Copies every file that changed' e na linha seguinte, indentada, 'since the last run.', e na tela aparecem vários espaços no meio da frase. Corrija para que o texto volte a ter um espaço simples entre as palavras, sem mexer na indentação do parágrafo nem nos blocos marcados com \\b, que devem continuar exatamente como estão. Não altere a API pública. Ao terminar, descreva brevemente o que fez.",
+  "setup": [
+    ["python3", "-m", "venv", ".venv"],
+    ["./.venv/bin/pip", "install", "-q", "-e", ".", "pytest"]
+  ],
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "tests/test_zz_clk_dbg_oracle.py": "dbg_wrap_oracle_test.py"
+    },
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "-v",
+      "tests/test_zz_clk_dbg_oracle.py"
+    ],
+    "require_output": [
+      "test_wrap_joins_continuation_lines_with_single_space\\s+(PASSED|FAILED)",
+      "test_wrap_paragraph_keeps_indent_and_single_spaces\\s+(PASSED|FAILED)",
+      "test_wrap_preformatted_block_is_kept_verbatim\\s+(PASSED|FAILED)",
+      "test_help_paragraph_renders_with_single_spaces\\s+(PASSED|FAILED)"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/click/formatting.py",
+      "tests/test_formatting.py"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "pattern": "def wrap_text\\(",
+        "why": "API pública de wrap_text preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/formatting.py",
+        "pattern": "preserve_paragraphs: bool = False",
+        "why": "assinatura de preserve_paragraphs preservada"
+      }
+    ]
+  },
+  "notes": "Defeito real em src/click/formatting.py, função wrap_text (commit fixado): em modo preserve_paragraphs, _flush_par junta as linhas do parágrafo com \" \".join(buf) (linha ~84) sem remover a indentação das linhas de continuação, então 'changed' + '\\n      since' vira 'changed' + 7 espaços + 'since'. Aparece no --help de qualquer docstring com continuação indentada. Testes escritos do zero para esta tarefa."
+}

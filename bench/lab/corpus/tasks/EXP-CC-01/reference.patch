@@ -1,0 +1,16 @@
+diff --git a/lib/response.js b/lib/response.js
+index 0d5a4ae..9256e16 100644
+--- a/lib/response.js
++++ b/lib/response.js
+@@ -823,6 +823,11 @@ res.redirect = function redirect(url) {
+     address = arguments[1]
+   }
+ 
++  // accept URL objects, using their href
++  if (address instanceof URL) {
++    address = address.href;
++  }
++
+   if (!address) {
+     deprecate('Provide a url argument');
+   }

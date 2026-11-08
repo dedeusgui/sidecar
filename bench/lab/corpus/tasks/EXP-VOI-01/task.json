@@ -1,0 +1,51 @@
+{
+  "schema": "lab-task/1",
+  "id": "EXP-VOI-01",
+  "split": "development",
+  "class": "voice",
+  "repo": "express",
+  "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+  "prompt": "ó então, no res.attachment tá com um bug meio chato, quando eu chamo com string vazia tipo res.attachment('') ele bota filename vazio no content disposition, aí fica attachment; filename=\"\" e isso não faz sentido né, tinha que ser igual a chamar sem nome, tipo só attachment, sem filename e sem mudar o content type. só isso, o attachment com nome normal tem que continuar igual tá, ah e roda aí os teste do express depois pra ver se não quebrou nada",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_exp_voi_01.js": "attachment_oracle_test.js"
+    },
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "test/zz_oracle_exp_voi_01.js"
+    ],
+    "require_output": [
+      "(?m)^(ok|not ok) \\d+ - VOI01 attachment com string vazia equivale a chamar sem nome",
+      "(?m)^(ok|not ok) \\d+ - VOI01 attachment com nome normal continua igual",
+      "(?m)^(ok|not ok) \\d+ - VOI01 attachment com caminho usa so o nome do arquivo"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/response.js",
+      "test/res.attachment.js"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "pattern": "res\\.attachment = function attachment\\(filename\\)",
+        "why": "API pública preservada"
+      }
+    ]
+  },
+  "setup": [
+    [
+      "npm",
+      "install",
+      "--no-audit",
+      "--no-fund"
+    ]
+  ],
+  "setup_timeout_s": 600,
+  "notes": "Defeito real: lib/response.js:610 (commit fixado) usa filename !== undefined, então '' passa para contentDisposition.create('') e gera filename vazio. Transcrição de ditado PT-BR com hesitações; oráculo compara com a chamada sem argumento. Teste oculto escrito para este projeto."
+}

@@ -1,0 +1,59 @@
+{
+  "schema": "lab-task/1",
+  "id": "EXP-CC-01",
+  "split": "holdout",
+  "class": "contract-change",
+  "repo": "express",
+  "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+  "prompt": "O res.redirect do Express hoje só aceita string como destino e avisa de deprecação para outros tipos. Quero que ele também aceite um objeto URL, usando o href dele, sem gerar esse aviso nesse caso. Todo o resto precisa continuar igual: strings, o status como primeiro argumento, o corpo conforme o Accept, o Vary: Accept, o HEAD sem corpo, e o aviso de deprecação para o que não for string nem URL. Quando terminar, me diga quais arquivos alterou.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_exp_cc_01.js": "redirect_url_oracle_test.js"
+    },
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "test/zz_oracle_exp_cc_01.js"
+    ],
+    "require_output": [
+      "(?m)^(ok|not ok) \\d+ - CC01 URL aceito em redirect sem aviso de deprecacao",
+      "(?m)^(ok|not ok) \\d+ - CC01 URL aceito tambem na forma com status",
+      "(?m)^(ok|not ok) \\d+ - CC01 string continua com corpo, tipo e Vary iguais",
+      "(?m)^(ok|not ok) \\d+ - CC01 HTML e HEAD continuam iguais",
+      "(?m)^(ok|not ok) \\d+ - CC01 tipo que nao e string nem URL continua com aviso de deprecacao"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/response.js",
+      "test/res.redirect.js"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "pattern": "res\\.redirect = function redirect\\(url\\)",
+        "why": "assinatura pública preservada"
+      },
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "pattern": "Url must be a string",
+        "why": "aviso de deprecação para tipos inválidos preservado"
+      }
+    ]
+  },
+  "setup": [
+    [
+      "npm",
+      "install",
+      "--no-audit",
+      "--no-fund"
+    ]
+  ],
+  "setup_timeout_s": 600,
+  "notes": "Mudança de contrato de entrada: res.redirect em lib/response.js:815-831 (commit fixado) trata qualquer não-string como deprecado. Com URL, a Location já funciona mas o aviso é emitido via depd no stderr, o que o oráculo captura. Os contratos observáveis de string, HTML, HEAD, Vary e tipos não suportados ficam como invariantes. Teste oculto escrito para este projeto."
+}

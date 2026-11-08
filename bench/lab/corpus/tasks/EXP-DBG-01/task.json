@@ -1,0 +1,52 @@
+{
+  "schema": "lab-task/1",
+  "id": "EXP-DBG-01",
+  "split": "validation",
+  "class": "debug",
+  "repo": "express",
+  "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+  "prompt": "Achei um problema no cabeçalho Link do Express. Se eu chamo res.links() com um objeto vazio, ou ele deixa uma vírgula sobrando no fim do Link que já existia, ou cria um Link vazio quando não havia nenhum. Dá uma olhada, descobre a causa e corrige. Com links não vazios, o comportamento tem que continuar igual, e não quero mudar a API pública. Ao final, me explica em duas frases o que estava errado.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "test/zz_oracle_exp_dbg_01.js": "links_oracle_test.js"
+    },
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "test/zz_oracle_exp_dbg_01.js"
+    ],
+    "require_output": [
+      "(?m)^(ok|not ok) \\d+ - DBG01 links vazios nao alteram Link existente",
+      "(?m)^(ok|not ok) \\d+ - DBG01 links vazios sem Link previo nao criam cabecalho",
+      "(?m)^(ok|not ok) \\d+ - DBG01 links nao vazios continuam acumulando entradas",
+      "(?m)^(ok|not ok) \\d+ - DBG01 links com array de valores continua funcionando"
+    ],
+    "timeout_s": 300
+  },
+  "scope": {
+    "allowed_paths": [
+      "lib/response.js",
+      "test/res.links.js"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "lib/response.js",
+        "pattern": "res\\.links = function\\(links\\)",
+        "why": "API pública preservada"
+      }
+    ]
+  },
+  "setup": [
+    [
+      "npm",
+      "install",
+      "--no-audit",
+      "--no-fund"
+    ]
+  ],
+  "setup_timeout_s": 600,
+  "notes": "Defeito real: lib/response.js:98-101 (commit fixado). Com objeto vazio, Object.keys(...).map produz '' e o código ainda anexa ', ' ao Link existente, deixando vírgula sobrando; sem Link prévio, define Link vazio. Verificado por requisição HTTP antes de escrever o oráculo. Teste oculto escrito para este projeto."
+}
