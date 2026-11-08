@@ -16,12 +16,22 @@ type Tuning struct {
 	OwnConfSpan float64 `json:"own_conf_span"`
 	// MinBlockConfidence is the abstention gate: no block is sent unless one item reaches it.
 	MinBlockConfidence float64 `json:"min_block_confidence"`
+	// LongPromptTerms and LongPromptMinSupport are the length-aware specificity rule: a prompt with at
+	// least LongPromptTerms distinct terms needs LongPromptMinSupport matched terms before a candidate
+	// may open the block on its own. LongPromptTerms 0 disables the rule (the shipped default until a
+	// replay on frozen external sets shows it helps without losing recall).
+	LongPromptTerms      float64 `json:"long_prompt_terms"`
+	LongPromptMinSupport float64 `json:"long_prompt_min_support"`
+	// LongPromptExemptCoverage exempts a candidate whose salience-weighted coverage (rare terms weigh
+	// more, see conceptSalience) reaches this value: a few rare matches are specific evidence even in a
+	// long prompt. 0 means no exemption.
+	LongPromptExemptCoverage float64 `json:"long_prompt_exempt_coverage"`
 }
 
 // DefaultTuning returns the shipped parameters. It is the single source for the constants below.
 func DefaultTuning() Tuning {
 	return Tuning{OwnCoverCap: ownCoverCap, OwnAltWeight: ownAltWeight, OwnConfBase: 0.3, OwnConfSpan: 0.6,
-		MinBlockConfidence: minBlockConfidence}
+		MinBlockConfidence: minBlockConfidence, LongPromptTerms: 0, LongPromptMinSupport: 0, LongPromptExemptCoverage: 0}
 }
 
 // Valid reports whether the parameters are usable; replay rejects invalid variants instead of running them.
@@ -29,7 +39,7 @@ func (t Tuning) Valid() bool {
 	ok := func(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 }
 	return ok(t.OwnCoverCap) && t.OwnCoverCap >= 1 && ok(t.OwnAltWeight) && t.OwnAltWeight <= 2 &&
 		ok(t.OwnConfBase) && ok(t.OwnConfSpan) && t.OwnConfBase+t.OwnConfSpan <= 0.95 &&
-		ok(t.MinBlockConfidence) && t.MinBlockConfidence <= 1
+		ok(t.MinBlockConfidence) && t.MinBlockConfidence <= 1 && ok(t.LongPromptTerms) && ok(t.LongPromptMinSupport) && ok(t.LongPromptExemptCoverage)
 }
 
 func tuningOrDefault(t *Tuning) Tuning {

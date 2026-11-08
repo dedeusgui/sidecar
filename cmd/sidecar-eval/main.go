@@ -166,6 +166,7 @@ func main() {
 		{"lexical + grafo + git", retrieveRun(retrieve.Ablation{})},
 		{"v2.1 (intent router)", retrieveRunWith(retrieve.Options{IntentRouting: true})},
 		{"v2 (intent + contract + packer)", retrieveRunWith(retrieve.Options{EngineVersion: "v2"})},
+		{"v2 adaptive (policy)", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Adaptive: true})},
 		{"v2 sem intent", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoIntent: true}})},
 		{"v2 sem contract", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoContract: true}})},
 		{"v2 sem packer", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoPacker: true}})},

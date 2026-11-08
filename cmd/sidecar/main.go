@@ -288,7 +288,8 @@ func cmdExplain(args []string, in io.Reader, out, errOut io.Writer) int {
 	}
 	abs, _ := filepath.Abs(*root)
 	rootDir, _ := repo.FindRoot(abs)
-	opts := retrieve.Options{EngineVersion: *engine, Profile: os.Getenv("SIDECAR_PROFILE")}
+	opts := retrieve.Options{EngineVersion: *engine, Profile: os.Getenv("SIDECAR_PROFILE"),
+		Adaptive: *engine == "v2" && retrieve.FeatureEnabled("adaptive")}
 	rep, err := app.Explain(rootDir, strings.TrimSpace(string(prompt)), opts)
 	if err != nil {
 		_, _ = fmt.Fprintln(errOut, "erro:", err)
