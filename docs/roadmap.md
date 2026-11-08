@@ -1,6 +1,8 @@
 # Roadmap consolidado — Sidecar V2, produto completo
 
-**Atualização:** 2026-11-06 · **Estado:** plano de implementação, NÃO prova de funcionalidades concluídas.
+**Atualização de direção:** 2026-11-08. **Fonte operacional prioritária a partir do PR #6:** [roadmap-next-iterations.md](roadmap-next-iterations.md) — rodadas R1–R7 para avaliação de qualidade de patch, retrieval adaptativo, Task Evidence Brief, Task Grooming, impacto/verificação, sessões e Studio. O histórico abaixo (rodadas A–E/W0–W10) permanece para rastreabilidade; seus status datados não devem ser lidos como estado atual sem consultar Git e os relatórios de avaliação.
+
+**Última consolidação detalhada das rodadas históricas:** 2026-11-06. **Estado:** arquitetura e plano de implementação, NÃO prova de funcionalidades concluídas.
 **Fonte arquitetural:** [product-v2.md](product-v2.md) · **Reuso e licenças:** [reference-implementations.md](reference-implementations.md) · **Medição:** [evaluation-plan.md](evaluation-plan.md).
 
 ## 0. Direção irrevogável do produto
@@ -160,3 +162,20 @@ Cada PR deve atualizar `AGENTS.md`/docs pertinentes, adicionar testes, anotar up
 Cada feature só muda o default após um PR que contenha: hipótese → referência upstream e licença → diff → testes locais/CI → métricas **antes e depois** → regressões adversas → documentação → reversão. Se um experimento falhar, substituí-lo sem abrir mão da capacidade essencial correspondente do produto.
 
 **V2 pronta** significa produto **integrado, instalável, testado e auditável**, não a soma de módulos que compilaram isoladamente.
+
+
+## 7. Continuidade após o PR #6 — encaminhamento aos próximos agentes (2026-11-08)
+
+**Não abrir uma V3 nem reimplementar a V2.** Continuar a partir do código integrado e da matriz operacional em [roadmap-next-iterations.md](roadmap-next-iterations.md). O PR #6 é um marco **parcial**, não a conclusão do Evaluation Lab ou promoção automática da V2. Consultar [eval-round2-2026-11-08.md](eval-round2-2026-11-08.md) e os logs de CI antes de declarar resultados.
+
+| Rodada nova | Reutiliza a rodada antiga | Próximo resultado verificável |
+|---|---|---|
+| R1 Evaluation Lab | A4, E1–E3, W9 | Corpus externo pinado + oráculos de edição, replay, perf, A/B agentic seguro |
+| R2 Context Policy | B2–B5, W2–W4 | Ativar componentes por necessidade, abster melhor, reduzir custo sem perda de recuperação |
+| R3 Task Evidence Brief | B1–B5, W2–W4 | Contexto de tarefa conciso, contrato e fonte, hipóteses separadas de fatos |
+| R4 Task Grooming | B2–B3, C5, W3/W6 | Identificar decisões de alto impacto não resolvidas e orientar perguntas seletivas |
+| R5 Impact & Verification | B3, D2, W3/W7 | Conservar contratos relevantes, blast radius, testes e escopo de patch |
+| R6 Session Intelligence | C1–C5, W5/W6 | Detectar estagnação e testar intervenções somente com evidência nova |
+| R7 Studio e distribuição | A1–A2, D1–D5, E3–E5, W0/W7/W8/W10 | Visualização local, adapters reais, release reversível |
+
+**Gate de mudança:** cada PR novo registra baseline, evidência, hipótese, implementação mínima, ablação, benchmark relevante e rollback. O objetivo primário é **custo e tempo por tarefa correta com regressões de contrato controladas**. Menos tool calls ou maior Hit@5, isoladamente, não bastam.
