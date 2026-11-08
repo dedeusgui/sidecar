@@ -14,10 +14,10 @@ Versionado; reconstruir o estado por Git + testes + este arquivo, não por memó
 | R1.6 scorecard unificado | `bench/scorecard.py` (OFF/ON) | seções por evidência, pareado, custo/correta | `lab.py report` + testes | ✅ |
 | R1.7 comparação OFF/V1/V2/componentes | OFF/ON | braços V1, V2; componentes dependem de R2–R5 | `lab.py run --arms OFF,V1,V2` | 🟡 piloto dev feito (§Piloto); componentes aguardam R2–R5 |
 | R2 Adaptive Context Engine | V2 com abstenção parcial | política por intenção, E17, termos genéricos | gates R2 | 🟡 rodada 1: [eval-r2](eval-r2-2026-11-08.md) — política `adaptive` opt-in (sem perda offline, −6/−16% tokens); H1 inconclusiva (flag off); H2 rejeitada; E17 = lacuna de dicionário. Gate de sucesso agentic pendente |
-| R3 Task Evidence Brief | `ContractEvidence`, packer | brief rastreável | gate R3 | ⬜ |
-| R4 TaskUncertainty / grooming | — | detector, política, decisões, benchmark | gate R4 | ⬜ |
+| R3 Task Evidence Brief | `ContractEvidence`, packer | brief rastreável | gate R3 | 🟡 [task-brief](task-brief.md): `SIDECAR_FEATURES=brief` opt-in; qualidade offline idêntica, tokens 417→340; piloto agentic: ver §Piloto R3 |
+| R4 TaskUncertainty / grooming | — | detector, política, decisões, benchmark | gate R4 | 🟡 [grooming](grooming.md): `SIDECAR_FEATURES=groom` opt-in; 0/17 perguntas desnecessárias, 8/11 corretas (fixture interna); benefício líquido não medido |
 | R5 Impact/Verification | `ContractEvidence` | blast radius, verificações | gate R5 | 🟡 [change-impact](change-impact.md): `sidecar impact` + nota opt-in; histórico real: 46%/63%/49% (chi/click/express) com 3–6 arquivos sinalizados; gate agentic pendente |
-| R6 Session Intelligence | `SessionObserver` passivo | traces, estagnação | gate R6 | ⬜ |
+| R6 Session Intelligence | `SessionObserver` passivo | traces, estagnação | gate R6 | 🟡 [session-intelligence](session-intelligence.md): classificação passiva + sombra + `sidecar progress` + métricas no lab; sem transporte de intervenção (gate pendente) |
 | R7 Studio/adapters/release | docs de integração | estático, matriz de suporte | gate R7 | ⬜ |
 
 ## Corpus (R1.1)

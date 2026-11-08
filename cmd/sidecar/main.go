@@ -18,6 +18,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/app"
 	"github.com/dedeusgui/sidecar/internal/install"
 	"github.com/dedeusgui/sidecar/internal/paths"
+	"github.com/dedeusgui/sidecar/internal/progress"
 	"github.com/dedeusgui/sidecar/internal/repo"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
@@ -53,6 +54,8 @@ func run(args []string, in io.Reader, out, errOut io.Writer) int {
 		return cmdExplain(rest, in, out, errOut)
 	case "impact":
 		return cmdImpact(rest, out, errOut)
+	case "progress":
+		return cmdProgress(rest, in, out, errOut)
 	case "observe":
 		return cmdObserve(rest, in)
 	case "memory":
@@ -535,6 +538,35 @@ func readOracleArtifact(path, keyPath string) (app.OracleArtifact, []byte, error
 		return art, nil, fmt.Errorf("oracle artifact: %w", err)
 	}
 	return art, key, nil
+}
+
+// cmdProgress classifies a recorded tool-event sequence (JSON lines {"kind","key","err"}) into useful
+// iteration, exploration and stagnation. It reads stdin only, runs nothing, and is how benchmark traces from
+// real agent runs are scored with the same code the passive observer uses.
+func cmdProgress(args []string, in io.Reader, out, errOut io.Writer) int {
+	fs := flag.NewFlagSet("progress", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	var events []progress.Event
+	dec := json.NewDecoder(io.LimitReader(in, 8<<20))
+	for dec.More() {
+		var raw struct {
+			Kind string `json:"kind"`
+			Key  string `json:"key"`
+			Err  string `json:"err"`
+		}
+		if err := dec.Decode(&raw); err != nil {
+			_, _ = fmt.Fprintln(errOut, "erro lendo eventos:", err)
+			return 1
+		}
+		events = append(events, progress.Event{Kind: raw.Kind, Key: raw.Key, Err: raw.Err})
+	}
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(progress.Analyze(events))
+	return 0
 }
 
 // cmdImpact prints what the current change touches: unchanged consumers, tests that name the changed
