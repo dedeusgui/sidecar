@@ -208,7 +208,11 @@ def main():
                             check=True, capture_output=True, text=True).stdout.strip()
     if not clean(args.repo):
         sys.exit("repositório de origem tem alterações; use um checkout limpo")
-    jobs = [(c, arm, rep) for c in cases for rep in range(args.reps) for arm in ("OFF", "ON")]
+    # Pares adjacentes com ordem AB/BA alternada, para que o efeito de posição não recaia sempre sobre um braço.
+    jobs = []
+    for k, (c, rep) in enumerate((c, rep) for c in cases for rep in range(args.reps)):
+        arms = ("OFF", "ON") if k % 2 == 0 else ("ON", "OFF")
+        jobs += [(c, arm, rep) for arm in arms]
     reserved = len(jobs) * args.max_budget
     print(f"plano: {len(cases)} casos × 2 braços × {args.reps} rep = {len(jobs)} execuções; "
           f"modelo {args.model}; teto reservado US$ {reserved:.2f} (limite total US$ {args.total_budget:.2f})")
