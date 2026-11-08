@@ -1,0 +1,77 @@
+{
+  "schema": "lab-task/1",
+  "id": "CLK-H3",
+  "split": "holdout",
+  "class": "edit",
+  "repo": "click",
+  "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+  "prompt": "No bash, tenho uma opção --pair com nargs=2, do tipo click.Choice com `-1`, `-2`, `x` e `y`. Quando eu já digitei `--pair -1` e aperto Tab para o segundo valor, o click sugere nomes de opções em vez de `-1`, `-2`, `x` e `y`. O primeiro valor começa com `-`, mas é valor, porque o parser consome os dois valores depois do nome da opção. Corrija isso para o segundo valor ser completado normalmente, inclusive quando eu já digitei `x`. Quando a palavra que estou digitando começa com `-`, continua valendo sugerir nomes de opções. Depois de um par completo, como `--pair -2 -1`, ou de uma opção de um valor, como `--level -1`, a autocompletação deve seguir para os argumentos posicionais. Não altere a API pública. Ao terminar, descreva brevemente o que fez.",
+  "oracle": {
+    "kind": "tests",
+    "files": {
+      "tests/test_zz_clk_h3_oracle.py": "multi_value_dash_oracle_test.py"
+    },
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "-v",
+      "tests/test_zz_clk_h3_oracle.py"
+    ],
+    "require_output": [
+      "test_second_value_after_dash_first_value_completes_choices\\s+(PASSED|FAILED)",
+      "test_second_value_after_dash_first_value_is_filtered_by_prefix\\s+(PASSED|FAILED)",
+      "test_dash_word_after_dash_first_value_still_lists_option_names\\s+(PASSED|FAILED)",
+      "test_second_value_after_plain_first_value_completes_choices\\s+(PASSED|FAILED)",
+      "test_complete_pair_with_dash_values_moves_to_arguments\\s+(PASSED|FAILED)",
+      "test_single_value_option_with_dash_value_moves_to_arguments\\s+(PASSED|FAILED)",
+      "test_dash_second_value_completes_pair_and_moves_to_arguments\\s+(PASSED|FAILED)"
+    ],
+    "timeout_s": 300
+  },
+  "setup": [
+    [
+      "python3",
+      "-m",
+      "venv",
+      ".venv"
+    ],
+    [
+      "./.venv/bin/pip",
+      "install",
+      "-q",
+      "-e",
+      ".",
+      "pytest"
+    ]
+  ],
+  "scope": {
+    "allowed_paths": [
+      "src/click/shell_completion.py",
+      "tests/test_shell_completion.py"
+    ],
+    "invariants": [
+      {
+        "type": "regex_present",
+        "path": "src/click/shell_completion.py",
+        "pattern": "def _is_incomplete_option\\(",
+        "why": "_is_incomplete_option preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/shell_completion.py",
+        "pattern": "class BashComplete\\(ShellComplete\\):",
+        "why": "BashComplete preservado"
+      },
+      {
+        "type": "regex_present",
+        "path": "src/click/shell_completion.py",
+        "pattern": "def get_completions\\(",
+        "why": "API pública get_completions preservada"
+      }
+    ]
+  },
+  "notes": "Defeito real em src/click/shell_completion.py (commit fixado), função _is_incomplete_option (~linhas 666-688). Ela procura o último argumento que começa com o caractere de opção e só então compara com param.opts. Com nargs=2, um primeiro valor como '-1' é tomado como nome de opção, não é reconhecido como spelling de --pair e o segundo valor deixa de ser completado. O parser (_get_value_from_state, nargs>1) consome os valores sem checar o hífen, então a checagem da completação diverge do parser. Correção de referência: procurar um spelling da opção nos últimos nargs args. Testes escritos do zero. Split holdout: só validada, nunca executada com agente."
+}

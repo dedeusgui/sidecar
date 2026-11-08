@@ -22,7 +22,7 @@
       }
     ],
     "isolation": "unshare-net",
-    "detail": "rd/mixed_exact_and_wildcard_entries (0.00s)\n    --- PASS: TestBenchmarkAllowContentTypeWildcard/mixed_entries_still_reject_unknown (0.00s)\n    --- PASS: TestBenchmarkAllowContentTypeWildcard/missing_content_type_with_body_is_rejected (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.003s\nFAIL\n"
+    "detail": "rd/mixed_exact_and_wildcard_entries (0.00s)\n    --- PASS: TestBenchmarkAllowContentTypeWildcard/mixed_entries_still_reject_unknown (0.00s)\n    --- PASS: TestBenchmarkAllowContentTypeWildcard/missing_content_type_with_body_is_rejected (0.00s)\nFAIL\nFAIL\tgithub.com/go-chi/chi/v5/middleware\t0.004s\nFAIL\n"
   },
   "reference": {
     "kind": "tests",
@@ -49,6 +49,6 @@
     "isolation": "unshare-net",
     "detail": ""
   },
-  "ts": 1794175630.7456546,
+  "ts": 1794175901.0188506,
   "base_verdict": "fail"
 }
