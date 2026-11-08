@@ -2,6 +2,10 @@
 
 > Fonte única de instruções de desenvolvimento deste repositório. Leia antes de alterar código, testes, benchmarks, documentação ou distribuição. Não confunda estas instruções para **contribuir no Sidecar** com instruções que o Sidecar injeta nos repositórios dos usuários.
 
+## Campanha atual: Sidecar V3 (read-first para Codex)
+
+Após os PRs #6–#18, a baseline de código é a V1/V2 existente (PR #18 mergeado). A campanha V3 está especificada em [docs/v3/README.md](docs/v3/README.md), com [avaliação/gates](docs/v3/evaluation-protocol.md), [referências upstream pinadas](docs/v3/upstream-references.md) e [handoff executável para Codex](docs/v3/CODEX-HANDOFF.md). **Ler os quatro antes de iniciar trabalho V3**; este AGENTS.md prevalece nos invariantes de privacidade, segurança, legalidade, validação e merges. As metas V3 não são resultados comprovados. O [roadmap de R1–R7](docs/roadmap-next-iterations.md) permanece histórico para a V2.
+
 ## Missão e limites
 
 Sidecar é uma camada de **recuperação local, automática e econômica de contexto de código** para agentes. Indexa o repositório encontrado, recupera evidências relevantes para o prompt e entrega contexto via hooks sem modificar o prompt original ou bloquear o agente.
