@@ -1,0 +1,1986 @@
+{
+  "repos": {
+    "spring-petclinic": {
+      "path": "spring-petclinic",
+      "commit": "500158f732419217507c7656904b8e6aa1bcc0d6",
+      "source": "https://github.com/spring-projects/spring-petclinic",
+      "license": "Apache-2.0"
+    },
+    "chi": {
+      "path": "chi",
+      "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+      "source": "https://github.com/go-chi/chi",
+      "license": "MIT"
+    },
+    "click": {
+      "path": "click",
+      "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+      "source": "https://github.com/pallets/click",
+      "license": "BSD-3-Clause"
+    },
+    "hono": {
+      "path": "hono",
+      "commit": "eb754bd5ef22c63f1634a4c374a86be086f85710",
+      "source": "https://github.com/honojs/hono",
+      "license": "MIT"
+    },
+    "serde-json": {
+      "path": "serde-json",
+      "commit": "8c535a260ce561eaab4111aafc29038eb9f77ff3",
+      "source": "https://github.com/serde-rs/json",
+      "license": "MIT OR Apache-2.0"
+    },
+    "sinatra": {
+      "path": "sinatra",
+      "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+      "source": "https://github.com/sinatra/sinatra",
+      "license": "MIT"
+    },
+    "monolog": {
+      "path": "monolog",
+      "commit": "3bed304b1905fed5c30d172872f4d890cbb03c6a",
+      "source": "https://github.com/Seldaek/monolog",
+      "license": "MIT"
+    },
+    "kotlinx-datetime": {
+      "path": "kotlinx-datetime",
+      "commit": "77c95cc8125015f83ea8fd900404c295fba7276e",
+      "source": "https://github.com/Kotlin/kotlinx-datetime",
+      "license": "Apache-2.0"
+    },
+    "dapper": {
+      "path": "dapper",
+      "commit": "eb47546a408bbf6c178bda4f04dc205bc51ffbfe",
+      "source": "https://github.com/DapperLib/Dapper",
+      "license": "Apache-2.0"
+    },
+    "express": {
+      "path": "express",
+      "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+      "source": "https://github.com/expressjs/express",
+      "license": "MIT"
+    }
+  },
+  "cases": [
+    {
+      "id": "HN-dev-01@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-01@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-01@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-01@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-01@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-01@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-01@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-01@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-01@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-01@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "como faço pão de fermentação natural em casa?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-02@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "qual é a melhor forma de guardar sobras de comida na geladeira?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-03@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "me indica um filme de comédia leve pra assistir hoje",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-04@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "quanto tempo leva para cozinhar arroz integral na panela de pressão?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-05@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "how do I change the oil filter on a 2010 honda civic?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-06@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "what time does the store open on sundays near downtown?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-07@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "preciso de uma lista de exercícios para fazer em casa sem equipamento",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-08@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "qual o melhor horário para plantar tomate na primavera?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-09@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "como cuidar de uma planta suculenta que está murchando?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@spring-petclinic",
+      "split": "dev",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@chi",
+      "split": "dev",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@click",
+      "split": "dev",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@hono",
+      "split": "dev",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@serde-json",
+      "split": "dev",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@sinatra",
+      "split": "dev",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@monolog",
+      "split": "dev",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@kotlinx-datetime",
+      "split": "dev",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@dapper",
+      "split": "dev",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-dev-10@express",
+      "split": "dev",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "meu filho está com febre, quando devo levar ao pronto socorro?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@spring-petclinic",
+      "split": "validation",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@chi",
+      "split": "validation",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@click",
+      "split": "validation",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@hono",
+      "split": "validation",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@serde-json",
+      "split": "validation",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@sinatra",
+      "split": "validation",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@monolog",
+      "split": "validation",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@kotlinx-datetime",
+      "split": "validation",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@dapper",
+      "split": "validation",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-01@express",
+      "split": "validation",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "como faço para mudar o estado da minha conta de luz?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@spring-petclinic",
+      "split": "validation",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@chi",
+      "split": "validation",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@click",
+      "split": "validation",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@hono",
+      "split": "validation",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@serde-json",
+      "split": "validation",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@sinatra",
+      "split": "validation",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@monolog",
+      "split": "validation",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@kotlinx-datetime",
+      "split": "validation",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@dapper",
+      "split": "validation",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-02@express",
+      "split": "validation",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "qual a rota mais rápida de ônibus para o centro da cidade?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@spring-petclinic",
+      "split": "validation",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@chi",
+      "split": "validation",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@click",
+      "split": "validation",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@hono",
+      "split": "validation",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@serde-json",
+      "split": "validation",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@sinatra",
+      "split": "validation",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@monolog",
+      "split": "validation",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@kotlinx-datetime",
+      "split": "validation",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@dapper",
+      "split": "validation",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-03@express",
+      "split": "validation",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "quais são os melhores tênis para correr na chuva?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@spring-petclinic",
+      "split": "validation",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@chi",
+      "split": "validation",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@click",
+      "split": "validation",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@hono",
+      "split": "validation",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@serde-json",
+      "split": "validation",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@sinatra",
+      "split": "validation",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@monolog",
+      "split": "validation",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@kotlinx-datetime",
+      "split": "validation",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@dapper",
+      "split": "validation",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-04@express",
+      "split": "validation",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "como escrevo uma carta de apresentação para um estágio?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@spring-petclinic",
+      "split": "validation",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@chi",
+      "split": "validation",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@click",
+      "split": "validation",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@hono",
+      "split": "validation",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@serde-json",
+      "split": "validation",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@sinatra",
+      "split": "validation",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@monolog",
+      "split": "validation",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@kotlinx-datetime",
+      "split": "validation",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@dapper",
+      "split": "validation",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-05@express",
+      "split": "validation",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "I want to know the natural history of octopuses in the wild",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@spring-petclinic",
+      "split": "validation",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@chi",
+      "split": "validation",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@click",
+      "split": "validation",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@hono",
+      "split": "validation",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@serde-json",
+      "split": "validation",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@sinatra",
+      "split": "validation",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@monolog",
+      "split": "validation",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@kotlinx-datetime",
+      "split": "validation",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@dapper",
+      "split": "validation",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-06@express",
+      "split": "validation",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "what is a good value for a first home down payment?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@spring-petclinic",
+      "split": "validation",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@chi",
+      "split": "validation",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@click",
+      "split": "validation",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@hono",
+      "split": "validation",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@serde-json",
+      "split": "validation",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@sinatra",
+      "split": "validation",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@monolog",
+      "split": "validation",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@kotlinx-datetime",
+      "split": "validation",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@dapper",
+      "split": "validation",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-07@express",
+      "split": "validation",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "quero um roteiro de viagem de três dias em Lisboa com crianças",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@spring-petclinic",
+      "split": "validation",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@chi",
+      "split": "validation",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@click",
+      "split": "validation",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@hono",
+      "split": "validation",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@serde-json",
+      "split": "validation",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@sinatra",
+      "split": "validation",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@monolog",
+      "split": "validation",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@kotlinx-datetime",
+      "split": "validation",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@dapper",
+      "split": "validation",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-validation-08@express",
+      "split": "validation",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "a temperatura ideal para assar frango com batata no forno?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@spring-petclinic",
+      "split": "holdout",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@chi",
+      "split": "holdout",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@click",
+      "split": "holdout",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@hono",
+      "split": "holdout",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@serde-json",
+      "split": "holdout",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@sinatra",
+      "split": "holdout",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@monolog",
+      "split": "holdout",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@kotlinx-datetime",
+      "split": "holdout",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@dapper",
+      "split": "holdout",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-01@express",
+      "split": "holdout",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "quais são as regras de um jogo de xadrez para iniciantes?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@spring-petclinic",
+      "split": "holdout",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@chi",
+      "split": "holdout",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@click",
+      "split": "holdout",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@hono",
+      "split": "holdout",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@serde-json",
+      "split": "holdout",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@sinatra",
+      "split": "holdout",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@monolog",
+      "split": "holdout",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@kotlinx-datetime",
+      "split": "holdout",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@dapper",
+      "split": "holdout",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-02@express",
+      "split": "holdout",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "o que é o sistema de tarifas do metrô de Nova York?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@spring-petclinic",
+      "split": "holdout",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@chi",
+      "split": "holdout",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@click",
+      "split": "holdout",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@hono",
+      "split": "holdout",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@serde-json",
+      "split": "holdout",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@sinatra",
+      "split": "holdout",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@monolog",
+      "split": "holdout",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@kotlinx-datetime",
+      "split": "holdout",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@dapper",
+      "split": "holdout",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-03@express",
+      "split": "holdout",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "onde posso comprar sementes de girassol orgânicas perto de mim?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@spring-petclinic",
+      "split": "holdout",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@chi",
+      "split": "holdout",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@click",
+      "split": "holdout",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@hono",
+      "split": "holdout",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@serde-json",
+      "split": "holdout",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@sinatra",
+      "split": "holdout",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@monolog",
+      "split": "holdout",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@kotlinx-datetime",
+      "split": "holdout",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@dapper",
+      "split": "holdout",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-04@express",
+      "split": "holdout",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "how do I write a cover letter that stands out for a designer role?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@spring-petclinic",
+      "split": "holdout",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@chi",
+      "split": "holdout",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@click",
+      "split": "holdout",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@hono",
+      "split": "holdout",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@serde-json",
+      "split": "holdout",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@sinatra",
+      "split": "holdout",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@monolog",
+      "split": "holdout",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@kotlinx-datetime",
+      "split": "holdout",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@dapper",
+      "split": "holdout",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-05@express",
+      "split": "holdout",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "meu cachorro não quer comer ração nova, o que faço?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@spring-petclinic",
+      "split": "holdout",
+      "repo": "spring-petclinic",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@chi",
+      "split": "holdout",
+      "repo": "chi",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@click",
+      "split": "holdout",
+      "repo": "click",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@hono",
+      "split": "holdout",
+      "repo": "hono",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@serde-json",
+      "split": "holdout",
+      "repo": "serde-json",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@sinatra",
+      "split": "holdout",
+      "repo": "sinatra",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@monolog",
+      "split": "holdout",
+      "repo": "monolog",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@kotlinx-datetime",
+      "split": "holdout",
+      "repo": "kotlinx-datetime",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@dapper",
+      "split": "holdout",
+      "repo": "dapper",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    },
+    {
+      "id": "HN-holdout-06@express",
+      "split": "holdout",
+      "repo": "express",
+      "category": "negative",
+      "prompt": "qual é a diferença entre um cartório e um tabelionato?",
+      "relevant": []
+    }
+  ]
+}
