@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dedeusgui/sidecar/internal/index"
@@ -44,8 +45,8 @@ func stats(xs []float64) stageStats {
 // runPerf times the in-process retrieval pipeline stage by stage using Trace.Timings, cold then warm.
 // Percentiles from fewer than 100 samples are indicative only; the report states the sample count.
 func runPerf(cf casesFile, indexes map[string]*index.Index, warm int, outPath string) error {
-	cold := map[string]map[string][]float64{"v1": {}, "v2": {}}
-	hot := map[string]map[string][]float64{"v1": {}, "v2": {}}
+	cold := map[string]map[string][]float64{"v1": {}, "v2": {}, "v2-adaptive": {}}
+	hot := map[string]map[string][]float64{"v1": {}, "v2": {}, "v2-adaptive": {}}
 	add := func(m map[string][]float64, tr retrieve.Trace, wall time.Duration) {
 		for st, d := range tr.Timings {
 			m[st] = append(m[st], float64(d.Microseconds())/1000)
@@ -55,8 +56,8 @@ func runPerf(cf casesFile, indexes map[string]*index.Index, warm int, outPath st
 	seenRepo := map[string]bool{}
 	for _, c := range cf.Cases {
 		ix := indexes[c.Repo]
-		for _, eng := range []string{"v1", "v2"} {
-			opts := retrieve.Options{EngineVersion: eng, Root: ix.Root()}
+		for _, eng := range []string{"v1", "v2", "v2-adaptive"} {
+			opts := retrieve.Options{EngineVersion: strings.TrimSuffix(eng, "-adaptive"), Adaptive: strings.HasSuffix(eng, "-adaptive"), Root: ix.Root()}
 			first := !seenRepo[c.Repo+eng]
 			seenRepo[c.Repo+eng] = true
 			for i := 0; i <= warm; i++ {
@@ -87,7 +88,7 @@ func runPerf(cf casesFile, indexes map[string]*index.Index, warm int, outPath st
 		rep.Samples[eng+"_warm_wall"] = len(hot[eng]["wall"])
 		rep.Samples[eng+"_cold_wall"] = len(cold[eng]["wall"])
 	}
-	for _, eng := range []string{"v1", "v2"} {
+	for _, eng := range []string{"v1", "v2", "v2-adaptive"} {
 		stages := make([]string, 0)
 		for st := range rep.Warm[eng] {
 			stages = append(stages, st)

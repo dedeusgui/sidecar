@@ -1,10 +1,29 @@
 {
   "version": "replay-config/1",
-  "note": "active espelha retrieve.DefaultTuning(); variantes e grade são hipóteses. Promover = editar active E os defaults juntos (go test + --replay-check guardam a deriva). Rollback = git revert dos dois.",
-  "active": {"own_cover_cap": 4, "own_alt_weight": 1, "own_conf_base": 0.3, "own_conf_span": 0.6, "min_block_confidence": 0.5},
-  "variants": {
-    "cap3": {"own_cover_cap": 3, "own_alt_weight": 1, "own_conf_base": 0.3, "own_conf_span": 0.6, "min_block_confidence": 0.5},
-    "gate55": {"own_cover_cap": 4, "own_alt_weight": 1, "own_conf_base": 0.3, "own_conf_span": 0.6, "min_block_confidence": 0.55}
+  "note": "R2: hipótese de especificidade por comprimento (long_prompt_*). active espelha DefaultTuning(); grade limitada.",
+  "active": {
+    "own_cover_cap": 4,
+    "own_alt_weight": 1,
+    "own_conf_base": 0.3,
+    "own_conf_span": 0.6,
+    "min_block_confidence": 0.5,
+    "long_prompt_terms": 0,
+    "long_prompt_min_support": 0,
+    "long_prompt_exempt_coverage": 0
   },
-  "grid": {"own_cover_cap": [4, 5], "own_alt_weight": [0.75, 1]}
+  "variants": {},
+  "grid": {
+    "long_prompt_terms": [
+      6
+    ],
+    "long_prompt_min_support": [
+      3
+    ],
+    "long_prompt_exempt_coverage": [
+      0,
+      0.15,
+      0.25,
+      0.35
+    ]
+  }
 }
