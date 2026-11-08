@@ -4,6 +4,8 @@ Base: `main` = `1ef08c729e2db170208347132453920c83a2df9f` (igual ao branch de tr
 
 Este documento registra o que está implementado, o que é só simulação, o que foi testado com agente real, o que está desatualizado e o que segue bloqueado. Não declara conclusão de workstreams que não foram executados.
 
+> Continuação em [eval-round2-2026-11-08.md](eval-round2-2026-11-08.md) (rodada 2 do PR #6).
+
 ## 1. Linha de base
 
 | Verificação | Antes das mudanças | Depois |
@@ -41,7 +43,7 @@ Este documento registra o que está implementado, o que é só simulação, o qu
 | 6 | Registros antigos com oráculo do autorrelato. | Dados anteriores podiam continuar influenciando o ranking. | **Migração v5→v6** (versionada, com teste): registros antigos viram `weak`, proveniência `legacy`, e deixam de ser aplicados. |
 | 7 | `docs/agent-feedback.md` dizia "decisão em aberto" sobre o oráculo de autorrelato, e a fórmula estava desatualizada. | Documentação contradizia o código. | **Corrigido:** seção reescrita; `development.md` atualizado. |
 | 8 | O braço ON do `run_agents.py` usa prefixo de prompt, não o hook do cliente. O caminho real estava atrás de `--real-hooks`, que não tem isolamento provado. | Ambiguidade sobre o que foi medido. | `--real-hooks` **continua desativado**. O hook real foi exercitado em `real_hook_pilot.py`, com entrega verificada no stream. |
-| 9 | **Falha de abstenção:** em um caso sem evidência ("pão de fermentação natural"), o hook entregou 1.307 caracteres de contexto ruidoso (confiança 0,95), por casar a palavra comum "natural". | Custo de tokens e risco de seguir ruído. Não mudou o desfecho desta amostra. | **Aberto.** Diagnosticado e reproduzível; a correção mexe no retrieval e exige A/B com `sidecar-eval`. Ver [agent-pilot-2026-11-08.md](agent-pilot-2026-11-08.md). |
+| 9 | **Falha de abstenção:** em um caso sem evidência ("pão de fermentação natural"), o hook entregou 1.307 caracteres de contexto ruidoso (confiança 0,95), por casar a palavra comum "natural". | Custo de tokens e risco de seguir ruído. | **Parcialmente corrigido na V2 (rodada 2):** cobertura sobre os termos do prompt; falsos positivos em negativos externos 39% → 16% (dev+validation). Modo residual: duas palavras genéricas que coincidem com código ainda passam. Ver [eval-round2-2026-11-08.md](eval-round2-2026-11-08.md). A V1 não foi alterada. |
 | 10 | As confianças de `explain --json` (0,95, 0,90) são constantes heurísticas, não calibradas. | Leitor pode interpretar como probabilidade. | Já documentado no código; **sem alteração** nesta rodada. |
 | 11 | `internal/lexical/cognates.go` não está gofmt-limpo no HEAD. | Ruído de formatação. | **Não tocado** (fora do escopo). |
 

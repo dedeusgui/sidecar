@@ -4,6 +4,8 @@
 
 Artefatos: [`bench/results/real-hook-pilot-2026-11-08/`](../bench/results/real-hook-pilot-2026-11-08/) (`runs.jsonl`, `run-metadata.json`, `agent-benchmark.md`, `diagnosis.md`, `pilot.log`).
 
+> **Atualização (2026-11-08, rodada 2):** este piloto foi executado **antes** do isolamento. A verificação posterior encontrou cerca de vinte plugins sincronizados da conta carregados no processo, com seus agentes e skills, o que contamina o braço OFF. Os números acima não devem ser usados como comparação. O piloto isolado está em [real-hook-pilot-isolated-2026-11-08](../bench/results/real-hook-pilot-isolated-2026-11-08/): 10 execuções, todas comparáveis, canário não disparado. O caso negativo ON ainda aparece com contexto, mas o texto do prompt está no checkout (a própria documentação do repositório o contém), então esse caso não é um teste limpo de abstenção. Ver [eval-round2-2026-11-08.md](eval-round2-2026-11-08.md).
+
 ## O que foi executado
 
 | Item | Valor |

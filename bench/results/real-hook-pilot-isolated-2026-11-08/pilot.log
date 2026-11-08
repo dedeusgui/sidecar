@@ -1,0 +1,13 @@
+plano: 5 casos × 2 braços × 1 rep = 10 execuções; modelo claude-haiku-5-5; teto reservado US$ 1.00 (limite total US$ 1.00)
+[1/10] OFF H01-weight rep0
+[2/10] ON H01-weight rep0
+[3/10] ON H02-migration rep0
+[4/10] OFF H02-migration rep0
+[5/10] OFF H03-trace rep0
+[6/10] ON H03-trace rep0
+[7/10] ON H04-model rep0
+[8/10] OFF H04-model rep0
+[9/10] OFF N01-negative rep0
+[10/10] ON N01-negative rep0
+custo medido: US$ 0.0578
+wrote /tmp/claude-0/-home-user-sidecar/8808f1b8-044b-526b-9b93-ae8a707e7fd4/scratchpad/pilot-2/agent-benchmark.md

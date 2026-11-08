@@ -141,7 +141,16 @@ sidecar feedback purge [--all]
 
 **Cobertura.** Testes em `internal/store/feedback_test.go` (pesos com valores exatos, níveis, padrões mais fracos, aplicação por nível, migração v5→v6), `internal/retrieve/feedback_retrieve_test.go` (feedback fraco não reordena), `internal/app/feedback_test.go` e `internal/app/feedback_oracle_test.go` (autorrelato de conclusão não é oráculo, proveniência e edição definem o nível, validação) e `cmd/sidecar/feedback_test.go`. **Não há medição de ROI com agente real.** Não existe ainda experimento que compare tarefas com e sem feedback histórico.
 
-**Pendente:** `evidence_presented` (exige registrar quais evidências foram apresentadas por sessão; hoje só há contagem), e o braço `NoFeedback` no `sidecar-eval`.
+**Integridade (2026-11-08, schema v7).** Duas lacunas foram fechadas:
+
+- **Apresentação.** O hook grava no estado do observador os pares caminho e símbolo que injetou, em hash. Um ID de feedback só conta como apresentado se a sessão tem esse par. Evidência não apresentada fica `weak`, mesmo com oráculo independente ou arquivo editado. Coluna `evidence_presented`.
+- **Proveniência do oráculo.** `harness` e `human` só entram com um **artefato de oráculo**: JSON gravado pelo harness, com HMAC-SHA256 sobre `schema, run_id, session_id, task_id, commit, oracle_sha256, status`, assinado com uma chave que fica fora do workspace do agente (`--harness-key`, mínimo de 16 bytes). O artefato precisa verificar, pertencer à sessão do relatório e apontar para o HEAD do worktree. Um relatório que declara `harness` ou `human` é recusado antes de qualquer escrita. Colunas `oracle_run_id`, `oracle_commit` e `oracle_sha256` guardam a identidade da execução.
+- **Recusas antes de gravar.** ID fora do índice, símbolo que o arquivo não tem, mesmo ID como útil e enganoso. Nada é gravado nesses casos.
+- **Níveis.** Forte exige apresentação e oráculo independente com resultado conhecido. Médio exige apresentação e edição na sessão. Teste final reprovado relatado pelo próprio agente não torna o registro forte.
+
+Limite: a chave do harness é responsabilidade de quem executa o harness. Se o agente puder ler a chave, o HMAC não prova nada. Isso é uma garantia de controle local, não criptografia de identidade.
+
+**Ainda não implementado:** `evidence_retrieved` e `evidence_selected`, que exigem registrar candidatos e seleção no pacote de contexto; hoje só há `presented`. O braço `NoFeedback` no `sidecar-eval` também continua pendente.
 
 ## Experimento inicial
 
