@@ -23,6 +23,7 @@ Exemplo:
 import argparse
 import hashlib
 import json
+import math
 import os
 import pathlib
 import shutil
@@ -63,7 +64,8 @@ def parse_stream(text):
     que foi carregado no processo (init), para detectar contaminação de configurações globais."""
     out = {"hook_started": False, "hook_delivered": False, "hook_context": "", "hook_names": [],
            "result": None, "is_error": None, "subtype": None, "cost_usd": None, "tokens_in": None,
-           "tokens_out": None, "tool_calls": 0, "turns": None, "served_models": None, "init": None,
+           "tokens_out": None, "input_uncached": None, "cache_read": None, "cache_create": None, "output": None,
+           "tool_result_tokens": None, "tool_calls": 0, "turns": None, "served_models": None, "init": None,
            "saw_result": False}
     texts = []
     for line in text.splitlines():
@@ -108,18 +110,36 @@ def parse_stream(text):
             out["result"] = d.get("result") if isinstance(d.get("result"), str) else None
             out["is_error"] = d.get("is_error")
             out["subtype"] = st or d.get("subtype")
-            out["cost_usd"] = d.get("total_cost_usd")
+            out["cost_usd"] = _nonnegative_number(d.get("total_cost_usd"))
             out["turns"] = d.get("num_turns")
             usage = d.get("usage") or {}
-            out["tokens_in"] = sum(int(usage.get(k) or 0) for k in
-                                   ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
-            out["tokens_out"] = int(usage.get("output_tokens") or 0)
+            if isinstance(usage, dict):
+                out["input_uncached"] = _token_count(usage, "input_tokens")
+                out["cache_read"] = _token_count(usage, "cache_read_input_tokens")
+                out["cache_create"] = _token_count(usage, "cache_creation_input_tokens")
+                out["output"] = _token_count(usage, "output_tokens")
+            input_counts = (out["input_uncached"], out["cache_read"], out["cache_create"])
+            out["tokens_in"] = sum(input_counts) if all(v is not None for v in input_counts) else None
+            out["tokens_out"] = out["output"]
             models = d.get("modelUsage")
             if isinstance(models, dict) and models:
                 out["served_models"] = sorted(models)
     if out["result"] is None and texts:
         out["result"] = texts[-1]
+    if not out["saw_result"]:
+        out["tool_calls"] = None
     return out
+
+
+def _token_count(usage, key):
+    value = usage.get(key)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def _nonnegative_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        return None
+    return value
 
 
 def contamination(parsed, canary_fired, requested_model):
@@ -219,6 +239,9 @@ def run_one(args, case, arm, rep, repo_path, commit, model, cfg_root):
             "init": parsed["init"], "canary_fired": canary_fired,
             "comparable": not reasons, "incomparable_reasons": reasons,
             "stream_error": parsed["is_error"] is True or parsed["subtype"] not in (None, "success"),
+            "input_uncached": parsed["input_uncached"], "cache_read": parsed["cache_read"],
+            "cache_create": parsed["cache_create"], "output": parsed["output"],
+            "tool_result_tokens": parsed["tool_result_tokens"], "resident_context_tokens": None,
             **ra.judge(case, files), **ra.attention(case, files, ctx, dest),
         }
         if arm == "OFF":

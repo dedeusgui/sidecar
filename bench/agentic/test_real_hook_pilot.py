@@ -53,6 +53,39 @@ class StreamTests(unittest.TestCase):
         self.assertEqual(p["tokens_out"], 66)
         self.assertEqual(p["result"], '{"files": ["release/handler.go"]}')
 
+    def test_usage_counters_keep_uncached_cache_read_cache_create_and_output_separate(self):
+        p = pilot.parse_stream(stream(None))
+        self.assertEqual((p["input_uncached"], p["cache_read"], p["cache_create"], p["output"]), (2, 0, 41533, 66))
+
+    def test_explicit_zero_usage_is_zero_but_missing_or_malformed_stays_unknown(self):
+        events = [json.loads(line) for line in stream(None).splitlines()]
+        result = events[-1]
+        result["usage"] = {"input_tokens": 0, "cache_creation_input_tokens": 0,
+                           "cache_read_input_tokens": 0, "output_tokens": 0}
+        zero = pilot.parse_stream("\n".join(json.dumps(e) for e in events))
+        self.assertEqual((zero["input_uncached"], zero["cache_read"], zero["cache_create"], zero["output"], zero["tokens_in"]),
+                         (0, 0, 0, 0, 0))
+
+        result["usage"] = {"input_tokens": 2}
+        missing = pilot.parse_stream("\n".join(json.dumps(e) for e in events))
+        self.assertEqual(missing["input_uncached"], 2)
+        self.assertIsNone(missing["cache_read"])
+        self.assertIsNone(missing["tokens_in"])
+        self.assertIsNone(missing["tokens_out"])
+
+        result["usage"] = {"input_tokens": "bad", "cache_creation_input_tokens": -1}
+        malformed = pilot.parse_stream("\n".join(json.dumps(e) for e in events))
+        self.assertIsNone(malformed["input_uncached"])
+        self.assertIsNone(malformed["cache_create"])
+        self.assertIsNone(malformed["tokens_in"])
+
+    def test_missing_usage_object_does_not_become_zero(self):
+        events = [json.loads(line) for line in stream(None).splitlines()]
+        del events[-1]["usage"]
+        parsed = pilot.parse_stream("\n".join(json.dumps(e) for e in events))
+        for key in ("input_uncached", "cache_read", "cache_create", "output", "tokens_in", "tokens_out"):
+            self.assertIsNone(parsed[key], key)
+
 
 class CommandTests(unittest.TestCase):
     def test_off_arm_registers_no_hook(self):

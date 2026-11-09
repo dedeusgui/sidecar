@@ -141,6 +141,21 @@ func TestNoEvidenceEditRequestIsUnknownNotAQuestion(t *testing.T) {
 	}
 }
 
+func TestQuotedImperativeDoesNotTriggerGroomingQuestion(t *testing.T) {
+	for _, p := range []string{
+		`What does "change the session TTL" mean? Only explain the request.`,
+		`A mensagem “corrija o valor” apareceu no log; explique o significado.`,
+	} {
+		rep := Analyze(p, retrieve.Result{})
+		if len(rep.Gaps) != 0 {
+			t.Errorf("quoted text must not create grooming gaps for %q: %+v", p, rep)
+		}
+		if d := Decide(rep, p, 0, DefaultPolicy()); d.Action != None {
+			t.Errorf("read-only prompt must not ask a grooming question for %q: %+v", p, d)
+		}
+	}
+}
+
 func TestMatchAnswer(t *testing.T) {
 	opts := []Option{{Label: "follow the code"}, {Label: "follow the document"}}
 	cases := map[string]int{"B": 1, "opção a": 0, "(b)": 1, "follow the document please": 1, "follow the code": 0,

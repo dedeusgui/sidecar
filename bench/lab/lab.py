@@ -28,6 +28,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 
 HERE = pathlib.Path(__file__).resolve().parent
 CORPUS = HERE / "corpus"
@@ -163,14 +164,34 @@ def load_task(tid):
     return task, tdir
 
 
-def build_manifest():
+def build_manifest(include_holdout=False):
     repos = load_repos()
     tasks = []
+    sealed_path = CORPUS / "manifest.json"
+    sealed = load_json(sealed_path) if sealed_path.is_file() and not include_holdout else None
+    sealed_tasks = {t["id"]: t for t in (sealed or {}).get("tasks", [])}
+    sealed_holdout = [t for t in sealed_tasks.values() if t.get("split") == "holdout"]
+    if not include_holdout and sealed is None:
+        raise LabError("manifesto selado ausente; atualização de inventário exige --include-holdout explícito")
+    if not include_holdout:
+        current_ids = {p.name for p in task_dirs()}
+        expected_non_holdout = {tid for tid, t in sealed_tasks.items() if t.get("split") != "holdout"}
+        if current_ids - set(sealed_tasks) or expected_non_holdout - current_ids:
+            raise LabError("inventário difere do manifesto selado; recusei ler tarefas fora do inventário congelado")
+        tasks.extend(sealed_holdout)
     for tdir in task_dirs():
+        if not include_holdout:
+            prior = sealed_tasks[tdir.name]
+            if prior.get("split") == "holdout":
+                continue
+            if sha256_file(tdir / "task.json") != prior.get("task_sha256"):
+                raise LabError(f"tarefa {tdir.name} mudou após o manifesto selado; atualizar exige revisão explícita do inventário")
         task = load_json(tdir / "task.json")
         errs = validate_task_schema(task, tdir)
         if errs:
             raise LabError(f"{tdir.name}: " + "; ".join(errs))
+        if not include_holdout and task["split"] == "holdout":
+            raise LabError(f"tarefa {tdir.name} mudou para holdout; atualização explícita do manifesto necessária")
         val = tdir / "validation.json"
         tasks.append({
             "id": task["id"], "split": task["split"], "class": task["class"], "repo": task["repo"],
@@ -180,12 +201,17 @@ def build_manifest():
             "validated": bool(val.is_file() and load_json(val).get("ok")),
         })
     by_split = {s: [t for t in tasks if t["split"] == s] for s in SPLITS}
-    holdout_prompts = sorted(load_json(TASKS / t["id"] / "task.json")["prompt"] for t in by_split["holdout"])
+    holdout_prompt_hash = (sealed or {}).get("holdout_prompts_sha256")
+    if include_holdout:
+        holdout_prompts = sorted(load_json(TASKS / t["id"] / "task.json")["prompt"] for t in by_split["holdout"])
+        holdout_prompt_hash = sha256_bytes("\n".join(holdout_prompts).encode())
+    if by_split["holdout"] and not holdout_prompt_hash:
+        raise LabError("hash do holdout ausente no manifesto selado")
     return {
         "schema": "lab-manifest/1", "repos": repos, "tasks": tasks,
         "counts": {s: len(v) for s, v in by_split.items()},
         "classes": {c: sum(1 for t in tasks if t["class"] == c) for c in CLASSES},
-        "holdout_prompts_sha256": sha256_bytes("\n".join(holdout_prompts).encode()),
+        "holdout_prompts_sha256": holdout_prompt_hash,
         "note": "holdout selado: use --final; acessos ficam em holdout_ledger.jsonl",
     }
 
@@ -306,6 +332,68 @@ def sandbox_prefix():
     if shutil.which("unshare") and subprocess.run(["unshare", "-rn", "true"], capture_output=True).returncode == 0:
         return ["unshare", "-rn"], "unshare-net"
     return [], "none"
+
+
+def _bind_specs(paths):
+    specs = []
+    for item in paths:
+        host, target = item if isinstance(item, (tuple, list)) else (item, item)
+        host = pathlib.Path(host).resolve()
+        target = pathlib.PurePosixPath(str(target))
+        if not host.exists() or not target.is_absolute() or ".." in target.parts:
+            raise LabError(f"agent filesystem sandbox recebeu mount inválido: {host} -> {target}")
+        specs.append((str(host), target.as_posix()))
+    return specs
+
+
+def agent_sandbox_command(argv, work, readonly_paths=(), writable_paths=(), sandbox_env=None):
+    """Executa o agente em uma raiz vazia: somente sistema, checkout e mounts explicitamente permitidos."""
+    bwrap = shutil.which("bwrap")
+    if sys.platform != "linux" or not bwrap:
+        raise LabError("agent filesystem sandbox indisponível: Linux com bwrap é obrigatório")
+    work = pathlib.Path(work).resolve()
+    if not work.is_dir():
+        raise LabError("agent filesystem sandbox exige checkout existente")
+    readonly = _bind_specs(readonly_paths)
+    writable = _bind_specs(writable_paths)
+    targets = [dest for _, dest in readonly + writable] + ["/work", "/agent-bin", "/home/agent"]
+    dirs = set()
+    for target in targets:
+        parent = pathlib.PurePosixPath(target).parent
+        while parent != pathlib.PurePosixPath("/"):
+            dirs.add(parent.as_posix())
+            parent = parent.parent
+    cmd = [bwrap, "--die-with-parent", "--unshare-pid", "--ro-bind", "/usr", "/usr",
+           "--symlink", "usr/bin", "/bin", "--symlink", "usr/lib", "/lib",
+           "--symlink", "usr/lib64", "/lib64", "--ro-bind", "/etc", "/etc",
+           "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/run"]
+    for directory in sorted(dirs, key=lambda p: (p.count("/"), p)):
+        cmd.extend(["--dir", directory])
+    cmd.extend(["--bind", str(work), "/work"])
+    for host, target in writable:
+        cmd.extend(["--bind", host, target])
+    for host, target in readonly:
+        cmd.extend(["--ro-bind", host, target])
+    cmd.extend(["--clearenv", "--setenv", "PATH", "/agent-bin", "--setenv", "HOME", "/home/agent",
+                "--setenv", "CLAUDE_CONFIG_DIR", "/agent-config", "--setenv", "SIDECAR_HOME", "/sidecar-home",
+                "--setenv", "TMPDIR", "/tmp", "--setenv", "LANG", "C.UTF-8", "--setenv", "CI", "1",
+                "--setenv", "GOTOOLCHAIN", "local", "--setenv", "GOPROXY", "off", "--setenv", "GOFLAGS", "-mod=mod",
+                "--chdir", "/work"])
+    for key, value in sorted((sandbox_env or {}).items()):
+        cmd.extend(["--setenv", key, str(value)])
+    cmd.extend(["--", *argv])
+    return cmd
+
+
+def verify_agent_sandbox():
+    """Preflight the actual bwrap mount setup before a paid agent run is accepted."""
+    with tempfile.TemporaryDirectory(prefix="lab-sandbox-check-") as work:
+        command = agent_sandbox_command(["/usr/bin/true"], work)
+        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()[-300:]
+            raise LabError(f"agent filesystem sandbox falhou no preflight: {detail}")
+    return "bwrap-restricted"
 
 
 def oracle_env(task):
@@ -456,6 +544,82 @@ def validate_task(tid, keep=False):
 
 # --------------------------------------------------------------------------- agents
 
+AGENT_BIN_COMMANDS = (
+    "claude", "git", "bash", "sh", "env", "ls", "cat", "head", "tail", "sed", "grep", "rg", "find", "timeout",
+    "go", "gofmt", "python", "python3", "pytest", "npm", "node", "yarn", "pnpm", "ruby", "bundle", "rake",
+    "cargo", "rustc", "mvn", "gradle", "php", "phpunit", "composer", "mkdir", "cp", "mv", "rm", "touch", "pwd",
+)
+
+
+def _inside(path, root):
+    try:
+        pathlib.Path(path).relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def agent_runtime_bin(root):
+    """Create a PATH with only named runtime/test commands; never include Sidecar or CodeGraph."""
+    root = pathlib.Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    mounts, env = [], {}
+    for name in AGENT_BIN_COMMANDS:
+        found = shutil.which(name)
+        if not found:
+            continue
+        executable = pathlib.Path(found).resolve()
+        if not executable.is_file():
+            continue
+        if _inside(executable, "/usr"):
+            target = str(executable)
+        elif name == "claude":
+            package = next((p for p in (executable.parent, *executable.parents) if (p / "package.json").is_file()), None)
+            if package:
+                target = "/agent-runtime/claude-package/" + executable.relative_to(package).as_posix()
+                mounts.append((package, "/agent-runtime/claude-package"))
+            else:
+                target = "/agent-runtime/claude"
+                mounts.append((executable, target))
+        elif name == "go":
+            code, goroot, _, timed_out = run([str(executable), "env", "GOROOT"], timeout=10)
+            if code == 0 and not timed_out and pathlib.Path(goroot.strip()).is_dir():
+                target = "/agent-runtime/go-root/bin/go"
+                mounts.append((pathlib.Path(goroot.strip()), "/agent-runtime/go-root"))
+                env["GOROOT"] = "/agent-runtime/go-root"
+            else:
+                target = "/agent-runtime/go"
+                mounts.append((executable, target))
+        else:
+            target = f"/agent-runtime/{name}"
+            mounts.append((executable, target))
+        link = root / name
+        if not link.exists() and not link.is_symlink():
+            link.symlink_to(target)
+    return root, mounts, env
+
+
+BASE_AGENT_TOOLS = ["Read", "Grep", "Glob", "Edit", "Write", "Bash(ls:*)"]
+TEST_RUNNER_TOOLS = {
+    "go": ["Bash(go test:*)"],
+    "python": ["Bash(pytest:*)", "Bash(python -m pytest:*)", "Bash(python3 -m pytest:*)"],
+    "javascript": ["Bash(npm test:*)", "Bash(npm run test:*)", "Bash(node --test:*)", "Bash(yarn test:*)", "Bash(pnpm test:*)"],
+    "ruby": ["Bash(bundle exec:*)", "Bash(rake test:*)"],
+    "rust": ["Bash(cargo test:*)"],
+    "java": ["Bash(mvn test:*)", "Bash(gradle test:*)", "Bash(./gradlew test:*)"],
+    "php": ["Bash(phpunit:*)", "Bash(vendor/bin/phpunit:*)", "Bash(composer test:*)"],
+}
+
+
+def tools_allow_for(task, requested=None):
+    """Stable effective tool list, equal across arms; explicit --tools-allow replaces defaults."""
+    if requested is not None:
+        values = requested.split(",") if isinstance(requested, str) else requested
+    else:
+        language = task.get("language") or load_repos().get(task.get("repo"), {}).get("language")
+        values = BASE_AGENT_TOOLS + TEST_RUNNER_TOOLS.get(language, [])
+    return list(dict.fromkeys(v.strip() for v in values if v and v.strip()))
+
 class ScriptedAgent:
     """Agente SIMULADO para testar a infraestrutura. Nunca é evidência de resultado agentic."""
     simulated = True
@@ -517,15 +681,101 @@ DEFAULT_FOLLOWUP = ("Revise o que você alterou: confirme que o pedido foi atend
                     "Responda em uma frase.")
 
 
-def followup_for(task):
-    """Segunda volta do protocolo de duas voltas: a fala do usuário simulado, definida pela tarefa e não pelo braço.
-    Tarefa ambígua: a resposta que o usuário daria se perguntado (`underspec.canned_answer`). Demais: uma revisão genérica,
-    igual para todos os braços (é nela que a nota de impacto aparece, pois há edições não commitadas)."""
+def assistant_questions(stream_text):
+    """Extract ephemeral, ordered assistant questions from stream-json; callers must not persist their text."""
+    questions = []
+    for line_order, line in enumerate(stream_text.splitlines()):
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if event.get("type") != "assistant":
+            continue
+        message_id = event.get("uuid") or event.get("message_id") or f"message-{line_order}"
+        message = event.get("message") or {}
+        for block_order, block in enumerate(message.get("content") or []):
+            if not isinstance(block, dict) or block.get("type") != "text":
+                continue
+            text = block.get("text", "")
+            if "?" in text:
+                questions.append({"text": text, "order": line_order * 1000 + block_order,
+                                  "message_id": message_id})
+    return questions
+
+
+def _normalized_text(value):
+    return unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode("ascii").lower()
+
+
+def _option_labels(task):
+    labels = task.get("underspec", {}).get("options") or []
+    out = set()
+    for option in labels:
+        values = [option] if isinstance(option, str) else [option.get(k) for k in ("label", "value", "name", "choice") if isinstance(option, dict)]
+        for value in values:
+            if isinstance(value, str) and value.strip():
+                out.add(" ".join(_normalized_text(value).split()))
+    return out
+
+
+def _relevant_question(task, question):
+    if "?" not in question:
+        return False
+    text = " " + " ".join(_normalized_text(question).split()) + " "
+    matched = 0
+    for label in _option_labels(task):
+        if label and re.search(rf"(?<![a-z0-9]){re.escape(label)}(?![a-z0-9])", text):
+            matched += 1
+    return matched >= 2
+
+
+def _question_events(first_turn):
+    questions = list(first_turn.get("assistant_questions") or [])
+    for event in first_turn.get("tool_events") or []:
+        if event.get("kind") == "clarify" and event.get("completed") is True and not event.get("err"):
+            text = event.get("question") or event.get("key") or ""
+            if text:
+                questions.append({"text": text, "order": event.get("order"), "message_id": event.get("message_id")})
+    return questions
+
+
+def _asked_before_edit(first_turn, question):
+    edits = [e for e in first_turn.get("tool_events", []) if e.get("kind") == "edit"]
+    if not edits:
+        return True
+    order = question.get("order")
+    if order is None:
+        return False
+    for edit in edits:
+        edit_order = edit.get("order")
+        if edit_order is None or edit_order <= order:
+            return False
+        if question.get("message_id") and question.get("message_id") == edit.get("message_id"):
+            return False
+    return True
+
+
+def clarification_status(task, first_turn=None, session_available=True):
+    """Classify the simulator response without storing the question or exposing an unasked decision."""
+    if not isinstance(task.get("underspec"), dict):
+        return "not_applicable"
+    questions = _question_events(first_turn or {})
+    asked = [q for q in questions if "?" in q.get("text", "")]
+    relevant = any(_relevant_question(task, q.get("text", "")) and _asked_before_edit(first_turn or {}, q) for q in asked)
+    if not session_available:
+        return "expired" if relevant else "irrelevant" if asked else "not_asked"
+    return "answered" if relevant else "irrelevant" if asked else "not_asked"
+
+
+def followup_for(task, first_turn=None, session_available=True):
+    """Return a neutral follow-up unless a relevant clarification was asked before editing."""
+    if isinstance(task.get("underspec"), dict):
+        if session_available and ((first_turn or {}).get("clarification_status") == "answered" or
+                                  clarification_status(task, first_turn, session_available) == "answered"):
+            return task["underspec"]["canned_answer"]
+        return DEFAULT_FOLLOWUP
     if task.get("followup"):
         return task["followup"]
-    u = task.get("underspec")
-    if u:
-        return f"Sobre a sua dúvida de antes, a minha decisão é: {u['canned_answer']} Continue e conclua a tarefa com essa decisão."
     return DEFAULT_FOLLOWUP
 
 
@@ -546,23 +796,31 @@ def merge_turns(turns):
     """Soma as voltas de uma execução: custo, tokens, chamadas, tempo e eventos; o resultado é o da última volta; qualquer
     volta não comparável, com timeout ou sem modelo servido contamina a execução inteira."""
     def total(key):
-        vals = [t[key] for t in turns if t.get(key) is not None]
-        return sum(vals) if vals else None
+        vals = [t.get(key) for t in turns]
+        return sum(vals) if vals and all(v is not None for v in vals) else None
     last = turns[-1]
     models = sorted({m for t in turns for m in (t["served_models"] or [])}) or None
     reasons = [r for t in turns for r in t["incomparable_reasons"]]
-    delivered = [t["hook_delivered"] for t in turns if t["hook_delivered"] is not None]
-    return {"wall_s": round(total("wall_s") or 0, 2), "result": last["result"], "cost_usd": total("cost_usd"), "tokens_in": total("tokens_in"),
+    delivered = [t.get("hook_delivered") for t in turns]
+    hook_delivered = True if any(v is True for v in delivered) else False if all(v is not None for v in delivered) else None
+    wall = total("wall_s")
+    clarification = next((t.get("clarification_status") for t in turns if t.get("clarification_status")), None)
+    optional_metrics = {key: total(key) for key in ("input_uncached", "cache_read", "cache_create", "output",
+                                                     "tool_result_tokens", "index_ms", "hook_ms", "sync_ms",
+                                                     "retrieve_ms", "resident_context_tokens")}
+    return {"wall_s": round(wall, 2) if wall is not None else None, "result": last["result"], "cost_usd": total("cost_usd"), "tokens_in": total("tokens_in"),
             "tokens_out": total("tokens_out"), "tool_calls": total("tool_calls"), "turns": total("turns"), "served_models": models,
-            "exit": last["exit"], "timed_out": any(t["timed_out"] for t in turns), "hook_delivered": any(delivered) if delivered else None,
-            "injected_chars": total("injected_chars") or 0, "incomparable_reasons": reasons,
+            "exit": last["exit"], "timed_out": any(t["timed_out"] for t in turns), "hook_delivered": hook_delivered,
+            "injected_chars": total("injected_chars"), "incomparable_reasons": reasons,
             "stream_error": any(t["stream_error"] for t in turns), "hook_names": sorted({n for t in turns for n in t["hook_names"]}),
+            "clarification_status": clarification,
             "first_edit_s": None, "tool_events": [e for t in turns for e in t["tool_events"]], "volta_injetada": [t["injected_chars"] for t in turns],
             "n_voltas": len(turns),
             # O que o Sidecar disse de fato (só presença; o texto não é guardado): permite saber se R4/R5 foram exercidos.
             "notas": {"groom": any("Open decision" in t.get("hook_context", "") for t in turns),
                       "impact": any("Change check" in t.get("hook_context", "") for t in turns),
-                      "brief": any("TASK BRIEF" in t.get("hook_context", "") for t in turns)}}
+                      "brief": any("TASK BRIEF" in t.get("hook_context", "") for t in turns)},
+            **optional_metrics}
 
 
 class ClaudeAgent:
@@ -578,48 +836,89 @@ class ClaudeAgent:
         # oculto. Medido (2026-11-08): sem a regra a leitura funciona; com ela Read, Grep e `ls` são negados.
         self.deny_paths = [str(pathlib.Path(p).resolve()) for p in deny_paths]
 
-    def command(self, prompt, settings, resume=None):
+    def command(self, prompt, settings, resume=None, tools_allow=None, deny_paths=None):
         persist = self.turns > 1  # uma segunda volta precisa da sessão do cliente
+        tools_allow = (self.tools_allow or []) if tools_allow is None else tools_allow
         flags = ["--output-format", "stream-json", "--verbose", "--include-hook-events", *([] if persist else ["--no-session-persistence"]),
                  *(["--resume", resume] if resume else []), "--permission-mode", "acceptEdits", "--setting-sources", "project,local", "--strict-mcp-config",
-                 "--disable-slash-commands", "--allowedTools", *self.tools_allow, *deny_flags(self.deny_paths)]
+                 "--disable-slash-commands", "--allowedTools", *tools_allow,
+                 *deny_flags(self.deny_paths if deny_paths is None else deny_paths)]
         cmd = ["claude", "-p", prompt, "--model", self.model, *flags, "--max-budget-usd", str(self.max_budget)]
         return cmd + (["--settings", settings] if settings else [])
 
     def run(self, task, tdir, work, arm, env, prompt):
         rhp = self.rhp
+        tools_allow = arm["tools_allow"] if "tools_allow" in arm else tools_allow_for(task, self.tools_allow)
         cfg, marker = rhp.make_config_dir(self.credentials, tempfile.gettempdir())
+        cfg_dir = pathlib.Path(cfg)
+        sandbox_home, sandbox_tmp = cfg_dir / "home", cfg_dir / "tmp"
+        sandbox_home.mkdir()
+        sandbox_tmp.mkdir()
+        (cfg_dir / "settings.json").write_text((cfg_dir / "settings.json").read_text().replace(marker, "/agent-config/canary-fired.txt"))
+        bin_dir, runtime_mounts, sandbox_env = agent_runtime_bin(cfg_dir / "runtime-bin")
+        writable_mounts = [(cfg_dir, "/agent-config"), (sandbox_home, "/home/agent"),
+                           (sandbox_tmp, "/tmp"), (pathlib.Path(env["SIDECAR_HOME"]), "/sidecar-home")]
+        readonly_mounts = list(runtime_mounts) + [(bin_dir, "/agent-bin")]
+        if arm["engine"] is not None:
+            readonly_mounts.append((self.sidecar, "/opt/sidecar"))
+            sandbox_env["SIDECAR_ENGINE"] = arm["engine"]
+            sandbox_env.update({k: v for k, v in arm.get("env", {}).items() if k in ("SIDECAR_FEATURES", "SIDECAR_PROFILE")})
         try:
             env = dict(env, CLAUDE_CONFIG_DIR=cfg)
             for k in ("ORCA_AGENT_HOOK_PORT", "ORCA_AGENT_HOOK_TOKEN", "ORCA_PANE_KEY", "ANTHROPIC_API_KEY"):
                 env.pop(k, None)
             settings = None
+            index_ms = None
             if arm["engine"] is not None:
-                subprocess.run([self.sidecar, "index", "--root", str(work)], env=env, capture_output=True, check=True, timeout=300)
-                settings = rhp.hook_settings_json(self.sidecar)
-            turns, session, prompts = [], None, [prompt]
-            if self.turns > 1:
-                prompts.append(followup_for(task))
-            for n, text in enumerate(prompts):
+                index_started = time.perf_counter()
+                index_cmd = agent_sandbox_command(["/opt/sidecar", "index", "--root", "/work"], work,
+                                                  readonly_mounts, writable_mounts, sandbox_env)
+                code, _, err, timed_out = run(index_cmd, cwd=work, env=env, timeout=300)
+                if code != 0 or timed_out:
+                    raise LabError(f"indexação isolada falhou: {err[-300:]}")
+                index_ms = round((time.perf_counter() - index_started) * 1000, 3)
+                settings = rhp.hook_settings_json("/opt/sidecar")
+            hook_log = pathlib.Path(env["SIDECAR_HOME"]) / "logs" / "hook.jsonl"
+            turns, session = [], None
+            for n in range(self.turns):
+                text = prompt if n == 0 else followup_for(task, turns[0], session_available=bool(session))
+                hook_offset = hook_log_offset(hook_log)
                 t0 = time.perf_counter()
-                code, out, err, to = run(self.command(text, settings, resume=session), cwd=work, env=env, timeout=self.timeout)
+                denied = self.deny_paths + ["/agent-config/.credentials.json"]
+                sandboxed = agent_sandbox_command(self.command(text, settings, resume=session, tools_allow=tools_allow,
+                                                               deny_paths=denied),
+                                                  work, readonly_mounts, writable_mounts, sandbox_env)
+                code, out, err, to = run(sandboxed, cwd=work, env=env, timeout=self.timeout)
                 wall = time.perf_counter() - t0
                 parsed = rhp.parse_stream(out)
+                hook_metrics = hook_metrics_since(hook_log, hook_offset)
                 session = session or session_id_of(out)
                 reasons = rhp.contamination(parsed, os.path.exists(marker), self.model)
                 events = tool_events(out)
+                question_tool_events = tool_events(out, include_question_text=True) if n == 0 and self.turns > 1 else events
                 if touched_benchmark_data(events, self.deny_paths):
                     reasons = list(reasons) + ["o agente tentou acessar dados do benchmark (oráculo, reference.patch ou resultados)"]
                 if n == 0 and self.turns > 1 and not session:
                     reasons = list(reasons) + ["sessão do cliente ausente: a segunda volta não pôde ser retomada"]
-                turns.append({"wall_s": round(wall, 2), "result": parsed["result"] or "", "cost_usd": parsed["cost_usd"],
+                turn = {"wall_s": round(wall, 2), "result": parsed["result"] or "", "cost_usd": parsed["cost_usd"],
                               "tokens_in": parsed["tokens_in"], "tokens_out": parsed["tokens_out"],
+                              "input_uncached": parsed["input_uncached"], "cache_read": parsed["cache_read"],
+                              "cache_create": parsed["cache_create"], "output": parsed["output"],
+                              "tool_result_tokens": parsed["tool_result_tokens"], "resident_context_tokens": None,
+                              "index_ms": index_ms if n == 0 else 0.0 if index_ms is not None else None,
+                              "hook_ms": hook_metrics["hook_ms"], "sync_ms": hook_metrics["sync_ms"],
+                              "retrieve_ms": hook_metrics["retrieve_ms"],
                               "tool_calls": parsed["tool_calls"], "turns": parsed["turns"], "served_models": parsed["served_models"],
                               "exit": code, "timed_out": to, "hook_delivered": parsed["hook_delivered"] if arm["engine"] else None,
                               "injected_chars": len(parsed["hook_context"]), "incomparable_reasons": reasons,
                               "stream_error": parsed["is_error"] is True or parsed["subtype"] not in (None, "success"),
                               "hook_names": parsed["hook_names"], "first_edit_s": None, "tool_events": events,
-                              "hook_context": parsed["hook_context"]})
+                              "assistant_questions": assistant_questions(out), "hook_context": parsed["hook_context"]}
+                if n == 0 and self.turns > 1:
+                    status_turn = dict(turn, tool_events=question_tool_events)
+                    turn["clarification_status"] = clarification_status(
+                        task, status_turn, session_available=bool(session) and code == 0 and not to)
+                turns.append(turn)
                 if to or code != 0 or not session and self.turns > 1:
                     break  # sem resposta da primeira volta não há o que continuar
             leaked = workspace_mentions_benchmark(work, self.deny_paths + ["reference.patch", "holdout_ledger"])
@@ -633,17 +932,15 @@ class ClaudeAgent:
 
 # --------------------------------------------------------------------------- tool traces (R6)
 
-TEST_CMD = re.compile(r"^\s*(go test|pytest|python3? -m pytest|npm (run )?test|node --test|yarn test|bundle exec|ruby -[IiT]|cargo test|mvn |gradle |phpunit|vendor/bin/phpunit)")
+TEST_CMD = re.compile(r"^\s*(go test\b|pytest\b|python3? -m pytest\b|npm (run )?test\b|pnpm test\b|yarn test\b|node --test\b|bundle exec\b|ruby -[IiT]|rake (test|spec)\b|cargo test\b|mvn test\b|gradle test\b|(?:\./)?gradlew test\b|phpunit\b|vendor/bin/phpunit\b|composer test\b)")
 SEARCH_CMD = re.compile(r"^\s*(grep|rg|find|ag|ack|git grep)\b")
 READ_CMD = re.compile(r"^\s*(cat|head|tail|sed -n|less|nl)\b")
 
 
-def tool_events(stream_text):
-    """Reduz o stream-json do Claude Code a eventos {kind,key,err} (mapeamento aproximado e documentado):
-    Read->read, Grep/Glob->search, Edit/Write/MultiEdit/NotebookEdit->edit, Bash->test|search|read|other por prefixo.
-    Falhas vêm do tool_result com is_error. Só o que o stream mostra: evento ausente é 'não observado'."""
-    events, pending = [], {}
-    for line in stream_text.splitlines():
+def tool_events(stream_text, include_question_text=False):
+    """Return ordered, correlated tool calls. Clarification text is ephemeral unless explicitly requested."""
+    events, pending, context_orders = [], {}, []
+    for line_order, line in enumerate(stream_text.splitlines()):
         line = line.strip()
         if not line.startswith("{"):
             continue
@@ -651,11 +948,20 @@ def tool_events(stream_text):
             d = json.loads(line)
         except ValueError:
             continue
+        order_base = line_order * 1000
+        if d.get("type") == "system" and d.get("subtype") == "hook_response" and d.get("hook_event") == "UserPromptSubmit":
+            try:
+                output = json.loads(d.get("output") or "")
+                context = output.get("hookSpecificOutput", {}).get("additionalContext")
+                if isinstance(context, str) and context:
+                    context_orders.append(order_base)
+            except (ValueError, TypeError, AttributeError):
+                pass
         msg = d.get("message")
         if not isinstance(msg, dict):
             continue
         content = msg.get("content")
-        for block in content if isinstance(content, list) else []:
+        for block_order, block in enumerate(content if isinstance(content, list) else []):
             if not isinstance(block, dict):
                 continue
             if d.get("type") == "assistant" and block.get("type") == "tool_use":
@@ -671,22 +977,80 @@ def tool_events(stream_text):
                     cmd = inp.get("command", "")
                     kind = "test" if TEST_CMD.match(cmd) else "search" if SEARCH_CMD.match(cmd) else "read" if READ_CMD.match(cmd) else "other"
                     ev = {"kind": kind, "key": cmd if kind != "test" else "test", "cmd": cmd}
+                elif name == "AskUserQuestion":
+                    question_items = inp.get("questions")
+                    question_items = question_items if isinstance(question_items, list) else [inp]
+                    labels = [o.get("label", "") for item in question_items if isinstance(item, dict)
+                              for o in item.get("options") or [] if isinstance(o, dict) and o.get("label")]
+                    question = " ".join(str(item.get("question") or item.get("text") or "")
+                                         for item in question_items if isinstance(item, dict))
+                    if labels:
+                        question += " Options: " + "; ".join(labels)
+                    ev = {"kind": "clarify", "key": ""}
+                    if include_question_text:
+                        ev["question"] = question
                 if ev is not None:
+                    ev.update({"order": order_base + block_order, "thread_id": d.get("parent_tool_use_id") or msg.get("parent_tool_use_id") or "main",
+                               "message_id": d.get("uuid") or d.get("message_id") or msg.get("id") or f"message-{line_order}",
+                               "tool_use_id": block.get("id"), "timestamp": d.get("timestamp") or msg.get("timestamp"),
+                               "completed": None, "err": None})
                     events.append(ev)
                     pending[block.get("id")] = ev
-            elif d.get("type") == "user" and block.get("type") == "tool_result" and block.get("is_error"):
-                content = block.get("content")
-                text = content if isinstance(content, str) else " ".join(c.get("text", "") for c in content or [] if isinstance(c, dict))
-                first = (text or "").strip().splitlines()[0].lower() if (text or "").strip() else "error"
-                events.append({"kind": "other", "key": "err", "err": re.sub(r"\d+", "#", first)[:200]})
+            elif d.get("type") == "user" and block.get("type") == "tool_result":
+                ev = pending.get(block.get("tool_use_id"))
+                if ev is None:
+                    continue
+                ev["completed"] = True
+                ev["result_order"] = order_base + block_order
+                if block.get("is_error"):
+                    content = block.get("content")
+                    text = content if isinstance(content, str) else " ".join(c.get("text", "") for c in content or [] if isinstance(c, dict))
+                    first = (text or "").strip().splitlines()[0].lower() if (text or "").strip() else "error"
+                    ev["err"] = re.sub(r"\d+", "#", first)[:200]
+    context_order = min(context_orders) if context_orders else None
+    for ev in events:
+        ev["after_context"] = None if context_order is None else ev["order"] > context_order
     return events
+
+
+def hook_log_offset(path):
+    try:
+        return pathlib.Path(path).stat().st_size
+    except OSError:
+        return 0
+
+
+def hook_metrics_since(path, offset):
+    """Read only numeric stage timings from appended local hook diagnostics; never return prompt/code fields."""
+    try:
+        with pathlib.Path(path).open("rb") as f:
+            f.seek(offset)
+            data = f.read().decode("utf-8", errors="replace")
+    except OSError:
+        return {"hook_ms": None, "sync_ms": None, "retrieve_ms": None}
+    records = []
+    for line in data.splitlines():
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(rec, dict):
+            records.append(rec)
+    out = {}
+    for output_key, source_key in (("hook_ms", "total_ms"), ("sync_ms", "sync_ms"), ("retrieve_ms", "retrieve_ms")):
+        values = [r.get(source_key) for r in records]
+        known = bool(values) and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v >= 0
+                                     for v in values)
+        out[output_key] = round(sum(values), 3) if known else None
+    return out
 
 
 def progress_report(sidecar, events):
     """Classifica os eventos com o MESMO código do observador (sidecar progress). None se indisponível."""
-    if not sidecar or not events:
+    observed = [e for e in events if e.get("after_context") is True]
+    if not sidecar or not observed:
         return None
-    payload = "\n".join(json.dumps(e) for e in events) + "\n"
+    payload = "\n".join(json.dumps(e) for e in observed) + "\n"
     code, out, err, to = run([sidecar, "progress"], input_text=payload, timeout=30)
     if code != 0 or to:
         return None
@@ -743,13 +1107,15 @@ def spend_total(path):
 def execute_one(agent, task, tdir, arm, rep, args, home):
     with tempfile.TemporaryDirectory(prefix="lab-run-") as tmp:
         work = prepare_workspace(task, pathlib.Path(tmp) / "work")
+        sidecar_home = pathlib.Path(tmp) / "sidecar-home"
+        sidecar_home.mkdir()
         if tdir.resolve() in pathlib.Path(work).resolve().parents or str(tdir.resolve()) in str(work):
             raise LabError("oráculo dentro do workspace do agente")
         before = changed_paths(work)
         if before:
             raise LabError("checkout não está limpo")
         env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG") if k in os.environ}
-        env.update({"SIDECAR_HOME": home, "GOPROXY": "off", "GOFLAGS": "-mod=mod"})
+        env.update({"SIDECAR_HOME": str(sidecar_home), "GOPROXY": "off", "GOFLAGS": "-mod=mod"})
         if arm["engine"]:
             env["SIDECAR_ENGINE"] = arm["engine"]
         env.update(arm["env"])
@@ -766,24 +1132,30 @@ def execute_one(agent, task, tdir, arm, rep, args, home):
         v = verdict(orc)
         # Timeout é falha do braço, não contaminação: continua nas taxas (com custo possivelmente desconhecido).
         comparable = not r["incomparable_reasons"] and err is None
+        effective_tools = arm.get("tools_allow", tools_allow_for(task, getattr(agent, "tools_allow", None)))
         return {
             "schema": RUN_SCHEMA, "task": task["id"], "split": task["split"], "class": task["class"], "repo": task["repo"],
             "commit": task["commit"], "arm": arm["name"], "rep": rep, "model": getattr(agent, "model", "scripted"),
+            "tools_allow": effective_tools,
             "evidence": "simulated" if agent.simulated else "agentic", "verdict": v, "success": v == "pass" and comparable and not r["timed_out"],
             "comparable": comparable, "agent_error": err, "oracle": {k: orc[k] for k in
                 ("tests", "scope_ok", "outside_scope", "invariants", "changed", "isolation", "detail")},
             "oracle_s": round(time.perf_counter() - t0, 2), "task_sha256": sha256_file(tdir / "task.json"),
-            "n_voltas": r.get("n_voltas", 1), "notas": r.get("notas"), "volta_injetada": r.get("volta_injetada"), "tool_events": r.get("tool_events", []), "progress": progress_report(args.sidecar if args else None, r.get("tool_events", [])),
-            **{k: r[k] for k in ("wall_s", "cost_usd", "tokens_in", "tokens_out", "tool_calls", "turns",
+            "n_voltas": r.get("n_voltas", 1), "notas": r.get("notas"), "clarification_status": r.get("clarification_status"),
+            "volta_injetada": r.get("volta_injetada"), "tool_events": r.get("tool_events", []), "progress": progress_report(args.sidecar if args else None, r.get("tool_events", [])),
+            **{k: r.get(k) for k in ("wall_s", "cost_usd", "tokens_in", "tokens_out", "tool_calls", "turns",
                "served_models", "exit", "timed_out", "hook_delivered", "injected_chars", "incomparable_reasons",
-               "stream_error", "first_edit_s")},
+               "stream_error", "first_edit_s", "input_uncached", "cache_read", "cache_create", "output",
+               "tool_result_tokens", "index_ms", "hook_ms", "sync_ms", "retrieve_ms", "resident_context_tokens")},
         }
 
 
 def cmd_run(args):
-    manifest = build_manifest()
-    wanted = set(args.tasks.split(",")) if args.tasks else {t["id"] for t in manifest["tasks"]}
     splits = set(args.splits.split(","))
+    if "holdout" in splits and not args.final:
+        raise LabError("holdout selado: use --final (uma única avaliação final, sem tuning depois)")
+    manifest = build_manifest(include_holdout="holdout" in splits)
+    wanted = set(args.tasks.split(",")) if args.tasks else {t["id"] for t in manifest["tasks"]}
     tasks = [t for t in manifest["tasks"] if t["id"] in wanted and t["split"] in splits]
     if not tasks:
         raise LabError("nenhuma tarefa selecionada")
@@ -791,6 +1163,7 @@ def cmd_run(args):
     if unvalidated and not args.allow_unvalidated:
         raise LabError("tarefas sem validation.json ok (rode validate-task): " + ", ".join(unvalidated))
     arms = parse_arms(args.arms)
+    requested_tools = args.tools_allow.split(",") if args.tools_allow is not None else None
     offset = getattr(args, "rep_offset", 0)
     order = [(t, a, r + offset) for t, a, r in schedule([t["id"] for t in tasks], arms, args.reps, args.seed + offset)]
     n = len(order)
@@ -805,6 +1178,7 @@ def cmd_run(args):
         for need in ("claude", "git"):
             if not shutil.which(need):
                 raise LabError(f"comando ausente: {need}")
+        agent_isolation = verify_agent_sandbox()
         if not args.sidecar or not pathlib.Path(args.sidecar).is_file():
             raise LabError("--sidecar (binário) obrigatório para o agente claude")
         deny = [HERE.parent.parent, out_dir]
@@ -813,7 +1187,7 @@ def cmd_run(args):
             if d.resolve() == tmp_root or d.resolve() in tmp_root.parents or d.resolve() == pathlib.Path("/"):
                 raise LabError(f"--out-dir/repositório não pode ser {d}: bloquearia o workspace do agente. Use um subdiretório")
         agent = ClaudeAgent(args.model, str(pathlib.Path(args.sidecar).resolve()), args.credentials, args.max_budget,
-                            args.timeout, args.tools_allow.split(","), deny_paths=deny, turns=getattr(args, "turns", 1))
+                            args.timeout, requested_tools, deny_paths=deny, turns=getattr(args, "turns", 1))
         est = n * args.max_budget
         if not args.yes_spend:
             print(f"Dry run: {n} execuções ({len(tasks)} tarefas × {len(arms)} braços × {args.reps}); "
@@ -824,7 +1198,10 @@ def cmd_run(args):
     runs, spend = out_dir / "runs.jsonl", out_dir / "spend.jsonl"
     meta = {"schema": "lab-meta/1", "manifest": manifest, "arms": [a["name"] for a in arms], "seed": args.seed,
             "model_requested": getattr(agent, "model", None), "order": [[t, a["name"], r] for t, a, r in order],
-            "isolation": sandbox_prefix()[1], "sidecar_sha256": sha256_file(args.sidecar) if args.sidecar else None,
+            "tools_allow_by_repo": {task["repo"]: tools_allow_for(task, requested_tools) for task in tasks},
+            "isolation": sandbox_prefix()[1], "oracle_network_isolation": sandbox_prefix()[1],
+            "agent_filesystem_isolation": agent_isolation if args.agent == "claude" else "simulated-unrestricted",
+            "sidecar_sha256": sha256_file(args.sidecar) if args.sidecar else None,
             "claude_version": run(["claude", "--version"])[1].strip() if args.agent == "claude" else None,
             "hardware": {"cpus": os.cpu_count(), "platform": sys.platform}, "cost_cap_usd": args.max_total_usd,
             "started": time.time()}
@@ -839,6 +1216,7 @@ def cmd_run(args):
                 print("teto de custo atingido; parando", file=sys.stderr)
                 break
             task, tdir = load_task(tid)
+            arm = dict(arm, tools_allow=tools_allow_for(task, requested_tools))
             rec = execute_one(agent, task, tdir, arm, rep, args, home)
             with runs.open("a") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
@@ -880,8 +1258,10 @@ def summarize(rows):
     succ = [r for r in ok if r["success"]]
     cost = [r["cost_usd"] for r in ok if r["cost_usd"] is not None]
     wall = [r["wall_s"] for r in ok if r["wall_s"] is not None]
-    scc = [r["cost_usd"] for r in succ if r["cost_usd"] is not None]
-    return {
+    complete = lambda key: bool(ok) and all(r.get(key) is not None for r in ok)
+    complete_success_wall = bool(succ) and all(r.get("wall_s") is not None for r in succ)
+    progress = [r["progress"] for r in ok if r.get("progress")]
+    summary = {
         "runs": len(rows), "comparable": len(ok), "excluded": len(rows) - len(ok), "passed": len(succ),
         "pass_rate": round(len(succ) / len(ok), 3) if ok else None,
         "hidden_tests_passed": sum(1 for r in ok if r["oracle"]["tests"] == "pass"),
@@ -889,19 +1269,25 @@ def summarize(rows):
         "scope_violations_non_test": sum(1 for r in ok if non_test_outside(r)),
         "invariant_violations": sum(1 for r in ok for i in r["oracle"]["invariants"] if not i["ok"]),
         "infra_errors": sum(1 for r in rows if r["verdict"] == "error"),
-        "cost_total": round(sum(cost), 4) if cost else None,
+        "cost_total": round(sum(cost), 4) if complete("cost_usd") else None,
         "cost_per_success": round(sum(cost) / len(succ), 4) if succ and cost and len(cost) == len(ok) else None,
-        "wall_per_success_p50": pct([r["wall_s"] for r in succ if r["wall_s"] is not None], 0.5),
-        "wall_p95": pct(wall, 0.95), "tool_calls_mean": round(statistics.mean(
-            [r["tool_calls"] for r in ok if r["tool_calls"] is not None]), 2) if any(r["tool_calls"] is not None for r in ok) else None,
-        "injected_chars_mean": round(statistics.mean([r["injected_chars"] or 0 for r in ok]), 1) if ok else None,
+        "wall_per_success_p50": pct([r["wall_s"] for r in succ], 0.5) if complete_success_wall else None,
+        "wall_p95": pct(wall, 0.95) if complete("wall_s") else None,
+        "tool_calls_mean": round(statistics.mean([r["tool_calls"] for r in ok]), 2) if complete("tool_calls") else None,
+        "injected_chars_mean": round(statistics.mean([r["injected_chars"] for r in ok]), 1) if complete("injected_chars") else None,
         "models_served": sorted({m for r in rows for m in (r["served_models"] or [])}),
         "cost_unknown_runs": sum(1 for r in ok if r["cost_usd"] is None),
-        "progress_runs": sum(1 for r in ok if r.get("progress")),
-        "redundant_calls_mean": round(statistics.mean([r["progress"]["redundant"] for r in ok if r.get("progress")]), 2)
-        if any(r.get("progress") for r in ok) else None,
+        "progress_runs": len(progress),
+        "redundant_calls_mean": round(statistics.mean([p["redundant"] for p in progress]), 2)
+        if progress and all(p.get("redundant") is not None for p in progress) else None,
         "stagnant_runs": sum(1 for r in ok if r.get("progress") and r["progress"]["stagnant_windows"] > 0),
     }
+    optional = ("input_uncached", "cache_read", "cache_create", "output", "tool_result_tokens", "index_ms", "hook_ms",
+                "sync_ms", "retrieve_ms", "resident_context_tokens")
+    measured = [key for key in optional if any(r.get(key) is not None for r in ok)]
+    if measured:
+        summary["measured"] = {key: round(sum(r[key] for r in ok), 3) if complete(key) else None for key in measured}
+    return summary
 
 
 METRICS = (("pass_rate", "taxa de aprovação (estrita: teste+escopo+invariantes)", "pass"), ("hidden_pass", "testes ocultos passaram (sem escopo)", "hid"), ("tool_calls", "chamadas de ferramenta", "calls"), ("tokens", "tokens (entrada+saída)", "tok"),
@@ -1030,6 +1416,18 @@ def render_md(rep):
             L.append(f"| {a} | {s['runs']} | {s['comparable']} | {s['passed']} | {s['pass_rate']} | {s['hidden_tests_passed']} | {s['scope_violations']} ({s['scope_violations_non_test']}) | "
                      f"{s['invariant_violations']} | {s['cost_per_success']} | {s['wall_per_success_p50']} | {s['tool_calls_mean']} | {s['redundant_calls_mean']} | {s['injected_chars_mean']} |")
         L.append("")
+        measured_labels = {"input_uncached": "entrada sem cache", "cache_read": "cache lido", "cache_create": "cache criado",
+                           "output": "saída", "tool_result_tokens": "tokens de resultados de ferramentas",
+                           "index_ms": "indexação ms", "hook_ms": "hook ms", "sync_ms": "sync ms",
+                           "retrieve_ms": "retrieval ms", "resident_context_tokens": "contexto residente tokens"}
+        measured_keys = [key for key in measured_labels if any(s.get("measured", {}).get(key) is not None for s in sec["arms"].values())]
+        if measured_keys:
+            L += ["### Contadores e tempos observados", "", "| métrica | braço | total nas execuções comparáveis |", "|---|---|---:|"]
+            for key in measured_keys:
+                for arm, summary in sec["arms"].items():
+                    if key in summary.get("measured", {}):
+                        L.append(f"| {measured_labels[key]} | {arm} | {summary['measured'][key]} |")
+            L.append("")
         for a, p in sec["paired_vs_OFF"].items():
             L.append(f"- {a} vs OFF: {p['pairs']} pares, Δpass {p['d_pass_mean']} IC95 {p['d_pass_ci95']}, Δcusto {p['d_cost_mean']} → **{p['conclusion']}**")
         L.append("")
@@ -1074,8 +1472,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("validate-task"); p.add_argument("id")
-    sub.add_parser("validate-corpus")
+    p = sub.add_parser("validate-corpus"); p.add_argument("--include-holdout", action="store_true")
     p = sub.add_parser("manifest"); p.add_argument("--out", default=str(CORPUS / "manifest.json"))
+    p.add_argument("--include-holdout", action="store_true", help="refresh sealed holdout metadata explicitly")
     p = sub.add_parser("run")
     p.add_argument("--agent", default="claude"); p.add_argument("--model"); p.add_argument("--sidecar")
     p.add_argument("--arms", default="OFF,V1,V2"); p.add_argument("--tasks"); p.add_argument("--splits", default="development,validation")
@@ -1083,7 +1482,7 @@ def main(argv=None):
     p.add_argument("--out-dir", required=True); p.add_argument("--credentials", default=str(pathlib.Path.home() / ".claude" / ".credentials.json"))
     p.add_argument("--max-budget", type=float, default=0.5, help="teto por execução (US$)")
     p.add_argument("--max-total-usd", type=float, default=None); p.add_argument("--timeout", type=int, default=600)
-    p.add_argument("--tools-allow", default="Read,Grep,Glob,Edit,Write,Bash(go test:*),Bash(ls:*)")
+    p.add_argument("--tools-allow", default=None, help="lista explícita que substitui a política padrão por linguagem")
     p.add_argument("--yes-spend", action="store_true"); p.add_argument("--final", action="store_true")
     p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--turns", type=int, choices=(1, 2), default=1, help="2 = protocolo de duas voltas com usuário simulado (R4/R5)"); p.add_argument("--rep-offset", type=int, default=0, help="índice da primeira repetição; permite processos paralelos com repetições distintas"); p.add_argument("--scripted-behaviour", default="reference")
     p = sub.add_parser("report"); p.add_argument("runs", nargs="+", help="um ou mais runs.jsonl (repetições de processos diferentes são juntadas)"); p.add_argument("--md"); p.add_argument("--json"); p.add_argument("--offline")
@@ -1095,13 +1494,25 @@ def main(argv=None):
             return 0 if r["ok"] else 1
         if a.cmd == "validate-corpus":
             bad = 0
+            held = set()
+            if not a.include_holdout:
+                sealed_path = CORPUS / "manifest.json"
+                if not sealed_path.is_file():
+                    raise LabError("manifesto selado ausente; validação segura do corpus requer inventário congelado")
+                inventory = load_json(sealed_path).get("tasks", [])
+                known = {t["id"] for t in inventory}
+                if {d.name for d in task_dirs()} - known:
+                    raise LabError("inventário difere do manifesto selado; recusei validar tarefas desconhecidas")
+                held = {t["id"] for t in inventory if t.get("split") == "holdout"}
             for d in task_dirs():
+                if d.name in held:
+                    continue
                 r = validate_task(d.name)
                 print(f"{d.name:28s} {'OK' if r['ok'] else 'FALHOU'} base={r['base_verdict']}")
                 bad += 0 if r["ok"] else 1
             return 1 if bad else 0
         if a.cmd == "manifest":
-            m = build_manifest()
+            m = build_manifest(include_holdout=a.include_holdout)
             pathlib.Path(a.out).write_text(json.dumps(m, indent=2, ensure_ascii=False) + "\n")
             print(f"{a.out}: {len(m['tasks'])} tarefas {m['counts']}")
             return 0

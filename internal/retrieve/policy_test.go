@@ -59,3 +59,27 @@ func TestForbiddenEditVerbsMakeAPromptReadOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestEditIntentIgnoresQuotedInstructionsButKeepsOtherClauses(t *testing.T) {
+	readOnly := []string{
+		`What does "change the session TTL" mean? Only explain the request.`,
+		`A mensagem “corrija o valor” apareceu no log; explique o significado.`,
+		`The README says 'change the cache TTL'; where is that documented?`,
+	}
+	for _, p := range readOnly {
+		if IsEditRequest(p) {
+			t.Errorf("quoted imperative in %q is data, not an edit request", p)
+		}
+	}
+
+	edits := []string{
+		"Não altere o timeout; corrija o parser.",
+		"Do not change the timeout; fix the parser.",
+		`Explain why the log says "change the TTL", then update the parser.`,
+	}
+	for _, p := range edits {
+		if !IsEditRequest(p) {
+			t.Errorf("an unquoted positive clause in %q still asks for an edit", p)
+		}
+	}
+}
