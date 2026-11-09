@@ -200,3 +200,17 @@ func TestCodeIdentifierShapes(t *testing.T) {
 		}
 	}
 }
+
+func TestExploreHintOnlyWhenTheDecisionAsks(t *testing.T) {
+	block := "[SIDECAR CONTEXT]\nx\n[END SIDECAR CONTEXT]"
+	if got := WithExploreHint(block, Decision{ExploreHint: false}, "/opt/sidecar"); got != block {
+		t.Fatalf("hint added without being asked: %q", got)
+	}
+	got := WithExploreHint(block, Decision{ExploreHint: true}, "/opt/my tools/sidecar")
+	if !strings.Contains(got, "\"/opt/my tools/sidecar\" explore --query") || !strings.HasSuffix(got, "[END SIDECAR CONTEXT]") {
+		t.Fatalf("hint: %q", got)
+	}
+	if WithExploreHint("", Decision{ExploreHint: true}, "/x") != "" {
+		t.Fatal("an abstention must stay empty")
+	}
+}

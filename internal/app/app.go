@@ -213,6 +213,10 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	var used []string
 	if decision != nil {
 		block, used = engine.RenderSession(res, *decision, statePath)
+		if exe, err := os.Executable(); err == nil {
+			block = engine.WithExploreHint(block, *decision, exe)
+		}
+		rec["v3_explore_hint"] = decision.ExploreHint && block != ""
 	} else if ropts.EngineVersion == "v2" && retrieve.FeatureEnabled("brief") {
 		var briefed bool
 		block, used, briefed = brief.RenderTaskSession(res, statePath)

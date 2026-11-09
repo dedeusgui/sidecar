@@ -1,6 +1,9 @@
 package engine
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/dedeusgui/sidecar/internal/brief"
 	"github.com/dedeusgui/sidecar/internal/ctxbuild"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
@@ -38,4 +41,20 @@ func RenderSession(res retrieve.Result, d Decision, statePath string) (string, [
 // sends the standard block unless SIDECAR_FEATURES=brief asks for the experiment.
 func useBrief(d Decision) bool {
 	return (d.Action == ActionBrief || d.Action == ActionVerify) && retrieve.FeatureEnabled("brief")
+}
+
+// WithExploreHint appends one line offering on-demand exploration to a non-empty block when the decision
+// asks for it. It never forces a call: EXPLORE_AVAILABLE only makes the tool known. exe is the command the
+// agent can run (the hook's own executable), quoted when it contains spaces.
+func WithExploreHint(block string, d Decision, exe string) string {
+	const end = "[END SIDECAR CONTEXT]"
+	if block == "" || !d.ExploreHint || exe == "" || !strings.HasSuffix(strings.TrimSpace(block), end) {
+		return block
+	}
+	if strings.ContainsAny(exe, " \t") {
+		exe = strconv.Quote(exe)
+	}
+	hint := "ON DEMAND: `" + exe + " explore --query \"<symbol, path or question>\"` returns numbered source, callers, tests and gaps for one topic.\n"
+	i := strings.LastIndex(block, end)
+	return block[:i] + hint + block[i:]
 }

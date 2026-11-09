@@ -30,6 +30,9 @@ import tempfile
 import time
 import unicodedata
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import sufficiency  # noqa: E402
+
 HERE = pathlib.Path(__file__).resolve().parent
 CORPUS = HERE / "corpus"
 TASKS = CORPUS / "tasks"
@@ -399,8 +402,10 @@ def agent_sandbox_command(argv, work, readonly_paths=(), writable_paths=(), sand
         cmd.extend(["--bind", host, target])
     for host, target in readonly:
         cmd.extend(["--ro-bind", host, target])
+    intended = {dest for _, dest in readonly}
     for host, target in competitor_tool_paths(readonly_paths):
-        if any(target == dest for _, dest in readonly):
+        link = pathlib.Path(host)
+        if target in intended or link.is_symlink() and os.readlink(link) in intended:
             continue  # montado de propósito (binário do braço habilitado)
         cmd.extend(["--tmpfs", target] if pathlib.Path(host).is_dir() else ["--ro-bind", "/dev/null", target])
     cmd.extend(["--clearenv", "--setenv", "PATH", "/agent-bin", "--setenv", "HOME", "/home/agent",
@@ -788,6 +793,7 @@ def agent_runtime_bin(root, work=None):
 
 
 BASE_AGENT_TOOLS = ["Read", "Grep", "Glob", "Edit", "Write", "Bash(ls:*)"]
+EXPLORE_TOOLS = ["Bash(sidecar explore:*)", "Bash(/opt/sidecar explore:*)"]  # only arms with "explore": True
 TEST_RUNNER_TOOLS = {
     "go": ["Bash(go test:*)"],
     "python": ["Bash(pytest:*)", "Bash(python -m pytest:*)", "Bash(python3 -m pytest:*)"],
@@ -1018,10 +1024,30 @@ def merge_turns(turns):
             "first_edit_s": None, "tool_events": events, "volta_injetada": [t["injected_chars"] for t in turns],
             "n_voltas": len(turns),
             # O que o Sidecar disse de fato (só presença; o texto não é guardado): permite saber se R4/R5 foram exercidos.
+            "sufficiency": merge_sufficiency([t.get("sufficiency") for t in turns]),
+            "token_origins": sufficiency.token_origins({**optional_metrics, "injected_chars": total("injected_chars"),
+                                                       "explore_chars": total("explore_chars"),
+                                                       "tool_result_chars": total("tool_result_chars")}),
             "notas": {"groom": any("Open decision" in t.get("hook_context", "") for t in turns),
                       "impact": any("Change check" in t.get("hook_context", "") for t in turns),
                       "brief": any("TASK BRIEF" in t.get("hook_context", "") for t in turns)},
             **optional_metrics}
+
+
+def merge_sufficiency(parts):
+    """Sum per-turn sufficiency counts; unknown (None) when a turn has no report."""
+    if not parts or any(p is None for p in parts):
+        return None
+    out = {}
+    for p in parts:
+        for k, v in p.items():
+            if k == "by_delivery":
+                out.setdefault(k, []).extend(v)
+            elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                out[k] = out.get(k, 0) + v
+            elif v is None:
+                out[k] = None
+    return out
 
 
 class ClaudeAgent:
@@ -1064,6 +1090,8 @@ class ClaudeAgent:
         readonly_mounts = list(runtime_mounts) + list(net_mounts) + [(bin_dir, "/agent-bin")]
         if arm["engine"] is not None:
             readonly_mounts.append((self.sidecar, "/opt/sidecar"))
+            if arm.get("explore"):
+                (bin_dir / "sidecar").symlink_to("/opt/sidecar")
             sandbox_env["SIDECAR_ENGINE"] = arm["engine"]
             sandbox_env.update({k: v for k, v in arm.get("env", {}).items() if k in ("SIDECAR_FEATURES", "SIDECAR_PROFILE")})
         try:
@@ -1103,6 +1131,7 @@ class ClaudeAgent:
                 question_tool_events = tool_events(out, include_question_text=True) if n == 0 and self.turns > 1 else raw_events
                 if touched_benchmark_data(raw_events, self.deny_paths):
                     reasons = list(reasons) + ["o agente tentou acessar dados do benchmark (oráculo, reference.patch ou resultados)"]
+                suff = sufficiency_report(raw_events, parsed["hook_context"], parsed["hook_delivered"] is True)
                 events = redact_tool_events(raw_events)
                 if n == 0 and self.turns > 1 and not session:
                     reasons = list(reasons) + ["sessão do cliente ausente: a segunda volta não pôde ser retomada"]
@@ -1120,7 +1149,9 @@ class ClaudeAgent:
                               if arm["engine"] else 0, "incomparable_reasons": reasons,
                               "stream_error": parsed["is_error"] is True or parsed["subtype"] not in (None, "success"),
                               "hook_names": parsed["hook_names"], "first_edit_s": None, "tool_events": events,
-                              "assistant_questions": assistant_questions(out), "hook_context": parsed["hook_context"]}
+                              "assistant_questions": assistant_questions(out), "hook_context": parsed["hook_context"],
+                              "sufficiency": suff, "explore_chars": suff["explore_chars"],
+                              "tool_result_chars": suff["tool_result_chars"]}
                 if n == 0 and self.turns > 1:
                     turn["unattributed_edits"] = bool(changed_paths(work)) and (
                         any("cmd" in e for e in raw_events) or not any(e.get("kind") == "edit" for e in raw_events))
@@ -1191,8 +1222,13 @@ def tool_events(stream_text, include_question_text=False):
                     ev = {"kind": "edit", "key": inp.get("file_path", "")}
                 elif name == "Bash":
                     cmd = inp.get("command", "")
-                    kind = "test" if TEST_CMD.match(cmd) else "search" if SEARCH_CMD.match(cmd) else "read" if READ_CMD.match(cmd) else "other"
+                    kind = ("explore" if sufficiency.EXPLORE_CMD.search(cmd) else "test" if TEST_CMD.match(cmd) else
+                            "search" if SEARCH_CMD.match(cmd) else "read" if READ_CMD.match(cmd) else "other")
                     ev = {"kind": kind, "key": cmd if kind != "test" else "test", "cmd": cmd}
+                elif name in ("Agent", "Task"):
+                    ev = {"kind": "delegate", "key": ""}
+                elif name in ("ToolSearch", "TodoWrite"):
+                    ev = {"kind": "bookkeeping", "key": name}
                 elif name == "AskUserQuestion":
                     question_items = inp.get("questions")
                     question_items = question_items if isinstance(question_items, list) else [inp]
@@ -1218,15 +1254,49 @@ def tool_events(stream_text, include_question_text=False):
                     continue
                 ev["completed"] = True
                 ev["result_order"] = order_base + block_order
+                content = block.get("content")
+                result_text = content if isinstance(content, str) else " ".join(
+                    c.get("text", "") for c in content or [] if isinstance(c, dict))
+                ev["result_chars"] = len(result_text or "")
+                if ev.get("kind") == "explore" and not block.get("is_error"):
+                    # Paths only (never code): which files the explore shipped and which it only named.
+                    ev["returned"], ev["named"] = sufficiency.paths_in_explore_output(result_text)
                 if block.get("is_error"):
-                    content = block.get("content")
-                    text = content if isinstance(content, str) else " ".join(c.get("text", "") for c in content or [] if isinstance(c, dict))
+                    text = result_text
                     first = (text or "").strip().splitlines()[0].lower() if (text or "").strip() else "error"
                     ev["err"] = re.sub(r"\d+", "#", first)[:200]
     context_order = min(context_orders) if context_orders else None
     for ev in events:
         ev["after_context"] = None if context_order is None else ev["order"] > context_order
     return events
+
+
+def deliveries_of(events, hook_context, hook_delivered):
+    """Sidecar deliveries of one turn, in stream order: the hook context, then each completed explore call."""
+    out = []
+    if hook_delivered and hook_context:
+        first = min((e["order"] for e in events), default=0)
+        out.append({"source": "hook", "order": first - 1, "thread_id": "main", "message_id": None,
+                    "returned": sufficiency.paths_in_hook_context(hook_context), "named": []})
+    for e in events:
+        if e.get("kind") == "explore" and e.get("completed"):
+            out.append({"source": "explore", "order": e["order"], "thread_id": e.get("thread_id", "main"),
+                        "message_id": e.get("message_id"), "returned": e.get("returned") or [],
+                        "named": e.get("named") or [], "errored": bool(e.get("err"))})
+    return out
+
+
+def sufficiency_report(events, hook_context, hook_delivered):
+    """Bucket counts and session signals for one turn; computed on raw events, persisted without paths."""
+    deliveries = deliveries_of(events, hook_context, hook_delivered)
+    classified = sufficiency.classify(events, deliveries)
+    summary = sufficiency.summarize(classified)
+    summary.update(sufficiency.session_signals(events, deliveries))
+    summary["by_delivery"] = [{k: c.get(k) for k in ("source", "bucket", "next", "concurrent", "thread_id")} for c in classified]
+    summary["explore_chars"] = sum(e.get("result_chars") or 0 for e in events if e.get("kind") == "explore") or 0
+    tool_chars = [e.get("result_chars") for e in events if e.get("completed")]
+    summary["tool_result_chars"] = sum(tool_chars) if tool_chars and all(c is not None for c in tool_chars) else (0 if not tool_chars else None)
+    return summary
 
 
 def redact_tool_events(events):
@@ -1236,6 +1306,9 @@ def redact_tool_events(events):
         clean = dict(event)
         clean.pop("cmd", None)
         clean.pop("question", None)
+        for field in ("returned", "named"):
+            if clean.get(field):
+                clean[field] = ["sha256:" + sha256_bytes(str(p).encode()) for p in clean[field]]
         for field in ("key", "err"):
             if clean.get(field):
                 clean[field] = "sha256:" + sha256_bytes(str(clean[field]).encode())
@@ -1304,13 +1377,19 @@ def parse_arms(spec):
             arms.append({"name": "OFF", "engine": None, "env": {}})
         elif item in ("V1", "V2"):
             arms.append({"name": item, "engine": item.lower(), "env": {}})
-        elif item.startswith("V2+"):
+        elif item == "V3":
+            # Hook V3 + `sidecar explore` on PATH: exploration is the intervention, recorded in meta.
+            arms.append({"name": item, "engine": "v3", "env": {}, "explore": True})
+        elif item == "V3-hook":
+            arms.append({"name": item, "engine": "v3", "env": {}, "explore": False})
+        elif item.startswith(("V2+", "V3+")):
             feats = item[3:].split("+")
             if not feats or any(f not in KNOWN_FEATURES for f in feats):
                 raise LabError(f"feature desconhecida em {item}: use {sorted(KNOWN_FEATURES)}")
-            arms.append({"name": item, "engine": "v2", "env": {"SIDECAR_FEATURES": ",".join(feats)}})
+            engine = item[:2].lower()
+            arms.append({"name": item, "engine": engine, "env": {"SIDECAR_FEATURES": ",".join(feats)}, "explore": engine == "v3"})
         else:
-            raise LabError(f"braço desconhecido: {item} (use OFF, V1, V2, V2+<feature>[+<feature>])")
+            raise LabError(f"braço desconhecido: {item} (use OFF, V1, V2, V3, V3-hook, V2+<feature>, V3+<feature>)")
     return arms
 
 
@@ -1389,6 +1468,7 @@ def execute_one(agent, task, tdir, arm, rep, args, home):
             "oracle_s": round(time.perf_counter() - t0, 2), "task_sha256": sha256_file(tdir / "task.json"),
             "n_voltas": r.get("n_voltas", 1), "notas": r.get("notas"), "clarification_status": r.get("clarification_status"),
             "volta_injetada": r.get("volta_injetada"), "tool_events": r.get("tool_events", []), "progress": progress_report(args.sidecar if args else None, r.get("tool_events", [])),
+            "sufficiency": r.get("sufficiency"), "token_origins": r.get("token_origins"),
             **{k: r.get(k) for k in ("wall_s", "cost_usd", "tokens_in", "tokens_out", "tool_calls", "turns",
                "served_models", "exit", "timed_out", "hook_delivered", "injected_chars", "incomparable_reasons",
                "stream_error", "first_edit_s", "input_uncached", "cache_read", "cache_create", "output",
@@ -1455,6 +1535,7 @@ def cmd_run(args):
     meta = {"schema": "lab-meta/1", "manifest": manifest, "arms": [a["name"] for a in arms], "seed": args.seed,
             "model_requested": getattr(agent, "model", None), "order": [[t, a["name"], r] for t, a, r in order],
             "tools_allow_by_repo": {task["repo"]: tools_allow_for(task, requested_tools) for task in tasks},
+            "explore_arms": {a["name"]: EXPLORE_TOOLS for a in arms if a.get("explore")},
             "isolation": sandbox_prefix()[1], "oracle_network_isolation": sandbox_prefix()[1],
             "agent_filesystem_isolation": agent_isolation if args.agent == "claude" else "simulated-unrestricted",
             "agent_auth_method": agent_auth if args.agent == "claude" else None,
@@ -1482,7 +1563,7 @@ def cmd_run(args):
                 expected = (sealed_task.get("task_sha256"), sealed_task.get("oracle_sha256"), sealed_task.get("reference_sha256"))
                 if actual != expected:
                     raise LabError("holdout difere do manifesto selado; execução interrompida")
-            arm = dict(arm, tools_allow=tools_allow_for(task, requested_tools))
+            arm = dict(arm, tools_allow=tools_allow_for(task, requested_tools) + (EXPLORE_TOOLS if arm.get("explore") else []))
             rec = execute_one(agent, task, tdir, arm, rep, args, home)
             with runs.open("a") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
@@ -1548,6 +1629,16 @@ def summarize(rows):
         if progress and all(p.get("redundant") is not None for p in progress) else None,
         "stagnant_runs": sum(1 for r in ok if r.get("progress") and r["progress"]["stagnant_windows"] > 0),
     }
+    suff = [r["sufficiency"] for r in ok if r.get("sufficiency")]
+    if suff:
+        # Proxy of allocation/recall only: "moved_on" is not correctness; read it next to pass_rate.
+        keys = list(sufficiency.BUCKETS) + ["total", "concurrent", "redundant_rereads", "stale_reads_after_edit",
+                                            "deliveries_without_effect"]
+        summary["sufficiency"] = {k: (sum(x.get(k) or 0 for x in suff) if all(x.get(k) is not None for x in suff) else None)
+                                  for k in keys}
+        summary["sufficiency"]["runs_with_report"] = len(suff)
+        summary["sufficiency"]["moved_on_and_passed"] = sum(1 for r in ok if r.get("sufficiency") and r["success"]
+                                                            and (r["sufficiency"].get("moved_on") or 0) > 0)
     optional = ("input_uncached", "cache_read", "cache_create", "output", "tool_result_tokens", "index_ms", "hook_ms",
                 "sync_ms", "retrieve_ms", "resident_context_tokens")
     measured = [key for key in optional if any(r.get(key) is not None for r in ok)]
@@ -1624,6 +1715,11 @@ def comparison_plan(arms):
     for a in arms:
         if a.startswith("V2+") and "V2" in arms:
             plan.append((a, "V2"))
+    for a in arms:
+        if a.startswith("V3") and "V2" in arms:
+            plan.append((a, "V2"))  # the V3 promotion question is V3 against V2, not only against OFF
+        if a.startswith("V3") and a != "V3" and "V3" in arms:
+            plan.append((a, "V3"))
     return plan
 
 
@@ -1693,6 +1789,15 @@ def render_md(rep):
                 for arm, summary in sec["arms"].items():
                     if key in summary.get("measured", {}):
                         L.append(f"| {measured_labels[key]} | {arm} | {summary['measured'][key]} |")
+            L.append("")
+        suff_arms = {a: s["sufficiency"] for a, s in sec["arms"].items() if s.get("sufficiency")}
+        if suff_arms:
+            L += ["### Suficiência após cada entrega do Sidecar (próximo ato por thread; NÃO é correção)", "",
+                  "| braço | entregas | moved_on | read_returned | read_named | read_not_returned | search | explore_again | errored | releituras redundantes | leitura após edição | sem efeito |",
+                  "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+            for a, x in suff_arms.items():
+                L.append(f"| {a} | {x['total']} | {x['moved_on']} | {x['read_returned']} | {x['read_named']} | {x['read_not_returned']} | "
+                         f"{x['search']} | {x['explore_again']} | {x['errored']} | {x['redundant_rereads']} | {x['stale_reads_after_edit']} | {x['deliveries_without_effect']} |")
             L.append("")
         for a, p in sec["paired_vs_OFF"].items():
             L.append(f"- {a} vs OFF: {p['pairs']} pares, Δpass {p['d_pass_mean']} IC95 {p['d_pass_ci95']}, Δcusto {p['d_cost_mean']} → **{p['conclusion']}**")
