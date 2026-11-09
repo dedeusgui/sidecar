@@ -1,6 +1,6 @@
 # Benchmarks do Sidecar: índice, nível de evidência e pistas de melhoria
 
-Gerado de `bench/registry.json` (2026-11-08) por `python3 bench/consolidate.py`. **Não edite à mão**: edite o registro e regenere.
+Gerado de `bench/registry.json` (2026-11-09) por `python3 bench/consolidate.py`. **Não edite à mão**: edite o registro e regenere.
 
 ## Níveis de evidência
 
@@ -28,6 +28,10 @@ Gerado de `bench/registry.json` (2026-11-08) por `python3 bench/consolidate.py`.
 | B14-studio-browser | infra | O Studio renderiza dados reais sem erro e sem executar conteúdo hostil? | 0 erros de console, 0 requisições de rede, sem rolagem horizontal; payload hostil exibido como texto | referência | sem linha do tempo por sessão |
 | B15-lab-two-turn | agentic | As notas de impacto (R5) e de pergunta (R4) mudam o resultado com um usuário simulado na segunda volta? | inconclusivo (N=6): nota de impacto entregue em 3/6 execuções e de pergunta em 2/6; falso positivo real do R4 (verbo negado) corrigido | parcial; não é referência | 6 tarefas; usuário simulado; rodada interrompida; sem holdout |
 | B16-corpus-v2 | infra | As 12 tarefas difíceis novas têm oráculo satisfazível e não vacuoso? | 12/12: o oráculo falha na base e passa com o patch de referência; manifesto com 32 tarefas validadas | referência de infraestrutura | dificuldade projetada, nunca medida com agente; autoria por subagentes |
+| B17-v3-relevance-router | offline | A Engine V3 (RelevanceGate + EffortRouter, opt-in) reduz contexto indevido sem perder recall em relação à V2? | FP B03 30/180→14/180; longos 3/6→1/6; independente 13/40→9/40 com Hit@5 igual (83,3%) e 0 positivos vazios; tokens nos positivos −29% a −31%; fixtures internas curtas de domínio perdem Hit@5 67,5%→57,5% (FN 5→13) | inconclusivo para promoção; V3 continua opt-in | regras desenhadas pelo autor do código; uma revisão após ver o agregado do split eval interno (não-cego); meta FP<5% não atingida; nenhum efeito agentic medido |
+| B18-explore-fact-coverage | offline | Os fatos exigidos por um oráculo de navegação chegam ao agente pelo hook V2/V3 ou pelo sidecar explore, e a que custo? | fatos presentes: hook V2 14/26 (12,4k chars), hook V3 13/26 (8,1k), explore 22/26 com 4/7 tarefas completas (38,9k chars) | referência offline; nenhuma economia agentic demonstrada | fato presente não é resposta correta; N=7; mesmo autor das perguntas e do explore; explore custa ~4x mais caracteres |
+| B19-aider-repomap-baseline | offline | Como o RepoMap do Aider (prompt como identificadores mencionados, sem arquivos no chat) se compara à V3 nos mesmos casos? | RepoMap Hit@5 30%/37,5%/20% (ten/longos/independente) vs V3 97,5%/87,5%/83,3%; RepoMap não se abstém (FP 100%) e entrega ~1000 tokens por prompt | baseline de referência | RepoMap foi desenhado como mapa com arquivos no chat, não como recuperação por prompt; uso aqui é o modo sem chat |
+| B20-ranking-determinism | infra | O ranking é idêntico entre construções independentes do índice? | antes: 10 listas de resultado diferiam (caso R05-1, empates entre homônimos desempatados por ID de linha); depois: 0 | corrigido | o teste sintético não reproduz o caso real; a prova é a comparação das 3 construções |
 
 ### Dados e comandos
 
@@ -95,6 +99,22 @@ artefatos: `bench/results/lab-two-turn-2026-11-08`, `docs/benchmarks-2026-11-08.
 comando: `python3 bench/lab/lab.py validate-task <ID>`  
 artefatos: `bench/lab/corpus/manifest.json`
 
+**B17-v3-relevance-router** — dados: B02/B03/B04 dev+validation, fixtures internas tune+eval, cenários V2 e conjunto independente novo (bench/v3/e1_independent.json, 30 positivos + 40 negativos, congelado antes do código V3); holdout excluído  
+comando: `go run ./cmd/sidecar-eval --external-cases OUT --out R.json --v3-decisions D.json && python3 bench/v3/e1_report.py --base 'v2 (intent + contract + packer)' --new 'v3 (relevance gate + effort router)' suite=R.json`  
+artefatos: `bench/results/v3-e1-2026-11-09/e1-v2-vs-v3.md`, `bench/results/v3-e1-2026-11-09/e1-v2-vs-v3.json`, `bench/v3/e1_independent.json`
+
+**B18-explore-fact-coverage** — dados: bench/lab/corpus-nav: 7 perguntas de fluxo (chi, click, express, hono, monolog, serde-json, sinatra), 26 fatos verificados por grep antes de qualquer execução  
+comando: `python3 bench/v3/e2_offline.py --sidecar BIN --checkout DIR`  
+artefatos: `bench/results/v3-e1-2026-11-09/e2-offline.md`, `bench/results/v3-e1-2026-11-09/e2-offline.json`, `bench/lab/corpus-nav/manifest.json`
+
+**B19-aider-repomap-baseline** — dados: mesmas suítes externas do B17; aider-chat 0.86.2 em venv isolado, map-tokens 1024  
+comando: `$AIDER_PY bench/v3/repomap_baseline.py MANIFEST OUT && python3 bench/v3/e1_report.py --base 'aider repomap' --new 'v3 (relevance gate + effort router)' suite=COMBINED.json`  
+artefatos: `bench/results/v3-e1-2026-11-09/e1-repomap-vs-v3.md`, `bench/results/v3-e1-2026-11-09/repomap-independent-outcomes.json`, `bench/v3/repomap_baseline.py`
+
+**B20-ranking-determinism** — dados: ten-repos, todos os métodos do sidecar-eval, 3 construções do índice antes e depois da correção  
+comando: `go run ./cmd/sidecar-eval --external-cases OUT --out det-N.json (3x) e comparar listas top`  
+artefatos: `internal/retrieve/determinism_test.go`
+
 ## Pistas de melhoria (insumos do V3)
 
 Cada pista aponta o benchmark que a sustenta e o que mediria a confirmação. São hipóteses, não decisões.
@@ -115,3 +135,5 @@ Cada pista aponta o benchmark que a sustenta e o que mediria a confirmação. S�
 | L12 | B12 | Efeito do contexto é heterogêneo por tarefa nos dois sentidos (ajuda CHI-CC-01, prejudica CHI-DBG-01 e CLK-CC-01) | Política seletiva por classe de tarefa e especificidade, medida por tarefa com repetições suficientes | B12 com ≥ 5 repetições nas tarefas que dividem os braços | alta |
 | L13 | B15, B08 | O R4 não detecta pedido vago de estilo (CLK-AMB-01) e pode tratar verbo negado como edição (corrigido) | Derivar alternativas do próprio repositório (formas existentes de apresentar/validar) antes de perguntar; tratar cláusulas proibidas como leitura | B08 ampliado + corpus com ≥ 5 tarefas ambíguas detectáveis | média |
 | L14 | B15, B16 | A rodada de duas voltas e o holdout final ficaram incompletos por limite de uso; o corpus v2 nunca foi rodado com agente | Cachear dependências por tarefa (npm/bundle; venv não copia) e rodar a rodada completa e o holdout uma única vez | B15 com ≥ 15 tarefas e ≥ 3 repetições; holdout com --final | alta (fecha lacunas de medição) |
+| L15 | B17 | Prompts curtos na linguagem de domínio do repositório têm o mesmo perfil léxico de negativos (1-2 termos casados); a V3 perde 8 positivos internos | Sinal de especificidade por raridade de NOMES do repositório (L02) ou vocabulário derivado de docs/comentários (L01), avaliado em conjunto independente NOVO | novo conjunto independente; B17 não pode mais ser usado para escolher | alta |
+| L16 | B18 | Explore não entrega handler/write do Monolog, route! do Sinatra e parse_args do Click; entrega ~4x mais caracteres que o hook | Expandir cadeia por chamadas a partir do melhor seed (callers/callees com corpo) e cortar símbolos sem termo da consulta | B18 + E2 agentic com suficiência por entrega | média |

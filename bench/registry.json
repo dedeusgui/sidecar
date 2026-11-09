@@ -1,6 +1,6 @@
 {
   "schema": "bench-registry/1",
-  "updated": "2026-11-08",
+  "updated": "2026-11-09",
   "evidence_levels": {
     "infra": "prova que uma peça funciona (teste, E2E de instalação); não mede ganho",
     "offline": "recuperação/política medida sem agente; não é resultado de desenvolvimento",
@@ -215,6 +215,64 @@
       "headline": "12/12: o oráculo falha na base e passa com o patch de referência; manifesto com 32 tarefas validadas",
       "status": "referência de infraestrutura",
       "caveat": "dificuldade projetada, nunca medida com agente; autoria por subagentes"
+    },
+    {
+      "id": "B17-v3-relevance-router",
+      "level": "offline",
+      "question": "A Engine V3 (RelevanceGate + EffortRouter, opt-in) reduz contexto indevido sem perder recall em relação à V2?",
+      "data": "B02/B03/B04 dev+validation, fixtures internas tune+eval, cenários V2 e conjunto independente novo (bench/v3/e1_independent.json, 30 positivos + 40 negativos, congelado antes do código V3); holdout excluído",
+      "command": "go run ./cmd/sidecar-eval --external-cases OUT --out R.json --v3-decisions D.json && python3 bench/v3/e1_report.py --base 'v2 (intent + contract + packer)' --new 'v3 (relevance gate + effort router)' suite=R.json",
+      "artifacts": [
+        "bench/results/v3-e1-2026-11-09/e1-v2-vs-v3.md",
+        "bench/results/v3-e1-2026-11-09/e1-v2-vs-v3.json",
+        "bench/v3/e1_independent.json"
+      ],
+      "headline": "FP B03 30/180→14/180; longos 3/6→1/6; independente 13/40→9/40 com Hit@5 igual (83,3%) e 0 positivos vazios; tokens nos positivos −29% a −31%; fixtures internas curtas de domínio perdem Hit@5 67,5%→57,5% (FN 5→13)",
+      "status": "inconclusivo para promoção; V3 continua opt-in",
+      "caveat": "regras desenhadas pelo autor do código; uma revisão após ver o agregado do split eval interno (não-cego); meta FP<5% não atingida; nenhum efeito agentic medido"
+    },
+    {
+      "id": "B18-explore-fact-coverage",
+      "level": "offline",
+      "question": "Os fatos exigidos por um oráculo de navegação chegam ao agente pelo hook V2/V3 ou pelo sidecar explore, e a que custo?",
+      "data": "bench/lab/corpus-nav: 7 perguntas de fluxo (chi, click, express, hono, monolog, serde-json, sinatra), 26 fatos verificados por grep antes de qualquer execução",
+      "command": "python3 bench/v3/e2_offline.py --sidecar BIN --checkout DIR",
+      "artifacts": [
+        "bench/results/v3-e1-2026-11-09/e2-offline.md",
+        "bench/results/v3-e1-2026-11-09/e2-offline.json",
+        "bench/lab/corpus-nav/manifest.json"
+      ],
+      "headline": "fatos presentes: hook V2 14/26 (12,4k chars), hook V3 13/26 (8,1k), explore 22/26 com 4/7 tarefas completas (38,9k chars)",
+      "status": "referência offline; nenhuma economia agentic demonstrada",
+      "caveat": "fato presente não é resposta correta; N=7; mesmo autor das perguntas e do explore; explore custa ~4x mais caracteres"
+    },
+    {
+      "id": "B19-aider-repomap-baseline",
+      "level": "offline",
+      "question": "Como o RepoMap do Aider (prompt como identificadores mencionados, sem arquivos no chat) se compara à V3 nos mesmos casos?",
+      "data": "mesmas suítes externas do B17; aider-chat 0.86.2 em venv isolado, map-tokens 1024",
+      "command": "$AIDER_PY bench/v3/repomap_baseline.py MANIFEST OUT && python3 bench/v3/e1_report.py --base 'aider repomap' --new 'v3 (relevance gate + effort router)' suite=COMBINED.json",
+      "artifacts": [
+        "bench/results/v3-e1-2026-11-09/e1-repomap-vs-v3.md",
+        "bench/results/v3-e1-2026-11-09/repomap-independent-outcomes.json",
+        "bench/v3/repomap_baseline.py"
+      ],
+      "headline": "RepoMap Hit@5 30%/37,5%/20% (ten/longos/independente) vs V3 97,5%/87,5%/83,3%; RepoMap não se abstém (FP 100%) e entrega ~1000 tokens por prompt",
+      "status": "baseline de referência",
+      "caveat": "RepoMap foi desenhado como mapa com arquivos no chat, não como recuperação por prompt; uso aqui é o modo sem chat"
+    },
+    {
+      "id": "B20-ranking-determinism",
+      "level": "infra",
+      "question": "O ranking é idêntico entre construções independentes do índice?",
+      "data": "ten-repos, todos os métodos do sidecar-eval, 3 construções do índice antes e depois da correção",
+      "command": "go run ./cmd/sidecar-eval --external-cases OUT --out det-N.json (3x) e comparar listas top",
+      "artifacts": [
+        "internal/retrieve/determinism_test.go"
+      ],
+      "headline": "antes: 10 listas de resultado diferiam (caso R05-1, empates entre homônimos desempatados por ID de linha); depois: 0",
+      "status": "corrigido",
+      "caveat": "o teste sintético não reproduz o caso real; a prova é a comparação das 3 construções"
     }
   ],
   "improvement_leads": [
@@ -365,6 +423,26 @@
       "hypothesis_v3": "Cachear dependências por tarefa (npm/bundle; venv não copia) e rodar a rodada completa e o holdout uma única vez",
       "confirm_with": "B15 com ≥ 15 tarefas e ≥ 3 repetições; holdout com --final",
       "priority": "alta (fecha lacunas de medição)"
+    },
+    {
+      "id": "L15",
+      "source": [
+        "B17"
+      ],
+      "problem": "Prompts curtos na linguagem de domínio do repositório têm o mesmo perfil léxico de negativos (1-2 termos casados); a V3 perde 8 positivos internos",
+      "hypothesis_v3": "Sinal de especificidade por raridade de NOMES do repositório (L02) ou vocabulário derivado de docs/comentários (L01), avaliado em conjunto independente NOVO",
+      "confirm_with": "novo conjunto independente; B17 não pode mais ser usado para escolher",
+      "priority": "alta"
+    },
+    {
+      "id": "L16",
+      "source": [
+        "B18"
+      ],
+      "problem": "Explore não entrega handler/write do Monolog, route! do Sinatra e parse_args do Click; entrega ~4x mais caracteres que o hook",
+      "hypothesis_v3": "Expandir cadeia por chamadas a partir do melhor seed (callers/callees com corpo) e cortar símbolos sem termo da consulta",
+      "confirm_with": "B18 + E2 agentic com suficiência por entrega",
+      "priority": "média"
     }
   ]
 }

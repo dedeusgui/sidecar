@@ -29,7 +29,7 @@ O problema é uma cadeia causal: a evidência precisa ser (a) relevante, (b) cor
 | B15 | 30 execuções de 2 turnos (6 tarefas × 5 braços, N=6): OFF/V2/Brief/Groom 5/6; Impact 4/6 | **Inconclusivo**; Brief teve mais tokens/chamadas; R4/R5 não promovidos. |
 | B16 | 32 tarefas validadas (12 novas, 9 holdout), oráculo falha no base e passa no patch de referência | Dificuldade **não** testada com agente; holdout não foi executado. |
 
-O core default continua V1, com V2 opt-in (verificar em código), e features `adaptive`, `brief`, `groom`, `impact` experimentais. Não marcar a V3 como disponível até cumprir gates.
+O core default continua V1, com V2 opt-in (verificar em código), e features `adaptive`, `brief`, `groom`, `impact` experimentais. **Atualização 2026-11-09:** a Engine V3 existe como opt-in experimental (`SIDECAR_ENGINE=v3`, `internal/engine`) e `sidecar explore` como CLI experimental (`internal/explore`); nenhum gate de promoção foi cumprido (sem evidência agentic). Estado em [progress.md](progress.md).
 
 ## Diagnóstico causal e prioridades
 
@@ -78,7 +78,8 @@ Esses perfis não autorizam LLM no core. Testar Haiku, Sonnet e um modelo mais f
 - `internal/progress`: observação e shadow intervention; ainda não comprova redução de calls.
 - `internal/index`, `internal/store`, `internal/extract`, `internal/lsp`: fontes indexadas/estruturais; preferir reuso.
 - `bench/lab` e `cmd/sidecar-eval`: infra de eval; `bench/results` traz artifacts anteriores.
-- `cmd/sidecar/main.go`: CLI (ainda **não** há `sidecar explore` V3). Adicionar só com teste de cliente e fallback.
+- `cmd/sidecar/main.go`: CLI, inclui `sidecar explore` (experimental, contrato em [../explore.md](../explore.md)); sem adaptador MCP nem E2E de cliente.
+- `internal/engine`: RelevanceGate/EffortRouter V3 opt-in; `internal/explore`: exploração sob demanda; `bench/lab/sufficiency.py`: próximo ato após cada entrega.
 
 ## Milestones e gates (sem MVP fictício)
 

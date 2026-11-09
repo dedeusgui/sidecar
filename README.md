@@ -56,7 +56,8 @@ estruturais, o orçamento de tokens, os tempos por fase e o contexto final. Use 
 | `sidecar status [--root DIR] [--json]` | resumo do índice do repositório |
 | `sidecar doctor` | instalação, binário, SQLite/FTS5, integridade do índice, falhas recentes |
 | `sidecar feedback record\|list\|purge [--root DIR] [--json]` | feedback pós-tarefa sobre evidências, opt-in; afeta o ranking só com `SIDECAR_ENGINE=v2`. `record --helpful ID --misleading ID` ou JSON no stdin; `purge` remove os obsoletos (`--all`: todos). Ver [agent-feedback.md](docs/agent-feedback.md) |
-| `sidecar explain [--root DIR] [--json]` | rastro completo de um prompt (lê stdin) |
+| `sidecar explain [--root DIR] [--json] [--engine v1\|v2\|v3]` | rastro completo de um prompt (lê stdin); com `v3` inclui a decisão do RelevanceGate/EffortRouter |
+| `sidecar explore --query TEXTO [--root DIR] [--json]` | **experimental**: exploração estrutural sob demanda (trechos numerados, chamadas/imports verificados, testes, impacto, lacunas) sob orçamento. Ver [explore.md](docs/explore.md) |
 | `sidecar activity [--json] [--limit N]` | últimas execuções do hook: `injected`, `no_evidence`, `skipped`, `partial`, `failed`, com latência p50/p95; nunca mostra o prompt |
 | `sidecar statusline` | uma linha para a status line, p. ex. `Sidecar: injected · 4 refs · 18ms` ou `Sidecar: no match` |
 | `sidecar lsp status\|doctor\|trust\|setup` | servidores de linguagem (opt-in); veja abaixo |
@@ -135,6 +136,10 @@ O projeto segue funcional na versão atual. A **V2 completa ainda está em desen
 - [Implementações open source de referência, caminhos de código e licenças](docs/reference-implementations.md)
 
 As funções novas são **planejadas, não entregues**. Toda alegação de ganho precisará de benchmark offline e A/B agentic, incluindo efeitos negativos.
+
+## Engine V3 (experimental, opt-in)
+
+`SIDECAR_ENGINE=v3` ativa um gate de relevância e um roteador de esforço determinísticos sobre a V2: abstém-se em conversa e assuntos fora do repositório, escolhe resposta enxuta, brief, verificação ou exploração sob demanda e registra o motivo de cada item. Sem modelo, rede ou embeddings. Medição offline (B17): menos falsos positivos e −29% de tokens sem perder Hit@5 nos repositórios externos, mas perda de recall em prompts curtos de domínio; **nenhum ganho end-to-end com agentes foi medido**. O default continua V1. Estado e números: [docs/v3/progress.md](docs/v3/progress.md).
 
 ## Engenharia, benchmarks e roadmap
 

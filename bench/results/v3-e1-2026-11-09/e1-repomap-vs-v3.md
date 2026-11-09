@@ -1,0 +1,318 @@
+# E1 — v3 (relevance gate + effort router) vs aider repomap
+
+Holdout incluído: não
+
+| Suíte | Método | FP/neg | Hit@1 | Hit@5 | MRR | Positivos vazios | Tokens pos | Tokens neg | p50 ms | p95 ms |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ten | aider repomap | 10/10 | 0.0% | 30.0% | 0.1363 | 0/40 | 1012.1 | 1022 | 102.47 | 4691.59 |
+| ten | v3 (relevance gate + effort router) | 0/10 | 52.5% | 97.5% | 0.7108 | 0/40 | 299.1 | 0 | 11.94 | 64.05 |
+| hn | aider repomap | 180/180 | — | — | — | 0/0 | None | 1044.7 | 80.53 | 381.12 |
+| hn | v3 (relevance gate + effort router) | 14/180 | — | — | — | 0/0 | None | 14.4 | 2.97 | 16.98 |
+| long | aider repomap | 6/6 | 6.2% | 37.5% | 0.2078 | 0/16 | 1015.6 | 992.5 | 58.05 | 1766.82 |
+| long | v3 (relevance gate + effort router) | 1/6 | 56.2% | 87.5% | 0.6844 | 0/16 | 339.9 | 28.3 | 15.57 | 27.01 |
+| ind | aider repomap | 40/40 | 3.3% | 20.0% | 0.1379 | 0/30 | 1010.3 | 1027.0 | 95.88 | 481.05 |
+| ind | v3 (relevance gate + effort router) | 9/40 | 56.7% | 83.3% | 0.6775 | 0/30 | 293.7 | 37.2 | 12.21 | 29.6 |
+
+## ten: 49 melhorias, 1 regressões
+- regressed `R03-3` (development, positive): hit5 True->False rr 0.333->0.000 empty False->False
+- improved `R01-1` (development, positive): hit5 False->True rr 0.077->1.000 empty False->False
+- improved `R01-2` (development, positive): hit5 False->True rr 0.037->1.000 empty False->False
+- improved `R01-3` (development, positive): hit5 False->True rr 0.018->1.000 empty False->False
+- improved `R01-4` (development, positive): hit5 False->True rr 0.037->1.000 empty False->False
+- improved `R01-5` (development, negative): FP True -> False
+- improved `R02-1` (development, positive): hit5 False->True rr 0.017->0.200 empty False->False
+- improved `R02-2` (development, positive): hit5 False->True rr 0.017->0.500 empty False->False
+- improved `R02-3` (development, positive): hit5 False->True rr 0.015->1.000 empty False->False
+- improved `R02-4` (development, positive): hit5 False->True rr 0.017->0.500 empty False->False
+- improved `R02-5` (development, negative): FP True -> False
+- improved `R03-1` (development, positive): hit5 False->True rr 0.036->1.000 empty False->False
+- improved `R03-2` (development, positive): hit5 False->True rr 0.036->0.500 empty False->False
+- improved `R03-4` (development, positive): hit5 False->True rr 0.036->0.500 empty False->False
+- improved `R03-5` (development, negative): FP True -> False
+- improved `R04-1` (development, positive): hit5 False->True rr 0.021->1.000 empty False->False
+- improved `R04-2` (development, positive): hit5 False->True rr 0.021->1.000 empty False->False
+- improved `R04-3` (development, positive): hit5 False->True rr 0.007->0.200 empty False->False
+- improved `R04-4` (development, positive): hit5 False->True rr 0.021->1.000 empty False->False
+- improved `R04-5` (development, negative): FP True -> False
+- improved `R05-1` (development, positive): hit5 False->True rr 0.125->0.333 empty False->False
+- improved `R05-2` (development, positive): hit5 False->True rr 0.034->0.500 empty False->False
+- improved `R05-3` (development, positive): hit5 False->True rr 0.083->0.500 empty False->False
+- improved `R05-4` (development, positive): hit5 False->True rr 0.100->0.500 empty False->False
+- improved `R05-5` (development, negative): FP True -> False
+- improved `R06-1` (development, positive): hit5 True->True rr 0.250->0.500 empty False->False
+- improved `R06-2` (development, positive): hit5 True->True rr 0.250->0.500 empty False->False
+- improved `R06-3` (development, positive): hit5 True->True rr 0.250->1.000 empty False->False
+- improved `R06-4` (development, positive): hit5 True->True rr 0.250->0.500 empty False->False
+- improved `R06-5` (development, negative): FP True -> False
+- improved `R07-1` (development, positive): hit5 True->True rr 0.500->1.000 empty False->False
+- improved `R07-2` (development, positive): hit5 True->True rr 0.500->1.000 empty False->False
+- improved `R07-3` (development, positive): hit5 True->True rr 0.500->1.000 empty False->False
+- improved `R07-4` (development, positive): hit5 True->True rr 0.500->1.000 empty False->False
+- improved `R07-5` (development, negative): FP True -> False
+- improved `R08-1` (development, positive): hit5 False->True rr 0.083->0.200 empty False->False
+- improved `R08-2` (development, positive): hit5 False->True rr 0.071->1.000 empty False->False
+- improved `R08-3` (development, positive): hit5 False->True rr 0.167->0.500 empty False->False
+- improved `R08-4` (development, positive): hit5 False->True rr 0.071->1.000 empty False->False
+- improved `R08-5` (development, negative): FP True -> False
+- improved `R09-1` (development, positive): hit5 False->True rr 0.013->0.333 empty False->False
+- improved `R09-2` (development, positive): hit5 False->True rr 0.013->0.333 empty False->False
+- improved `R09-3` (development, positive): hit5 False->True rr 0.030->1.000 empty False->False
+- improved `R09-4` (development, positive): hit5 False->True rr 0.013->0.333 empty False->False
+- improved `R09-5` (development, negative): FP True -> False
+- improved `R10-1` (development, positive): hit5 True->True rr 0.333->1.000 empty False->False
+- improved `R10-2` (development, positive): hit5 True->True rr 0.200->1.000 empty False->False
+- improved `R10-3` (development, positive): hit5 False->True rr 0.167->1.000 empty False->False
+- improved `R10-4` (development, positive): hit5 True->True rr 0.200->1.000 empty False->False
+- improved `R10-5` (development, negative): FP True -> False
+
+## hn: 166 melhorias, 0 regressões
+- improved `HN-dev-01@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-01@chi` (dev, negative): FP True -> False
+- improved `HN-dev-01@click` (dev, negative): FP True -> False
+- improved `HN-dev-01@hono` (dev, negative): FP True -> False
+- improved `HN-dev-01@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-01@sinatra` (dev, negative): FP True -> False
+- improved `HN-dev-01@monolog` (dev, negative): FP True -> False
+- improved `HN-dev-01@kotlinx-datetime` (dev, negative): FP True -> False
+- improved `HN-dev-01@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-01@express` (dev, negative): FP True -> False
+- improved `HN-dev-02@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-02@chi` (dev, negative): FP True -> False
+- improved `HN-dev-02@click` (dev, negative): FP True -> False
+- improved `HN-dev-02@hono` (dev, negative): FP True -> False
+- improved `HN-dev-02@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-02@sinatra` (dev, negative): FP True -> False
+- improved `HN-dev-02@monolog` (dev, negative): FP True -> False
+- improved `HN-dev-02@kotlinx-datetime` (dev, negative): FP True -> False
+- improved `HN-dev-02@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-02@express` (dev, negative): FP True -> False
+- improved `HN-dev-03@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-03@chi` (dev, negative): FP True -> False
+- improved `HN-dev-03@click` (dev, negative): FP True -> False
+- improved `HN-dev-03@hono` (dev, negative): FP True -> False
+- improved `HN-dev-03@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-03@sinatra` (dev, negative): FP True -> False
+- improved `HN-dev-03@monolog` (dev, negative): FP True -> False
+- improved `HN-dev-03@kotlinx-datetime` (dev, negative): FP True -> False
+- improved `HN-dev-03@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-03@express` (dev, negative): FP True -> False
+- improved `HN-dev-04@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-04@chi` (dev, negative): FP True -> False
+- improved `HN-dev-04@click` (dev, negative): FP True -> False
+- improved `HN-dev-04@hono` (dev, negative): FP True -> False
+- improved `HN-dev-04@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-04@sinatra` (dev, negative): FP True -> False
+- improved `HN-dev-04@monolog` (dev, negative): FP True -> False
+- improved `HN-dev-04@kotlinx-datetime` (dev, negative): FP True -> False
+- improved `HN-dev-04@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-04@express` (dev, negative): FP True -> False
+- improved `HN-dev-05@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-05@chi` (dev, negative): FP True -> False
+- improved `HN-dev-05@click` (dev, negative): FP True -> False
+- improved `HN-dev-05@hono` (dev, negative): FP True -> False
+- improved `HN-dev-05@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-05@sinatra` (dev, negative): FP True -> False
+- improved `HN-dev-05@monolog` (dev, negative): FP True -> False
+- improved `HN-dev-05@kotlinx-datetime` (dev, negative): FP True -> False
+- improved `HN-dev-05@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-05@express` (dev, negative): FP True -> False
+- improved `HN-dev-06@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-06@chi` (dev, negative): FP True -> False
+- improved `HN-dev-06@hono` (dev, negative): FP True -> False
+- improved `HN-dev-06@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-06@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-06@express` (dev, negative): FP True -> False
+- improved `HN-dev-07@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-07@chi` (dev, negative): FP True -> False
+- improved `HN-dev-07@click` (dev, negative): FP True -> False
+- improved `HN-dev-07@hono` (dev, negative): FP True -> False
+- improved `HN-dev-07@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-07@sinatra` (dev, negative): FP True -> False
+- improved `HN-dev-07@monolog` (dev, negative): FP True -> False
+- improved `HN-dev-07@kotlinx-datetime` (dev, negative): FP True -> False
+- improved `HN-dev-07@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-07@express` (dev, negative): FP True -> False
+- improved `HN-dev-08@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-08@chi` (dev, negative): FP True -> False
+- improved `HN-dev-08@click` (dev, negative): FP True -> False
+- improved `HN-dev-08@hono` (dev, negative): FP True -> False
+- improved `HN-dev-08@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-08@sinatra` (dev, negative): FP True -> False
+- improved `HN-dev-08@monolog` (dev, negative): FP True -> False
+- improved `HN-dev-08@kotlinx-datetime` (dev, negative): FP True -> False
+- improved `HN-dev-08@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-08@express` (dev, negative): FP True -> False
+- improved `HN-dev-09@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-09@chi` (dev, negative): FP True -> False
+- improved `HN-dev-09@click` (dev, negative): FP True -> False
+- improved `HN-dev-09@hono` (dev, negative): FP True -> False
+- improved `HN-dev-09@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-09@sinatra` (dev, negative): FP True -> False
+- improved `HN-dev-09@monolog` (dev, negative): FP True -> False
+- improved `HN-dev-09@kotlinx-datetime` (dev, negative): FP True -> False
+- improved `HN-dev-09@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-09@express` (dev, negative): FP True -> False
+- improved `HN-dev-10@spring-petclinic` (dev, negative): FP True -> False
+- improved `HN-dev-10@chi` (dev, negative): FP True -> False
+- improved `HN-dev-10@click` (dev, negative): FP True -> False
+- improved `HN-dev-10@hono` (dev, negative): FP True -> False
+- improved `HN-dev-10@serde-json` (dev, negative): FP True -> False
+- improved `HN-dev-10@sinatra` (dev, negative): FP True -> False
+- improved `HN-dev-10@monolog` (dev, negative): FP True -> False
+- improved `HN-dev-10@kotlinx-datetime` (dev, negative): FP True -> False
+- improved `HN-dev-10@dapper` (dev, negative): FP True -> False
+- improved `HN-dev-10@express` (dev, negative): FP True -> False
+- improved `HN-validation-01@spring-petclinic` (validation, negative): FP True -> False
+- improved `HN-validation-01@chi` (validation, negative): FP True -> False
+- improved `HN-validation-01@click` (validation, negative): FP True -> False
+- improved `HN-validation-01@hono` (validation, negative): FP True -> False
+- improved `HN-validation-01@serde-json` (validation, negative): FP True -> False
+- improved `HN-validation-01@sinatra` (validation, negative): FP True -> False
+- improved `HN-validation-01@monolog` (validation, negative): FP True -> False
+- improved `HN-validation-01@kotlinx-datetime` (validation, negative): FP True -> False
+- improved `HN-validation-01@dapper` (validation, negative): FP True -> False
+- improved `HN-validation-01@express` (validation, negative): FP True -> False
+- improved `HN-validation-02@spring-petclinic` (validation, negative): FP True -> False
+- improved `HN-validation-02@chi` (validation, negative): FP True -> False
+- improved `HN-validation-02@click` (validation, negative): FP True -> False
+- improved `HN-validation-02@hono` (validation, negative): FP True -> False
+- improved `HN-validation-02@serde-json` (validation, negative): FP True -> False
+- improved `HN-validation-02@sinatra` (validation, negative): FP True -> False
+- improved `HN-validation-02@kotlinx-datetime` (validation, negative): FP True -> False
+- improved `HN-validation-02@dapper` (validation, negative): FP True -> False
+- improved `HN-validation-02@express` (validation, negative): FP True -> False
+- improved `HN-validation-03@spring-petclinic` (validation, negative): FP True -> False
+- improved `HN-validation-03@chi` (validation, negative): FP True -> False
+- improved `HN-validation-03@click` (validation, negative): FP True -> False
+- improved `HN-validation-03@hono` (validation, negative): FP True -> False
+- improved `HN-validation-03@serde-json` (validation, negative): FP True -> False
+- improved `HN-validation-03@sinatra` (validation, negative): FP True -> False
+- improved `HN-validation-03@monolog` (validation, negative): FP True -> False
+- improved `HN-validation-03@kotlinx-datetime` (validation, negative): FP True -> False
+- improved `HN-validation-03@dapper` (validation, negative): FP True -> False
+- improved `HN-validation-03@express` (validation, negative): FP True -> False
+- improved `HN-validation-04@spring-petclinic` (validation, negative): FP True -> False
+- improved `HN-validation-04@chi` (validation, negative): FP True -> False
+- improved `HN-validation-04@click` (validation, negative): FP True -> False
+- improved `HN-validation-04@hono` (validation, negative): FP True -> False
+- improved `HN-validation-04@serde-json` (validation, negative): FP True -> False
+- improved `HN-validation-04@sinatra` (validation, negative): FP True -> False
+- improved `HN-validation-04@monolog` (validation, negative): FP True -> False
+- improved `HN-validation-04@kotlinx-datetime` (validation, negative): FP True -> False
+- improved `HN-validation-04@dapper` (validation, negative): FP True -> False
+- improved `HN-validation-04@express` (validation, negative): FP True -> False
+- improved `HN-validation-05@spring-petclinic` (validation, negative): FP True -> False
+- improved `HN-validation-05@chi` (validation, negative): FP True -> False
+- improved `HN-validation-05@click` (validation, negative): FP True -> False
+- improved `HN-validation-05@hono` (validation, negative): FP True -> False
+- improved `HN-validation-05@serde-json` (validation, negative): FP True -> False
+- improved `HN-validation-05@sinatra` (validation, negative): FP True -> False
+- improved `HN-validation-05@kotlinx-datetime` (validation, negative): FP True -> False
+- improved `HN-validation-05@dapper` (validation, negative): FP True -> False
+- improved `HN-validation-05@express` (validation, negative): FP True -> False
+- improved `HN-validation-06@spring-petclinic` (validation, negative): FP True -> False
+- improved `HN-validation-06@express` (validation, negative): FP True -> False
+- improved `HN-validation-07@spring-petclinic` (validation, negative): FP True -> False
+- improved `HN-validation-07@chi` (validation, negative): FP True -> False
+- improved `HN-validation-07@click` (validation, negative): FP True -> False
+- improved `HN-validation-07@hono` (validation, negative): FP True -> False
+- improved `HN-validation-07@serde-json` (validation, negative): FP True -> False
+- improved `HN-validation-07@sinatra` (validation, negative): FP True -> False
+- improved `HN-validation-07@monolog` (validation, negative): FP True -> False
+- improved `HN-validation-07@kotlinx-datetime` (validation, negative): FP True -> False
+- improved `HN-validation-07@dapper` (validation, negative): FP True -> False
+- improved `HN-validation-07@express` (validation, negative): FP True -> False
+- improved `HN-validation-08@spring-petclinic` (validation, negative): FP True -> False
+- improved `HN-validation-08@chi` (validation, negative): FP True -> False
+- improved `HN-validation-08@click` (validation, negative): FP True -> False
+- improved `HN-validation-08@hono` (validation, negative): FP True -> False
+- improved `HN-validation-08@serde-json` (validation, negative): FP True -> False
+- improved `HN-validation-08@sinatra` (validation, negative): FP True -> False
+- improved `HN-validation-08@monolog` (validation, negative): FP True -> False
+- improved `HN-validation-08@kotlinx-datetime` (validation, negative): FP True -> False
+- improved `HN-validation-08@dapper` (validation, negative): FP True -> False
+- improved `HN-validation-08@express` (validation, negative): FP True -> False
+
+## long: 18 melhorias, 3 regressões
+- regressed `LP-07` (dev, positive): hit5 True->True rr 0.333->0.250 empty False->False
+- regressed `LP-08` (dev, positive): hit5 True->False rr 0.500->0.000 empty False->False
+- regressed `LP-15` (validation, positive): hit5 True->False rr 1.000->0.000 empty False->False
+- improved `LP-01` (dev, positive): hit5 False->True rr 0.043->1.000 empty False->False
+- improved `LP-02` (dev, positive): hit5 False->True rr 0.043->0.200 empty False->False
+- improved `LP-03` (dev, positive): hit5 False->True rr 0.125->1.000 empty False->False
+- improved `LP-04` (dev, positive): hit5 False->True rr 0.017->1.000 empty False->False
+- improved `LP-05` (dev, positive): hit5 False->True rr 0.029->1.000 empty False->False
+- improved `LP-06` (dev, positive): hit5 True->True rr 0.200->0.500 empty False->False
+- improved `LP-09` (validation, positive): hit5 True->True rr 0.333->0.500 empty False->False
+- improved `LP-10` (validation, positive): hit5 False->True rr 0.033->1.000 empty False->False
+- improved `LP-11` (validation, positive): hit5 True->True rr 0.333->1.000 empty False->False
+- improved `LP-12` (validation, positive): hit5 False->True rr 0.111->1.000 empty False->False
+- improved `LP-13` (validation, positive): hit5 False->True rr 0.036->0.500 empty False->False
+- improved `LP-14` (validation, positive): hit5 False->True rr 0.167->1.000 empty False->False
+- improved `LP-16` (validation, positive): hit5 False->True rr 0.019->1.000 empty False->False
+- improved `LN-01` (dev, negative): FP True -> False
+- improved `LN-03` (dev, negative): FP True -> False
+- improved `LN-04` (validation, negative): FP True -> False
+- improved `LN-05` (validation, negative): FP True -> False
+- improved `LN-06` (validation, negative): FP True -> False
+
+## ind: 55 melhorias, 4 regressões
+- regressed `V3I-P01` (independent, positive): hit5 False->False rr 0.034->0.000 empty False->False
+- regressed `V3I-P12` (independent, positive): hit5 False->False rr 0.021->0.000 empty False->False
+- regressed `V3I-P21` (independent, positive): hit5 False->False rr 0.014->0.000 empty False->False
+- regressed `V3I-P25` (independent, positive): hit5 False->False rr 0.034->0.000 empty False->False
+- improved `V3I-P02` (independent, positive): hit5 False->True rr 0.017->0.200 empty False->False
+- improved `V3I-P03` (independent, positive): hit5 False->True rr 0.043->1.000 empty False->False
+- improved `V3I-P04` (independent, positive): hit5 False->True rr 0.040->1.000 empty False->False
+- improved `V3I-P05` (independent, positive): hit5 False->True rr 0.071->1.000 empty False->False
+- improved `V3I-P06` (independent, positive): hit5 False->False rr 0.037->0.125 empty False->False
+- improved `V3I-P07` (independent, positive): hit5 True->True rr 0.500->1.000 empty False->False
+- improved `V3I-P08` (independent, positive): hit5 False->True rr 0.167->1.000 empty False->False
+- improved `V3I-P09` (independent, positive): hit5 False->True rr 0.143->1.000 empty False->False
+- improved `V3I-P10` (independent, positive): hit5 False->True rr 0.143->1.000 empty False->False
+- improved `V3I-P11` (independent, positive): hit5 False->True rr 0.030->1.000 empty False->False
+- improved `V3I-P13` (independent, positive): hit5 False->True rr 0.013->0.333 empty False->False
+- improved `V3I-P14` (independent, positive): hit5 False->True rr 0.008->0.333 empty False->False
+- improved `V3I-P15` (independent, positive): hit5 True->True rr 0.333->1.000 empty False->False
+- improved `V3I-P18` (independent, positive): hit5 True->True rr 0.333->0.500 empty False->False
+- improved `V3I-P19` (independent, positive): hit5 False->True rr 0.030->0.500 empty False->False
+- improved `V3I-P20` (independent, positive): hit5 False->True rr 0.167->1.000 empty False->False
+- improved `V3I-P22` (independent, positive): hit5 False->True rr 0.083->1.000 empty False->False
+- improved `V3I-P23` (independent, positive): hit5 False->True rr 0.034->1.000 empty False->False
+- improved `V3I-P24` (independent, positive): hit5 False->True rr 0.019->1.000 empty False->False
+- improved `V3I-P26` (independent, positive): hit5 False->True rr 0.040->1.000 empty False->False
+- improved `V3I-P27` (independent, positive): hit5 False->True rr 0.025->0.500 empty False->False
+- improved `V3I-P28` (independent, positive): hit5 True->True rr 0.200->1.000 empty False->False
+- improved `V3I-P29` (independent, positive): hit5 False->True rr 0.167->1.000 empty False->False
+- improved `V3I-P30` (independent, positive): hit5 False->True rr 0.056->0.500 empty False->False
+- improved `V3I-N01` (independent, negative): FP True -> False
+- improved `V3I-N02` (independent, negative): FP True -> False
+- improved `V3I-N03` (independent, negative): FP True -> False
+- improved `V3I-N04` (independent, negative): FP True -> False
+- improved `V3I-N05` (independent, negative): FP True -> False
+- improved `V3I-N06` (independent, negative): FP True -> False
+- improved `V3I-N07` (independent, negative): FP True -> False
+- improved `V3I-N09` (independent, negative): FP True -> False
+- improved `V3I-N10` (independent, negative): FP True -> False
+- improved `V3I-N11` (independent, negative): FP True -> False
+- improved `V3I-N15` (independent, negative): FP True -> False
+- improved `V3I-N16` (independent, negative): FP True -> False
+- improved `V3I-N17` (independent, negative): FP True -> False
+- improved `V3I-N19` (independent, negative): FP True -> False
+- improved `V3I-N20` (independent, negative): FP True -> False
+- improved `V3I-N21` (independent, negative): FP True -> False
+- improved `V3I-N23` (independent, negative): FP True -> False
+- improved `V3I-N25` (independent, negative): FP True -> False
+- improved `V3I-N26` (independent, negative): FP True -> False
+- improved `V3I-N27` (independent, negative): FP True -> False
+- improved `V3I-N28` (independent, negative): FP True -> False
+- improved `V3I-N29` (independent, negative): FP True -> False
+- improved `V3I-N30` (independent, negative): FP True -> False
+- improved `V3I-N31` (independent, negative): FP True -> False
+- improved `V3I-N33` (independent, negative): FP True -> False
+- improved `V3I-N34` (independent, negative): FP True -> False
+- improved `V3I-N35` (independent, negative): FP True -> False
+- improved `V3I-N36` (independent, negative): FP True -> False
+- improved `V3I-N37` (independent, negative): FP True -> False
+- improved `V3I-N39` (independent, negative): FP True -> False
+- improved `V3I-N40` (independent, negative): FP True -> False
