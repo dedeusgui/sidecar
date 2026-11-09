@@ -66,7 +66,7 @@ def parse_stream(text):
            "result": None, "is_error": None, "subtype": None, "cost_usd": None, "tokens_in": None,
            "tokens_out": None, "input_uncached": None, "cache_read": None, "cache_create": None, "output": None,
            "tool_result_tokens": None, "tool_calls": 0, "turns": None, "served_models": None, "init": None,
-           "saw_result": False}
+           "saw_result": False, "hook_response_seen": False}
     texts = []
     for line in text.splitlines():
         line = line.strip()
@@ -92,6 +92,7 @@ def parse_stream(text):
         if t == "system" and st == "hook_started" and d.get("hook_event") == "UserPromptSubmit":
             out["hook_started"] = True
         if t == "system" and st == "hook_response" and d.get("hook_event") == "UserPromptSubmit":
+            out["hook_response_seen"] = True
             try:
                 ctx = json.loads(d.get("output") or "")["hookSpecificOutput"]["additionalContext"]
             except (ValueError, KeyError, TypeError):
@@ -128,6 +129,8 @@ def parse_stream(text):
         out["result"] = texts[-1]
     if not out["saw_result"]:
         out["tool_calls"] = None
+        if not out["hook_response_seen"]:
+            out["hook_delivered"] = None
     return out
 
 

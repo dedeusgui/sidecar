@@ -230,6 +230,41 @@ class RunnerTests(LabCase):
             with self.assertRaisesRegex(lab.LabError, "filesystem sandbox"):
                 lab.agent_sandbox_command(["true"], "/tmp/work", [], [])
 
+    def test_mounts_cannot_contain_protected_data(self):
+        with self.assertRaises(lab.LabError):
+            lab.reject_sensitive_mounts(["/usr"], ["/usr/local/benchmark"])
+
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_venv_python_and_pytest_work_after_workspace_relocation(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            work = root / "work"
+            work.mkdir()
+            subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(work / ".venv")], check=True)
+            site = work / ".venv" / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
+            (site / "pytest.py").write_text("print('venv-ok')\n")
+            bin_host, mounts, sandbox_env = lab.agent_runtime_bin(root / "bin", work)
+            tmp = root / "tmp"
+            tmp.mkdir()
+            command = lab.agent_sandbox_command(["pytest"], work, mounts + [(bin_host, "/agent-bin")],
+                                                [(tmp, "/tmp")], sandbox_env)
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("venv-ok", result.stdout)
+
+    def test_failed_agent_cannot_pass_even_if_oracle_passes(self):
+        d = self.make_task()
+        task = json.loads((d / "task.json").read_text())
+        class Failed(lab.ScriptedAgent):
+            def run(self, *args):
+                result = super().run(*args)
+                result["exit"] = 1
+                return result
+        with tempfile.TemporaryDirectory() as home:
+            rec = lab.execute_one(Failed("reference"), task, d, {"name": "OFF", "engine": None, "env": {}}, 0, None, home)
+        self.assertEqual(rec["oracle"]["tests"], "pass")
+        self.assertFalse(rec["success"])
+
     def test_language_tool_allowlists_cover_each_repository_runner(self):
         expected = {
             "go": "Bash(go test:*)",
@@ -342,6 +377,12 @@ class RunnerTests(LabCase):
         lab.cmd_run(args)
         self.assertFalse((pathlib.Path(args.out_dir) / "runs.jsonl").exists())
 
+    def test_spend_cap_reserves_the_next_execution(self):
+        self.make_task()
+        args = self.run_args(max_total_usd=0.09, max_budget=0.1)
+        lab.cmd_run(args)
+        self.assertFalse((pathlib.Path(args.out_dir) / "runs.jsonl").exists())
+
     def test_unvalidated_task_blocked(self):
         self.make_task()
         with self.assertRaises(lab.LabError):
@@ -449,6 +490,12 @@ class ToolTraceTests(unittest.TestCase):
         s = self.stream({"type": "system", "message": "text instead of an object"}, {"type": "user", "message": {"content": "plain string"}},
                         {"type": "assistant", "message": {"content": ["not a block", None]}})
         self.assertEqual(lab.tool_events(s), [])
+
+    def test_persisted_trace_redacts_command_and_error_text(self):
+        event = {"kind": "other", "key": "secret", "cmd": "cat secret", "err": "secret error"}
+        redacted = lab.redact_tool_events([event])[0]
+        self.assertNotIn("secret", json.dumps(redacted))
+        self.assertNotIn("cmd", redacted)
 
     def test_summarize_reports_redundancy_only_when_progress_exists(self):
         base = {"comparable": True, "success": True, "cost_usd": 0.1, "wall_s": 1.0, "tool_calls": 1, "injected_chars": 0,
@@ -630,6 +677,14 @@ class TwoTurnTests(unittest.TestCase):
         self.assertEqual(m["result"], "last")
         self.assertEqual(len(m["tool_events"]), 2)
         self.assertEqual(m["volta_injetada"], [300, 300])
+
+    def test_context_delivery_carries_over_and_event_order_spans_turns(self):
+        first = self.turn(tool_events=[{"kind": "read", "key": "a", "order": 20, "after_context": True}])
+        second = self.turn(hook_delivered=False, tool_events=[{"kind": "read", "key": "b", "order": 1, "after_context": None}])
+        events = lab.merge_turns([first, second])["tool_events"]
+        self.assertEqual([e["order"] for e in events], [0, 1])
+        self.assertEqual([e["turn"] for e in events], [1, 2])
+        self.assertTrue(events[1]["after_context"])
 
     def test_one_contaminated_or_timed_out_turn_taints_the_run(self):
         m = lab.merge_turns([self.turn(), self.turn(incomparable_reasons=["modelo servido ausente"], timed_out=True)])

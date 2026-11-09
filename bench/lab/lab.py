@@ -165,6 +165,8 @@ def load_task(tid):
 
 
 def build_manifest(include_holdout=False):
+    if include_holdout and CORPUS.resolve() == (HERE / "corpus").resolve():
+        raise LabError("atualização do holdout real está bloqueada enquanto o experimento não estiver autorizado")
     repos = load_repos()
     tasks = []
     sealed_path = CORPUS / "manifest.json"
@@ -515,6 +517,10 @@ def apply_patch(work, patch):
 
 def validate_task(tid, keep=False):
     """Prova: o oráculo FALHA na base, PASSA com o reference.patch, e o patch respeita o escopo."""
+    if CORPUS.resolve() == (HERE / "corpus").resolve():
+        sealed = load_json(CORPUS / "manifest.json")
+        if any(t.get("id") == tid and t.get("split") == "holdout" for t in sealed.get("tasks", [])):
+            raise LabError("validação do holdout real está bloqueada enquanto o experimento não estiver autorizado")
     task, tdir = load_task(tid)
     o = task["oracle"]
     report = {"id": tid, "ok": False, "base": None, "reference": None, "ts": time.time()}
@@ -559,7 +565,16 @@ def _inside(path, root):
         return False
 
 
-def agent_runtime_bin(root):
+def reject_sensitive_mounts(sources, forbidden):
+    for source in sources:
+        source = pathlib.Path(source).resolve()
+        for blocked in forbidden:
+            blocked = pathlib.Path(blocked).resolve()
+            if source == blocked or source in blocked.parents or blocked in source.parents:
+                raise LabError(f"agent filesystem sandbox: mount sobrepõe dados protegidos: {source}")
+
+
+def agent_runtime_bin(root, work=None):
     """Create a PATH with only named runtime/test commands; never include Sidecar or CodeGraph."""
     root = pathlib.Path(root)
     root.mkdir(parents=True, exist_ok=True)
@@ -596,6 +611,22 @@ def agent_runtime_bin(root):
         link = root / name
         if not link.exists() and not link.is_symlink():
             link.symlink_to(target)
+    if work and (pathlib.Path(work) / ".venv" / "bin" / "python").exists():
+        cfg = pathlib.Path(work) / ".venv" / "pyvenv.cfg"
+        if cfg.is_file():
+            for line in cfg.read_text(errors="replace").splitlines():
+                key, sep, value = line.partition("=")
+                if sep and key.strip() == "home":
+                    runtime = pathlib.Path(value.strip()).resolve().parent
+                    if runtime.is_dir() and not _inside(runtime, "/usr"):
+                        mounts.append((runtime, str(runtime)))
+                    break
+        for name, suffix in (("python", ""), ("python3", ""), ("pytest", "-m pytest ")):
+            link = root / name
+            if link.exists() or link.is_symlink():
+                link.unlink()
+            link.write_text(f'#!/bin/sh\nexec /work/.venv/bin/python {suffix}"$@"\n')
+            link.chmod(0o755)
     return root, mounts, env
 
 
@@ -759,6 +790,8 @@ def clarification_status(task, first_turn=None, session_available=True):
     """Classify the simulator response without storing the question or exposing an unasked decision."""
     if not isinstance(task.get("underspec"), dict):
         return "not_applicable"
+    if (first_turn or {}).get("unattributed_edits"):
+        return "uncertain_order"
     questions = _question_events(first_turn or {})
     asked = [q for q in questions if "?" in q.get("text", "")]
     relevant = any(_relevant_question(task, q.get("text", "")) and _asked_before_edit(first_turn or {}, q) for q in asked)
@@ -803,18 +836,29 @@ def merge_turns(turns):
     reasons = [r for t in turns for r in t["incomparable_reasons"]]
     delivered = [t.get("hook_delivered") for t in turns]
     hook_delivered = True if any(v is True for v in delivered) else False if all(v is not None for v in delivered) else None
-    wall = total("wall_s")
+    client_wall = total("wall_s")
     clarification = next((t.get("clarification_status") for t in turns if t.get("clarification_status")), None)
     optional_metrics = {key: total(key) for key in ("input_uncached", "cache_read", "cache_create", "output",
                                                      "tool_result_tokens", "index_ms", "hook_ms", "sync_ms",
                                                      "retrieve_ms", "resident_context_tokens")}
-    return {"wall_s": round(wall, 2) if wall is not None else None, "result": last["result"], "cost_usd": total("cost_usd"), "tokens_in": total("tokens_in"),
+    wall = client_wall
+    if wall is not None and optional_metrics["index_ms"] is not None:
+        wall += optional_metrics["index_ms"] / 1000
+    events, context_seen = [], False
+    for turn_index, turn in enumerate(turns):
+        for event in turn["tool_events"]:
+            event = dict(event, turn=turn_index + 1, stream_order=event.get("order"), order=len(events))
+            if context_seen:
+                event["after_context"] = True
+            events.append(event)
+        context_seen = context_seen or turn.get("hook_delivered") is True
+    return {"wall_s": round(wall, 2) if wall is not None else None, "client_wall_s": client_wall, "result": last["result"], "cost_usd": total("cost_usd"), "tokens_in": total("tokens_in"),
             "tokens_out": total("tokens_out"), "tool_calls": total("tool_calls"), "turns": total("turns"), "served_models": models,
             "exit": last["exit"], "timed_out": any(t["timed_out"] for t in turns), "hook_delivered": hook_delivered,
             "injected_chars": total("injected_chars"), "incomparable_reasons": reasons,
             "stream_error": any(t["stream_error"] for t in turns), "hook_names": sorted({n for t in turns for n in t["hook_names"]}),
             "clarification_status": clarification,
-            "first_edit_s": None, "tool_events": [e for t in turns for e in t["tool_events"]], "volta_injetada": [t["injected_chars"] for t in turns],
+            "first_edit_s": None, "tool_events": events, "volta_injetada": [t["injected_chars"] for t in turns],
             "n_voltas": len(turns),
             # O que o Sidecar disse de fato (só presença; o texto não é guardado): permite saber se R4/R5 foram exercidos.
             "notas": {"groom": any("Open decision" in t.get("hook_context", "") for t in turns),
@@ -836,14 +880,14 @@ class ClaudeAgent:
         # oculto. Medido (2026-11-08): sem a regra a leitura funciona; com ela Read, Grep e `ls` são negados.
         self.deny_paths = [str(pathlib.Path(p).resolve()) for p in deny_paths]
 
-    def command(self, prompt, settings, resume=None, tools_allow=None, deny_paths=None):
+    def command(self, prompt, settings, resume=None, tools_allow=None, deny_paths=None, max_budget=None):
         persist = self.turns > 1  # uma segunda volta precisa da sessão do cliente
         tools_allow = (self.tools_allow or []) if tools_allow is None else tools_allow
         flags = ["--output-format", "stream-json", "--verbose", "--include-hook-events", *([] if persist else ["--no-session-persistence"]),
                  *(["--resume", resume] if resume else []), "--permission-mode", "acceptEdits", "--setting-sources", "project,local", "--strict-mcp-config",
                  "--disable-slash-commands", "--allowedTools", *tools_allow,
                  *deny_flags(self.deny_paths if deny_paths is None else deny_paths)]
-        cmd = ["claude", "-p", prompt, "--model", self.model, *flags, "--max-budget-usd", str(self.max_budget)]
+        cmd = ["claude", "-p", prompt, "--model", self.model, *flags, "--max-budget-usd", str(self.max_budget if max_budget is None else max_budget)]
         return cmd + (["--settings", settings] if settings else [])
 
     def run(self, task, tdir, work, arm, env, prompt):
@@ -855,7 +899,7 @@ class ClaudeAgent:
         sandbox_home.mkdir()
         sandbox_tmp.mkdir()
         (cfg_dir / "settings.json").write_text((cfg_dir / "settings.json").read_text().replace(marker, "/agent-config/canary-fired.txt"))
-        bin_dir, runtime_mounts, sandbox_env = agent_runtime_bin(cfg_dir / "runtime-bin")
+        bin_dir, runtime_mounts, sandbox_env = agent_runtime_bin(cfg_dir / "runtime-bin", work)
         writable_mounts = [(cfg_dir, "/agent-config"), (sandbox_home, "/home/agent"),
                            (sandbox_tmp, "/tmp"), (pathlib.Path(env["SIDECAR_HOME"]), "/sidecar-home")]
         readonly_mounts = list(runtime_mounts) + [(bin_dir, "/agent-bin")]
@@ -864,6 +908,8 @@ class ClaudeAgent:
             sandbox_env["SIDECAR_ENGINE"] = arm["engine"]
             sandbox_env.update({k: v for k, v in arm.get("env", {}).items() if k in ("SIDECAR_FEATURES", "SIDECAR_PROFILE")})
         try:
+            reject_sensitive_mounts(["/usr", "/etc", work, cfg_dir, bin_dir, *[p for p, _ in runtime_mounts],
+                                     *[p for p, _ in writable_mounts]], self.deny_paths)
             env = dict(env, CLAUDE_CONFIG_DIR=cfg)
             for k in ("ORCA_AGENT_HOOK_PORT", "ORCA_AGENT_HOOK_TOKEN", "ORCA_PANE_KEY", "ANTHROPIC_API_KEY"):
                 env.pop(k, None)
@@ -879,14 +925,14 @@ class ClaudeAgent:
                 index_ms = round((time.perf_counter() - index_started) * 1000, 3)
                 settings = rhp.hook_settings_json("/opt/sidecar")
             hook_log = pathlib.Path(env["SIDECAR_HOME"]) / "logs" / "hook.jsonl"
-            turns, session = [], None
+            turns, session, remaining_budget = [], None, self.max_budget
             for n in range(self.turns):
                 text = prompt if n == 0 else followup_for(task, turns[0], session_available=bool(session))
                 hook_offset = hook_log_offset(hook_log)
                 t0 = time.perf_counter()
                 denied = self.deny_paths + ["/agent-config/.credentials.json"]
                 sandboxed = agent_sandbox_command(self.command(text, settings, resume=session, tools_allow=tools_allow,
-                                                               deny_paths=denied),
+                                                               deny_paths=denied, max_budget=remaining_budget),
                                                   work, readonly_mounts, writable_mounts, sandbox_env)
                 code, out, err, to = run(sandboxed, cwd=work, env=env, timeout=self.timeout)
                 wall = time.perf_counter() - t0
@@ -894,10 +940,11 @@ class ClaudeAgent:
                 hook_metrics = hook_metrics_since(hook_log, hook_offset)
                 session = session or session_id_of(out)
                 reasons = rhp.contamination(parsed, os.path.exists(marker), self.model)
-                events = tool_events(out)
-                question_tool_events = tool_events(out, include_question_text=True) if n == 0 and self.turns > 1 else events
-                if touched_benchmark_data(events, self.deny_paths):
+                raw_events = tool_events(out)
+                question_tool_events = tool_events(out, include_question_text=True) if n == 0 and self.turns > 1 else raw_events
+                if touched_benchmark_data(raw_events, self.deny_paths):
                     reasons = list(reasons) + ["o agente tentou acessar dados do benchmark (oráculo, reference.patch ou resultados)"]
+                events = redact_tool_events(raw_events)
                 if n == 0 and self.turns > 1 and not session:
                     reasons = list(reasons) + ["sessão do cliente ausente: a segunda volta não pôde ser retomada"]
                 turn = {"wall_s": round(wall, 2), "result": parsed["result"] or "", "cost_usd": parsed["cost_usd"],
@@ -910,15 +957,25 @@ class ClaudeAgent:
                               "retrieve_ms": hook_metrics["retrieve_ms"],
                               "tool_calls": parsed["tool_calls"], "turns": parsed["turns"], "served_models": parsed["served_models"],
                               "exit": code, "timed_out": to, "hook_delivered": parsed["hook_delivered"] if arm["engine"] else None,
-                              "injected_chars": len(parsed["hook_context"]), "incomparable_reasons": reasons,
+                              "injected_chars": (len(parsed["hook_context"]) if parsed["hook_delivered"] is not None else None)
+                              if arm["engine"] else 0, "incomparable_reasons": reasons,
                               "stream_error": parsed["is_error"] is True or parsed["subtype"] not in (None, "success"),
                               "hook_names": parsed["hook_names"], "first_edit_s": None, "tool_events": events,
                               "assistant_questions": assistant_questions(out), "hook_context": parsed["hook_context"]}
                 if n == 0 and self.turns > 1:
+                    turn["unattributed_edits"] = bool(changed_paths(work)) and (
+                        any("cmd" in e for e in raw_events) or not any(e.get("kind") == "edit" for e in raw_events))
                     status_turn = dict(turn, tool_events=question_tool_events)
                     turn["clarification_status"] = clarification_status(
                         task, status_turn, session_available=bool(session) and code == 0 and not to)
                 turns.append(turn)
+                if parsed["cost_usd"] is None:
+                    remaining_budget = 0
+                else:
+                    remaining_budget = max(0.0, remaining_budget - parsed["cost_usd"])
+                if n + 1 < self.turns and remaining_budget <= 0:
+                    turn["incomparable_reasons"] = list(turn["incomparable_reasons"]) + ["orçamento da execução esgotado antes da próxima volta"]
+                    break
                 if to or code != 0 or not session and self.turns > 1:
                     break  # sem resposta da primeira volta não há o que continuar
             leaked = workspace_mentions_benchmark(work, self.deny_paths + ["reference.patch", "holdout_ledger"])
@@ -1011,6 +1068,20 @@ def tool_events(stream_text, include_question_text=False):
     for ev in events:
         ev["after_context"] = None if context_order is None else ev["order"] > context_order
     return events
+
+
+def redact_tool_events(events):
+    """Keep repeatable identities without persisting shell commands, file contents or error text."""
+    out = []
+    for event in events:
+        clean = dict(event)
+        clean.pop("cmd", None)
+        clean.pop("question", None)
+        for field in ("key", "err"):
+            if clean.get(field):
+                clean[field] = "sha256:" + sha256_bytes(str(clean[field]).encode())
+        out.append(clean)
+    return out
 
 
 def hook_log_offset(path):
@@ -1153,7 +1224,7 @@ def execute_one(agent, task, tdir, arm, rep, args, home):
             "schema": RUN_SCHEMA, "task": task["id"], "split": task["split"], "class": task["class"], "repo": task["repo"],
             "commit": task["commit"], "arm": arm["name"], "rep": rep, "model": getattr(agent, "model", "scripted"),
             "tools_allow": effective_tools,
-            "evidence": "simulated" if agent.simulated else "agentic", "verdict": v, "success": v == "pass" and comparable and not r["timed_out"],
+            "evidence": "simulated" if agent.simulated else "agentic", "verdict": v, "success": v == "pass" and comparable and not r["timed_out"] and r["exit"] == 0 and not r["stream_error"],
             "comparable": comparable, "agent_error": err, "oracle": {k: orc[k] for k in
                 ("tests", "scope_ok", "outside_scope", "invariants", "changed", "isolation", "detail")},
             "oracle_s": round(time.perf_counter() - t0, 2), "task_sha256": sha256_file(tdir / "task.json"),
@@ -1162,7 +1233,7 @@ def execute_one(agent, task, tdir, arm, rep, args, home):
             **{k: r.get(k) for k in ("wall_s", "cost_usd", "tokens_in", "tokens_out", "tool_calls", "turns",
                "served_models", "exit", "timed_out", "hook_delivered", "injected_chars", "incomparable_reasons",
                "stream_error", "first_edit_s", "input_uncached", "cache_read", "cache_create", "output",
-               "tool_result_tokens", "index_ms", "hook_ms", "sync_ms", "retrieve_ms", "resident_context_tokens")},
+               "tool_result_tokens", "index_ms", "hook_ms", "sync_ms", "retrieve_ms", "resident_context_tokens", "client_wall_s")},
         }
 
 
@@ -1170,9 +1241,11 @@ def cmd_run(args):
     splits = set(args.splits.split(","))
     if "holdout" in splits and not args.final:
         raise LabError("holdout selado: use --final (uma única avaliação final, sem tuning depois)")
+    if "holdout" in splits and args.agent == "scripted" and CORPUS.resolve() == (HERE / "corpus").resolve():
+        raise LabError("agente simulado não pode abrir o holdout real")
     if "holdout" in splits and args.agent == "claude":
         verify_final_freeze(args)
-    manifest = build_manifest(include_holdout="holdout" in splits)
+    manifest = build_manifest()
     wanted = set(args.tasks.split(",")) if args.tasks else {t["id"] for t in manifest["tasks"]}
     tasks = [t for t in manifest["tasks"] if t["id"] in wanted and t["split"] in splits]
     if not tasks:
@@ -1193,6 +1266,8 @@ def cmd_run(args):
             raise LabError("agentes: claude | scripted")
         if not args.model or not re.match(r"^claude-[a-z0-9.-]+$", args.model):
             raise LabError("--model deve ser um ID explícito (ex.: claude-haiku-5-5), nunca um alias")
+        if args.yes_spend and args.max_total_usd is None:
+            raise LabError("--max-total-usd é obrigatório para execução paga")
         for need in ("claude", "git"):
             if not shutil.which(need):
                 raise LabError(f"comando ausente: {need}")
@@ -1200,6 +1275,7 @@ def cmd_run(args):
         if not args.sidecar or not pathlib.Path(args.sidecar).is_file():
             raise LabError("--sidecar (binário) obrigatório para o agente claude")
         deny = [HERE.parent.parent, out_dir]
+        reject_sensitive_mounts(["/usr", "/etc"], deny)
         tmp_root = pathlib.Path(tempfile.gettempdir()).resolve()
         for d in deny:
             if d.resolve() == tmp_root or d.resolve() in tmp_root.parents or d.resolve() == pathlib.Path("/"):
@@ -1231,10 +1307,17 @@ def cmd_run(args):
         for tid, arm, rep in order:
             if (tid, arm["name"], rep) in done:
                 continue
-            if args.max_total_usd is not None and spend_total(spend) >= args.max_total_usd:
+            if args.max_total_usd is not None and spend_total(spend) + args.max_budget > args.max_total_usd + 1e-9:
                 print("teto de custo atingido; parando", file=sys.stderr)
                 break
             task, tdir = load_task(tid)
+            if task["split"] == "holdout":
+                sealed_task = next(t for t in manifest["tasks"] if t["id"] == tid)
+                actual = (sha256_file(tdir / "task.json"), tree_sha256(tdir / "oracle") if (tdir / "oracle").is_dir() else None,
+                          sha256_file(tdir / "reference.patch") if (tdir / "reference.patch").is_file() else None)
+                expected = (sealed_task.get("task_sha256"), sealed_task.get("oracle_sha256"), sealed_task.get("reference_sha256"))
+                if actual != expected:
+                    raise LabError("holdout difere do manifesto selado; execução interrompida")
             arm = dict(arm, tools_allow=tools_allow_for(task, requested_tools))
             rec = execute_one(agent, task, tdir, arm, rep, args, home)
             with runs.open("a") as f:
@@ -1515,6 +1598,8 @@ def main(argv=None):
         if a.cmd == "validate-corpus":
             bad = 0
             held = set()
+            if a.include_holdout and CORPUS.resolve() == (HERE / "corpus").resolve():
+                raise LabError("validação do holdout real está bloqueada enquanto o experimento não estiver autorizado")
             if not a.include_holdout:
                 sealed_path = CORPUS / "manifest.json"
                 if not sealed_path.is_file():

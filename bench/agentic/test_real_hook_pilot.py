@@ -86,6 +86,11 @@ class StreamTests(unittest.TestCase):
         for key in ("input_uncached", "cache_read", "cache_create", "output", "tokens_in", "tokens_out"):
             self.assertIsNone(parsed[key], key)
 
+    def test_truncated_stream_does_not_claim_hook_was_not_delivered(self):
+        parsed = pilot.parse_stream('{"type":"system","subtype":"hook_started","hook_event":"UserPromptSubmit"}')
+        self.assertIsNone(parsed["hook_delivered"])
+        self.assertIsNone(parsed["tool_calls"])
+
 
 class CommandTests(unittest.TestCase):
     def test_off_arm_registers_no_hook(self):
