@@ -2,9 +2,9 @@
 
 > Fonte única de instruções de desenvolvimento deste repositório. Leia antes de alterar código, testes, benchmarks, documentação ou distribuição. Não confunda estas instruções para **contribuir no Sidecar** com instruções que o Sidecar injeta nos repositórios dos usuários.
 
-## Campanha atual: Sidecar V3 (read-first para Codex)
+## Campanha atual: Sidecar V3.5 (arquitetura proposta, ainda não implementada)
 
-Após os PRs #6–#18, a baseline de código é a V1/V2 existente (PR #18 mergeado). A campanha V3 está especificada em [docs/v3/README.md](docs/v3/README.md), com [avaliação/gates](docs/v3/evaluation-protocol.md), [referências upstream pinadas](docs/v3/upstream-references.md) e [handoff executável para Codex](docs/v3/CODEX-HANDOFF.md). **Ler os quatro antes de iniciar trabalho V3**; este AGENTS.md prevalece nos invariantes de privacidade, segurança, legalidade, validação e merges. As metas V3 não são resultados comprovados. **Estado e próximos passos:** [docs/v3/next-steps.md](docs/v3/next-steps.md) (detalhes em [progress.md](docs/v3/progress.md)). O [roadmap de R1–R7](docs/roadmap-next-iterations.md) permanece histórico para a V2.
+A V3 experimental já está implementada (PR #21, código em `internal/engine` e `internal/explore`). **V3.5 não está entregue.** A nova missão é unificar as capacidades existentes em um fluxo automático de assistência, sem o agente precisar aprender comandos Sidecar: **[visão V3.5](docs/v3.5/README.md)**, **[arquitetura e interfaces](docs/v3.5/architecture.md)**, **[migração executável](docs/v3.5/implementation-plan.md)**, **[evals/gates](docs/v3.5/evaluation.md)**. **Ler esses documentos antes de implementar V3.5**, preservando este contrato de privacidade, segurança, compatibilidade, licenças e testes. A V3 permanece como baseline factual em [progress.md](docs/v3/progress.md), [next-steps.md](docs/v3/next-steps.md) e [referências upstream](docs/v3/upstream-references.md). Não confundir metas da V3.5 com resultados publicados. Core local-first, sem LLM/serviço obrigatório; manter V1/V2/V3 funcionais e V3.5 opt-in até cumprir gates.
 
 ## Missão e limites
 
