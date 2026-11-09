@@ -344,7 +344,9 @@ func memberKeys(q string) []string {
 
 func isIdent(s string) bool {
 	for i, r := range s {
-		if !(r == '_' || r == '$' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || i > 0 && r >= '0' && r <= '9') {
+		letter := r == '_' || r == '$' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
+		digit := i > 0 && r >= '0' && r <= '9'
+		if !letter && !digit {
 			return false
 		}
 	}
@@ -476,7 +478,10 @@ func snippets(text string, items []retrieve.Evidence, budget int, terms []string
 	sort.Slice(spans, func(i, j int) bool { return spans[i].a < spans[j].a })
 	var merged []span
 	for _, s := range spans {
-		if n := len(merged); n > 0 && s.a <= merged[n-1].b+mergeGap && !(s.elided && merged[n-1].elided && s.a > merged[n-1].b+1) {
+		n := len(merged)
+		// Two focus windows of a long body stay apart (with a gap marker) unless they touch.
+		separateWindows := n > 0 && s.elided && merged[n-1].elided && s.a > merged[n-1].b+1
+		if n > 0 && s.a <= merged[n-1].b+mergeGap && !separateWindows {
 			merged[n-1].b = max(merged[n-1].b, s.b)
 			merged[n-1].elided = merged[n-1].elided || s.elided
 			continue
