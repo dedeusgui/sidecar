@@ -252,6 +252,138 @@ class RunnerTests(LabCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("venv-ok", result.stdout)
 
+    # ---- P0-A audit: failures reproduced with the real bwrap sandbox (see docs/v3/progress.md)
+
+    def sandbox_run(self, root, argv, work, mounts, env, masked=()):
+        tmp = root / "tmp"
+        tmp.mkdir(exist_ok=True)
+        command = lab.agent_sandbox_command(argv, work, mounts, [(tmp, "/tmp")], env, masked_paths=masked)
+        return subprocess.run(command, capture_output=True, text=True, timeout=60)
+
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_editable_install_paths_baked_into_the_workspace_survive_in_the_sandbox(self):
+        # `pip install -e .` writes the absolute host path of the checkout into a .pth file (Click). The workspace must
+        # therefore be mounted at that same absolute path inside the sandbox, not only at /work.
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root).resolve()
+            work = root / "work"
+            (work / "src").mkdir(parents=True)
+            (work / "src" / "pkgx.py").write_text("VALUE = 'editable-ok'\n")
+            subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(work / ".venv")], check=True)
+            site = work / ".venv" / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
+            (site / "pkgx.pth").write_text(str(work / "src") + "\n")
+            bin_host, mounts, env = lab.agent_runtime_bin(root / "bin", work)
+            result = self.sandbox_run(root, ["python3", "-c", "import pkgx; print(pkgx.VALUE)"], work,
+                                      mounts + [(bin_host, "/agent-bin")], env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("editable-ok", result.stdout)
+
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_runtime_install_tree_outside_usr_is_mounted_whole_not_just_the_entry_file(self):
+        # npm and bundler are scripts that load siblings from their install tree (Express, Sinatra).
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root).resolve()
+            tree = root / "opt" / "toolkit"
+            (tree / "bin").mkdir(parents=True)
+            (tree / "lib").mkdir()
+            (tree / "lib" / "helper.sh").write_text("echo helper-ok\n")
+            tool = tree / "bin" / "fakeruntime"
+            tool.write_text('#!/bin/sh\n. "${0%/*}/../lib/helper.sh"\n')
+            tool.chmod(0o755)
+            work = root / "work"
+            work.mkdir()
+            path = str(tree / "bin") + os.pathsep + os.environ["PATH"]
+            with mock.patch.object(lab, "INSTALL_BASES", (str(root / "opt"),)), mock.patch.dict(os.environ, {"PATH": path}):
+                bin_host, mounts, env = lab.agent_runtime_bin(root / "bin", commands=("fakeruntime", "sh"))
+            result = self.sandbox_run(root, ["fakeruntime"], work, mounts + [(bin_host, "/agent-bin")], env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("helper-ok", result.stdout)
+
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_script_whose_shebang_names_an_interpreter_outside_usr_gets_that_interpreter(self):
+        # Ruby's `bundle` starts with `#!/opt/rbenv/versions/x/bin/ruby`, a different tree from the one `bundle` lives in.
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root).resolve()
+            interp = root / "opt" / "interp" / "bin" / "myinterp"
+            interp.parent.mkdir(parents=True)
+            (interp.parent.parent / "lib").mkdir()
+            interp.write_text("#!/bin/sh\necho interp-ok\n")
+            interp.chmod(0o755)
+            app = root / "opt" / "app" / "bin" / "myapp"
+            app.parent.mkdir(parents=True)
+            (app.parent.parent / "lib").mkdir()
+            app.write_text(f"#!{interp}\n")
+            app.chmod(0o755)
+            work = root / "work"
+            work.mkdir()
+            with mock.patch.object(lab, "INSTALL_BASES", (str(root / "opt"),)), \
+                    mock.patch.dict(os.environ, {"PATH": str(app.parent) + os.pathsep + os.environ["PATH"]}):
+                bin_host, mounts, env = lab.agent_runtime_bin(root / "bin", commands=("myapp",))
+            result = self.sandbox_run(root, ["myapp"], work, mounts + [(bin_host, "/agent-bin")], env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("interp-ok", result.stdout)
+
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_sidecar_and_codegraph_are_unreachable_by_absolute_path_inside_a_mounted_runtime(self):
+        # The CodeGraph campaign found the control arm reaching the binary; a PATH filter does not stop an absolute path.
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root).resolve()
+            tree = root / "opt" / "toolkit"
+            (tree / "bin").mkdir(parents=True)
+            (tree / "lib" / "node_modules" / "@colbymchenry" / "codegraph").mkdir(parents=True)
+            (tree / "lib" / "node_modules" / "@colbymchenry" / "codegraph" / "cli.js").write_text("REACHED-MODULE\n")
+            for name in ("fakeruntime", "sidecar", "codegraph"):
+                f = tree / "bin" / name
+                f.write_text("#!/bin/sh\necho REACHED-" + name + "\n")
+                f.chmod(0o755)
+            work = root / "work"
+            work.mkdir()
+            path = str(tree / "bin") + os.pathsep + os.environ["PATH"]
+            with mock.patch.object(lab, "INSTALL_BASES", (str(root / "opt"),)), mock.patch.dict(os.environ, {"PATH": path}):
+                bin_host, mounts, env = lab.agent_runtime_bin(root / "bin", commands=("fakeruntime", "sh", "cat"))
+            masks = lab.forbidden_tool_masks([m for m, _ in mounts], scan_dirs=())
+            self.assertEqual(sorted(pathlib.Path(m).name for m in masks), ["codegraph", "codegraph", "sidecar"])
+            script = f"{tree}/bin/sidecar; {tree}/bin/codegraph; cat {tree}/lib/node_modules/@colbymchenry/codegraph/cli.js; fakeruntime"
+            result = self.sandbox_run(root, ["sh", "-c", script], work, mounts + [(bin_host, "/agent-bin")], env, masked=masks)
+            self.assertNotIn("REACHED", result.stdout.replace("REACHED-fakeruntime", ""))
+            self.assertIn("REACHED-fakeruntime", result.stdout)
+
+    def test_network_environment_is_explicit_and_maps_ca_files_read_only(self):
+        with tempfile.TemporaryDirectory() as root:
+            ca = pathlib.Path(root) / "ca.crt"
+            ca.write_text("pem")
+            environ = {"HTTPS_PROXY": "http://proxy:3128", "NO_PROXY": "localhost", "SSL_CERT_FILE": str(ca),
+                       "ANTHROPIC_API_KEY": "sk-secret", "AWS_SECRET_ACCESS_KEY": "x", "PATH": "/bin"}
+            env, mounts = lab.agent_network_env(environ)
+            self.assertEqual(env, {"HTTPS_PROXY": "http://proxy:3128", "NO_PROXY": "localhost", "SSL_CERT_FILE": "/agent-ca/ca.crt"})
+            self.assertEqual(mounts, [(ca, "/agent-ca/ca.crt")])
+            self.assertEqual(lab.agent_network_env({"PATH": "/bin"}), ({}, []))
+            self.assertEqual(lab.agent_network_env({"SSL_CERT_FILE": "/does/not/exist"}), ({}, []))
+
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_runtime_preflight_runs_each_language_smoke_command_in_the_real_sandbox(self):
+        self.assertEqual(lab.verify_agent_runtimes(["go"]), {"go": "ok"})
+        with mock.patch.dict(lab.RUNTIME_SMOKE, {"ruby": [["sh", "-c", "echo libruby.so missing >&2; exit 127"]]}):
+            with self.assertRaisesRegex(lab.LabError, "ruby.*libruby.so missing"):
+                lab.verify_agent_runtimes(["ruby"])
+        with self.assertRaisesRegex(lab.LabError, "sem verificação de runtime"):
+            lab.verify_agent_runtimes(["cobol"])
+
+    def test_claude_run_preflights_the_runtime_of_every_selected_language_before_any_spend(self):
+        self.make_task()
+        repos = json.loads(lab.REPOS_JSON.read_text())
+        repos["repos"]["toy"]["language"] = "python"
+        lab.REPOS_JSON.write_text(json.dumps(repos))
+        args = self.run_args(agent="claude", model="claude-haiku-5-5", sidecar=sys.executable, tasks="T-EDIT-01", arms="OFF",
+                             out_dir=str(pathlib.Path(self.tmp.name) / "out"), yes_spend=False)
+        self.assertEqual(lab.task_languages([{"repo": "toy"}, {"repo": "toy"}, {"repo": "unknown"}]), ["python"])
+        with mock.patch.object(lab, "verify_agent_sandbox", return_value="bwrap-restricted"), \
+                mock.patch.object(lab.shutil, "which", return_value="/usr/bin/true"), \
+                mock.patch.object(lab, "verify_agent_runtimes", side_effect=lab.LabError("runtime python inutilizável")) as pre:
+            with self.assertRaisesRegex(lab.LabError, "inutilizável"):
+                lab.cmd_run(args)
+        pre.assert_called_once_with(["python"])
+
     def test_failed_agent_cannot_pass_even_if_oracle_passes(self):
         d = self.make_task()
         task = json.loads((d / "task.json").read_text())
@@ -467,6 +599,29 @@ class ToolTraceTests(unittest.TestCase):
         failed_turn = {"assistant_questions": [], "tool_events": lab.tool_events(failed, include_question_text=True)}
         self.assertEqual(lab.followup_for(task, failed_turn), lab.DEFAULT_FOLLOWUP)
 
+    def test_blocks_of_one_api_message_share_a_message_id_even_when_split_across_stream_lines(self):
+        # Claude Code streams one `assistant` line per content block: same API message.id, different line uuid.
+        ask = {"type": "assistant", "uuid": "line-1", "message": {"id": "msg_A", "content": [{"type": "tool_use", "id": "q1",
+               "name": "AskUserQuestion", "input": {"questions": [{"question": "Which style?", "options": [
+                   {"label": "compact output"}, {"label": "pretty output"}]}]}}]}}
+        edit = {"type": "assistant", "uuid": "line-2", "message": {"id": "msg_A", "content": [{"type": "tool_use", "id": "e1",
+                "name": "Edit", "input": {"file_path": "a.go"}}]}}
+        events = lab.tool_events(self.stream(ask, edit), include_question_text=True)
+        self.assertEqual({e["message_id"] for e in events}, {"msg_A"})
+        task = {"underspec": {"canned_answer": "Use compact output.", "options": [
+            {"label": "compact output"}, {"label": "pretty output"}]}}
+        turn = {"assistant_questions": [], "tool_events": events}
+        # The question was emitted together with the edit, so it could not have been answered before the edit.
+        self.assertNotEqual(lab.clarification_status(task, turn), "answered")
+        self.assertEqual(lab.followup_for(task, turn), lab.DEFAULT_FOLLOWUP)
+
+    def test_assistant_text_questions_use_the_api_message_id_too(self):
+        lines = self.stream({"type": "assistant", "uuid": "l1", "message": {"id": "msg_B", "content": [{"type": "text", "text": "Compact output or pretty output?"}]}},
+                            {"type": "assistant", "uuid": "l2", "message": {"id": "msg_B", "content": [{"type": "tool_use", "id": "e1", "name": "Edit", "input": {"file_path": "a.go"}}]}})
+        question = lab.assistant_questions(lines)[0]
+        edit = lab.tool_events(lines)[0]
+        self.assertEqual(question["message_id"], edit["message_id"])
+
     def test_post_context_requires_a_delivered_hook_response(self):
         tool = lambda ident: {"type": "assistant", "uuid": ident, "message": {"content": [
             {"type": "tool_use", "id": ident, "name": "Read", "input": {"file_path": ident + ".go"}}]}}
@@ -485,6 +640,35 @@ class ToolTraceTests(unittest.TestCase):
         unobserved = lab.tool_events(self.stream(tool("unobserved")))[0]
         self.assertIsNone(unobserved["after_context"])
         self.assertIsNone(lab.progress_report("/sidecar", [unobserved]))
+
+    def test_hook_context_is_attributed_to_the_main_thread_not_to_subagents(self):
+        # UserPromptSubmit adds context to the main conversation. A subagent starts from the prompt the main agent wrote,
+        # so its later reads must not be counted as a reaction to the delivered evidence.
+        hook = {"type": "system", "subtype": "hook_response", "hook_event": "UserPromptSubmit",
+                "output": json.dumps({"hookSpecificOutput": {"additionalContext": "context"}})}
+        call = lambda ident, parent: {"type": "assistant", "uuid": ident, "parent_tool_use_id": parent, "message": {
+            "id": "m-" + ident, "content": [{"type": "tool_use", "id": ident, "name": "Read", "input": {"file_path": ident + ".go"}}]}}
+        events = lab.tool_events(self.stream(hook, call("main-read", None), call("sub-read", "task-1")))
+        by_id = {e["tool_use_id"]: e for e in events}
+        self.assertEqual(by_id["main-read"]["thread_id"], "main")
+        self.assertTrue(by_id["main-read"]["after_context"])
+        self.assertEqual(by_id["sub-read"]["thread_id"], "task-1")
+        self.assertFalse(by_id["sub-read"]["after_context"])
+        self.assertEqual(by_id["sub-read"]["context_scope"], "subagent")
+        self.assertEqual(by_id["main-read"]["context_scope"], "main")
+
+    def test_parallel_calls_of_one_message_share_a_delivery_position(self):
+        hook = {"type": "system", "subtype": "hook_response", "hook_event": "UserPromptSubmit",
+                "output": json.dumps({"hookSpecificOutput": {"additionalContext": "context"}})}
+        early = {"type": "assistant", "uuid": "l0", "message": {"id": "m0", "content": [
+            {"type": "tool_use", "id": "a", "name": "Read", "input": {"file_path": "a.go"}},
+            {"type": "tool_use", "id": "b", "name": "Grep", "input": {"pattern": "x"}}]}}
+        late = {"type": "assistant", "uuid": "l1", "message": {"id": "m1", "content": [
+            {"type": "tool_use", "id": "c", "name": "Read", "input": {"file_path": "c.go"}},
+            {"type": "tool_use", "id": "d", "name": "Read", "input": {"file_path": "d.go"}}]}}
+        events = lab.tool_events(self.stream(early, hook, late))
+        self.assertEqual([e["after_context"] for e in events], [False, False, True, True])
+        self.assertEqual([e["message_id"] for e in events], ["m0", "m0", "m1", "m1"])
 
     def test_tool_events_tolerates_unexpected_stream_shapes(self):
         s = self.stream({"type": "system", "message": "text instead of an object"}, {"type": "user", "message": {"content": "plain string"}},
@@ -614,6 +798,23 @@ class ReviewFixTests(LabCase):
         self.assertTrue(lab.touched_benchmark_data([{"kind": "test", "key": "test", "cmd": "go test -exec 'cat /data/bench/lab/x' ./..."}], ["/data/bench/lab"]))
 
 
+    def test_public_copy_of_the_benchmark_is_a_leak_channel_and_is_detected(self):
+        # The corpus and reference patches live in a public GitHub repository, and the sandbox keeps the network open for
+        # the model API: code run by a test command could fetch the answer. The harness cannot close that channel, so it
+        # must at least mark the run as not comparable.
+        d = self.make_task()
+        task = json.loads((d / "task.json").read_text())
+        with tempfile.TemporaryDirectory() as w:
+            work = lab.prepare_workspace(task, pathlib.Path(w) / "w")
+            (work / "fetch_test.go").write_text('http.Get("https://raw.githubusercontent.com/dedeusgui/sidecar/main/bench/lab/corpus/tasks/T/reference.patch")')
+            self.assertEqual(lab.workspace_mentions_benchmark(work, lab.PUBLIC_BENCHMARK_NEEDLES), "fetch_test.go")
+            (work / "fetch_test.go").write_text("package x")
+            self.assertIsNone(lab.workspace_mentions_benchmark(work, lab.PUBLIC_BENCHMARK_NEEDLES))
+        events = [{"kind": "test", "key": "test", "cmd": "python3 -c \"import urllib.request as u; u.urlopen('https://github.com/dedeusgui/sidecar/raw/main/x')\""}]
+        self.assertTrue(lab.touched_benchmark_data(events, ["/data/bench/lab"]))
+        self.assertFalse(lab.touched_benchmark_data([{"kind": "test", "key": "test", "cmd": "go test ./..."}], ["/data/bench/lab"]))
+
+
 class ComparisonTests(unittest.TestCase):
     def row(self, task, arm, rep, ok, calls, tin, tout, cost, wall):
         return {"task": task, "arm": arm, "rep": rep, "comparable": True, "success": ok, "cost_usd": cost, "wall_s": wall, "tool_calls": calls,
@@ -685,6 +886,19 @@ class TwoTurnTests(unittest.TestCase):
         self.assertEqual([e["order"] for e in events], [0, 1])
         self.assertEqual([e["turn"] for e in events], [1, 2])
         self.assertTrue(events[1]["after_context"])
+
+    def test_context_from_an_earlier_turn_never_reaches_subagent_events(self):
+        base = {"wall_s": 1.0, "result": "", "cost_usd": 0.1, "tokens_in": 1, "tokens_out": 1, "tool_calls": 1, "turns": 1,
+                "served_models": ["m"], "exit": 0, "timed_out": False, "injected_chars": 1, "incomparable_reasons": [],
+                "stream_error": False, "hook_names": []}
+        first = dict(base, hook_delivered=True, tool_events=[{"kind": "read", "key": "a", "order": 1, "thread_id": "main"}])
+        second = dict(base, hook_delivered=False, tool_events=[
+            {"kind": "read", "key": "b", "order": 1, "thread_id": "main", "after_context": False},
+            {"kind": "read", "key": "c", "order": 2, "thread_id": "task-9", "after_context": False, "context_scope": "subagent"}])
+        merged = lab.merge_turns([first, second])
+        by_key = {e["key"]: e for e in merged["tool_events"]}
+        self.assertTrue(by_key["b"]["after_context"])
+        self.assertFalse(by_key["c"]["after_context"])
 
     def test_one_contaminated_or_timed_out_turn_taints_the_run(self):
         m = lab.merge_turns([self.turn(), self.turn(incomparable_reasons=["modelo servido ausente"], timed_out=True)])

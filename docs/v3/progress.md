@@ -1,20 +1,25 @@
 # Sidecar V3 — progresso de implementação
 
-Atualizado em 2026-11-09. Branch `codex/v3-p0-lab`, baseada em `24323a8ef4f93f51c8bb5a7d305ed1574d8bbfe4` (PR #19). Não houve merge.
+Atualizado em 2026-11-09. Baseline: `main@d15aedb` (PR #19 documentação V3 e PR #20 laboratório P0-A **já mergeados**; CI da `main` verde). Branch de trabalho `ccr-8eafd1e3-wdjnbb`. **Não há merge nem execução paga.** Custo pago acumulado nesta campanha: US$ 0.
 
-## Checkpoint P0-A
+## Estado por entrega
 
-- Auditoria e leitura integral dos documentos solicitados concluídas. Baseline: 54 testes Python e todos os pacotes Go passaram; Go 1.24.0 oficial foi instalado em `/tmp/sidecar-tools/go` e seu checksum conferido.
-- O laboratório preserva valores desconhecidos nas voltas e nos totais, responde tarefas ambíguas apenas após pergunta relevante anterior à edição, registra permissões por linguagem e correlaciona traces por chamada, ordem e thread. Contadores de cache e tempos observados no log local são separados; tokens de resultados de ferramenta e contexto residente continuam desconhecidos quando não há fonte.
-- O agente real exige sandbox `bwrap` com checkout e estado isolados. Um teste com arquivo externo e executáveis falsos verificou a barreira de filesystem e o PATH filtrado. O preflight é obrigatório, mas a integração real ainda não foi exercida: `claude` não está instalado neste ambiente.
-- O manifesto normal reutiliza metadados selados do holdout, sem abrir seus arquivos ou oráculos; inventário novo ou tarefa alterada bloqueia a leitura automática. `validate-corpus` exclui o holdout por padrão. Um teste verifica a ausência de leitura do holdout sintético.
-- O reconhecimento de edição ignora instruções citadas e mantém comandos positivos em cláusulas separadas; os testes de `retrieve` e `groom` passaram.
-- A revisão independente identificou e motivou correções adicionais: ledger antes da leitura do holdout, proibição do agente simulado no holdout real, limites de gasto com reserva por execução e por volta, rejeição de mounts sobrepostos ao benchmark, falha do agente contada como falha e redação de comandos nas traces. O tempo total inclui indexação; uma fixture de venv verifica o runner após remontar o checkout.
-- Verificação mais recente: 79 testes do laboratório, 18 testes do parser agentic, todos os pacotes Go (`go test -count=1 ./...`) e `bench/consolidate.py --check` passaram. O manifesto de development/validation foi gerado em `/tmp/sidecar-v3-manifest.json` sem abrir o holdout. Os testes que exercitam o ledger usam exclusivamente fixtures sintéticas temporárias.
+| Entrega | Estado | Evidência / limite |
+|---|---|---|
+| P0-A laboratório (PR #20) | Mergeado; **auditado com sandbox real** nesta sessão | ver [eval-lab.md §5d](../eval-lab.md): 4 falhas reproduzidas e corrigidas; volta autenticada, `--resume` e contadores reais **não verificados** (sem credencial/orçamento) |
+| P0-B Relevance Gate + Effort Router | Não iniciado neste checkpoint | próximo passo |
+| P1 `sidecar explore` | Não iniciado | |
+| Context Sufficiency | Não iniciado | `internal/progress` não conhece threads; o harness agora marca `context_scope` |
+| Brief/Groom/Impact/Session sob o router | Não iniciado | |
+| Suítes E0–E5 competitivas | Não iniciado | CodeGraph não instalado neste ambiente |
 
-## Limites e próximos passos
+## Checkpoint P0-A (auditoria 2026-11-09)
 
-- O holdout real exige `--final`, `--yes-spend`, revisão limpa identificada por `--frozen-revision`, SHA-256 do binário e preflight do sandbox antes de abrir tarefas. A compatibilidade do sandbox com a instalação real do Claude e todos os runtimes de teste continua sem prova neste ambiente; P0-A ainda precisa de revisão final.
-- Implementar a política seletiva V3 opt-in, `sidecar explore`, calibração de Brief/Groom/Impact/Session Intelligence e controles competitivos; não há evidência de superioridade end-to-end nesta sessão.
-- Próximo passo: implementar o gate V3 opt-in e medir E1 em development/validation, sem usar o holdout.
-- Nenhuma chamada paga e nenhuma avaliação final do holdout foram executadas. Custo pago: US$ 0. O holdout final exige autorização, isolamento validado e versão congelada.
+- Reproduzido com `bwrap` e `claude` reais (sem custo): suítes de Click, Express e Sinatra **não rodavam** no sandbox do agente; sidecar/codegraph eram executáveis por caminho absoluto no braço OFF; `message_id` usava o `uuid` da linha do stream; contexto do hook era atribuído a subagentes.
+- Corrigido com testes de regressão (mutação confirmou que falham sem a correção). `python3 -m unittest bench.lab.test_lab bench.lab.test_analyze`: 92 testes OK.
+- Canal residual **declarado, não fechado**: rede aberta no sandbox + corpus público no GitHub. Mitigação = detecção e invalidação, não bloqueio. Para o holdout, o protocolo continua exigindo gabarito fora do alcance (avaliador independente) antes de qualquer alegação.
+- Nunca aberto: holdout (`SIN-EDIT-01` e demais). Probes usaram apenas tarefas de development/validation.
+
+## Próximo passo exato
+
+P0-B: gate determinístico opt-in `SIDECAR_ENGINE=v3` sobre `internal/retrieve`, com E1 V2×V3.

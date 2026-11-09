@@ -67,6 +67,22 @@ Outras correções da mesma revisão: timeout agora fica nas taxas como falha (a
 
 `lab.py run --turns 2` retoma a sessão (`--resume`). Em tarefa ambígua, a resposta predefinida só é enviada após uma pergunta relevante, observada antes de editar e com sessão disponível; caso contrário usa a revisão neutra. A pergunta em si não é gravada no registro. Métricas ausentes em uma volta tornam o total desconhecido. A trace correlaciona resultados com chamadas e só classifica ações após uma resposta de hook que entregou contexto.
 
+## 5d. Auditoria de integração real do P0-A (2026-11-09, sem custo)
+
+Executada com `bwrap` 0.9.0 e o binário nativo `claude` 2.1.319 deste ambiente, **sem credenciais e sem prompt ao modelo** (nenhuma chamada paga é possível). O que foi exercido de verdade e o que **não** foi:
+
+| Item | Resultado |
+|---|---|
+| `claude` dentro do sandbox, indexação e hook do Sidecar no filesystem isolado | **Verificado**: `claude --version` roda; `sidecar index` leva ~60–80 ms; o hook `UserPromptSubmit` dispara dentro do sandbox e injeta contexto (277 caracteres na sonda); o braço OFF não tem hook |
+| Falha de autenticação | **Verificado**: `Not logged in` vira `exit=1`, `stream_error`, execução não comparável; não conta como sucesso |
+| Suítes de teste do projeto no sandbox | **Falhavam em 3 de 4 linguagens, corrigido**: Click (`pip install -e .` grava o caminho absoluto do host no venv), Express (`npm` montado como arquivo único) e Sinatra (`bundle` com shebang para outra árvore de Ruby). Após a correção, no sandbox: chi (`go test`), Click (109 passed), Express (1290 passing), Sinatra (273 runs) |
+| Controle OFF e caminhos absolutos | **Falhava, corrigido**: com `PATH` filtrado, `/usr/local/bin/sidecar`, `/usr/local/bin/codegraph` e um pacote `@colbymchenry/codegraph` global continuavam executáveis por caminho absoluto. Agora são mascarados por mount (`forbidden_tool_masks`) |
+| Gabarito via código executado | Oráculo e `reference.patch` **não** estão montados: `cat`, `python` e `ls` por caminho absoluto falham com ENOENT. **Canal residual**: o corpus também existe num repositório público do GitHub e o sandbox precisa de rede para a API; um teste escrito pelo agente poderia baixá-lo. O harness **não bloqueia** esse canal; marca a execução como não comparável se o agente ou o código que ele escreveu menciona `dedeusgui/sidecar` ou `bench/lab/corpus` |
+| Subagentes e chamadas paralelas | **Corrigido**: `message_id` agora é o id da mensagem da API (as linhas do stream de uma mesma mensagem compartilham `message.id`, não `uuid`), então pergunta e `Edit` emitidos juntos não contam como "perguntou antes de editar". O contexto do hook só é atribuído à thread principal: ações de subagente recebem `context_scope=subagent` e `after_context=false` |
+| **Não verificado** | volta autenticada, `--resume` da segunda volta, contadores reais de custo/cache do `result`, `AskUserQuestion` no modo headless, modelo servido real. Exigem credencial e orçamento autorizado |
+
+Mudanças de harness correspondentes: o checkout é montado também no caminho absoluto do host (`/work` continua existindo); runtimes fora de `/usr` montam a árvore de instalação inteira (`/opt/<x>`, rbenv, nvm, pyenv...) mais o interpretador do shebang, com wrapper `exec` em vez de symlink; `verify_agent_runtimes` roda um comando de fumaça por linguagem no sandbox real **antes de qualquer gasto** e recusa a execução se algum falhar; `--agent-network-env` (opt-in) repassa proxy e CA, nunca credenciais de modelo.
+
 ## 6. Lacunas conhecidas (R1)
 
 - A lista padrão de ferramentas inclui runners por linguagem do repositório, igual entre braços e gravada nos registros; `--tools-allow` substitui essa lista. A disponibilidade dos runtimes deve ser conferida no ambiente de cada experimento.

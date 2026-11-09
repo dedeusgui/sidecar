@@ -22,6 +22,7 @@ import os
 import pathlib
 import random
 import re
+import shlex
 import shutil
 import statistics
 import subprocess
@@ -218,6 +219,12 @@ def build_manifest(include_holdout=False):
     }
 
 
+def task_languages(tasks):
+    """Linguagens dos repositórios das tarefas selecionadas, só pelo inventário (nunca abre arquivos de tarefa/oráculo)."""
+    repos = load_repos()
+    return sorted({repos[t["repo"]]["language"] for t in tasks if (repos.get(t["repo"]) or {}).get("language")})
+
+
 def holdout_guard(tasks, final, purpose, repeat=False):
     """Bloqueia holdout fora de --final e registra qualquer uso no ledger (append-only)."""
     held = [t for t in tasks if t["split"] == "holdout"]
@@ -348,8 +355,12 @@ def _bind_specs(paths):
     return specs
 
 
-def agent_sandbox_command(argv, work, readonly_paths=(), writable_paths=(), sandbox_env=None):
-    """Executa o agente em uma raiz vazia: somente sistema, checkout e mounts explicitamente permitidos."""
+def agent_sandbox_command(argv, work, readonly_paths=(), writable_paths=(), sandbox_env=None, masked_paths=()):
+    """Executa o agente em uma raiz vazia: somente sistema, checkout e mounts explicitamente permitidos.
+
+    O checkout aparece em `/work` e TAMBÉM no seu caminho absoluto do host: `pip install -e .`, shebangs de venv e a
+    configuração do bundler gravam esse caminho (medido com Click), e um mount só em /work os deixa quebrados.
+    `masked_paths` esconde arquivos/diretórios dentro de mounts permitidos (sidecar/codegraph em /usr ou num runtime)."""
     bwrap = shutil.which("bwrap")
     if sys.platform != "linux" or not bwrap:
         raise LabError("agent filesystem sandbox indisponível: Linux com bwrap é obrigatório")
@@ -359,6 +370,7 @@ def agent_sandbox_command(argv, work, readonly_paths=(), writable_paths=(), sand
     readonly = _bind_specs(readonly_paths)
     writable = _bind_specs(writable_paths)
     targets = [dest for _, dest in readonly + writable] + ["/work", "/agent-bin", "/home/agent"]
+    work_target = work.as_posix()
     dirs = set()
     for target in targets:
         parent = pathlib.PurePosixPath(target).parent
@@ -376,11 +388,20 @@ def agent_sandbox_command(argv, work, readonly_paths=(), writable_paths=(), sand
         cmd.extend(["--bind", host, target])
     for host, target in readonly:
         cmd.extend(["--ro-bind", host, target])
+    # Depois dos demais mounts: o checkout pode ficar sob /tmp, que acima é um bind do tmp isolado do agente.
+    if work_target != "/work":
+        cmd.extend(["--bind", str(work), work_target])
+    for masked in masked_paths:
+        masked = pathlib.Path(masked)
+        if masked.is_dir() and not masked.is_symlink():
+            cmd.extend(["--tmpfs", str(masked)])
+        elif masked.exists():
+            cmd.extend(["--ro-bind", "/dev/null", str(masked)])
     cmd.extend(["--clearenv", "--setenv", "PATH", "/agent-bin", "--setenv", "HOME", "/home/agent",
                 "--setenv", "CLAUDE_CONFIG_DIR", "/agent-config", "--setenv", "SIDECAR_HOME", "/sidecar-home",
                 "--setenv", "TMPDIR", "/tmp", "--setenv", "LANG", "C.UTF-8", "--setenv", "CI", "1",
                 "--setenv", "GOTOOLCHAIN", "local", "--setenv", "GOPROXY", "off", "--setenv", "GOFLAGS", "-mod=mod",
-                "--chdir", "/work"])
+                "--chdir", work_target])
     for key, value in sorted((sandbox_env or {}).items()):
         cmd.extend(["--setenv", key, str(value)])
     cmd.extend(["--", *argv])
@@ -574,45 +595,113 @@ def reject_sensitive_mounts(sources, forbidden):
                 raise LabError(f"agent filesystem sandbox: mount sobrepõe dados protegidos: {source}")
 
 
-def agent_runtime_bin(root, work=None):
+# Árvores onde runtimes costumam ser instalados fora de /usr (cada filho direto é uma instalação inteira) e, no HOME,
+# os gerenciadores de versão com layout conhecido. Qualquer outro caso cai no mount do arquivo único e é pego pelo
+# preflight `verify_agent_runtimes`, que recusa o run em vez de deixar o agente sem testes.
+INSTALL_BASES = ("/opt", "/srv")
+HOME_RUNTIME_LAYOUTS = ((".rbenv", "versions"), (".nvm", "versions", "node"), (".pyenv", "versions"),
+                        (".rustup", "toolchains"), (".sdkman", "candidates"))
+# `go` tem o GOROOT consultado; os demais nomes aceitam shebang absoluto fora de /usr.
+SHEBANG_BYTES = 256
+
+
+def runtime_roots(executable):
+    """Diretórios de instalação (somente leitura) de que um executável fora de /usr depende: sua própria árvore e a do
+    interpretador nomeado no shebang (`bundle` -> ruby de outra árvore). Vazio = só o arquivo (fallback)."""
+    path = pathlib.Path(executable).resolve()
+    roots, queue, seen = [], [path], set()
+    while queue:
+        current = queue.pop(0)
+        if current in seen or _inside(current, "/usr"):
+            continue
+        seen.add(current)
+        root = _install_root(current)
+        if root and root not in roots:
+            roots.append(root)
+        try:
+            with current.open("rb") as f:
+                head = f.read(SHEBANG_BYTES)
+        except OSError:
+            continue
+        if head.startswith(b"#!"):
+            words = head[2:].split(b"\n", 1)[0].decode("utf-8", errors="replace").split()
+            if words and words[0].startswith("/") and words[0] != "/usr/bin/env":
+                queue.append(pathlib.Path(words[0]).resolve())
+    return roots
+
+
+def _install_root(path):
+    for base in INSTALL_BASES:
+        base = pathlib.Path(base)
+        if base in path.parents:
+            return base / path.relative_to(base).parts[0]
+    home = pathlib.Path.home()
+    if home in path.parents:
+        rel = path.relative_to(home).parts
+        for layout in HOME_RUNTIME_LAYOUTS:
+            if rel[:len(layout)] == layout and len(rel) > len(layout) + 1:
+                return home.joinpath(*layout, rel[len(layout)])
+    return None
+
+
+def agent_runtime_bin(root, work=None, commands=None):
     """Create a PATH with only named runtime/test commands; never include Sidecar or CodeGraph."""
     root = pathlib.Path(root)
     root.mkdir(parents=True, exist_ok=True)
     mounts, env = [], {}
-    for name in AGENT_BIN_COMMANDS:
+    for name in (AGENT_BIN_COMMANDS if commands is None else commands):
         found = shutil.which(name)
         if not found:
             continue
         executable = pathlib.Path(found).resolve()
         if not executable.is_file():
             continue
+        link_target, via_wrapper = str(executable), False
         if _inside(executable, "/usr"):
-            target = str(executable)
+            pass
         elif name == "claude":
             package = next((p for p in (executable.parent, *executable.parents) if (p / "package.json").is_file()), None)
             if package:
-                target = "/agent-runtime/claude-package/" + executable.relative_to(package).as_posix()
+                link_target = "/agent-runtime/claude-package/" + executable.relative_to(package).as_posix()
                 mounts.append((package, "/agent-runtime/claude-package"))
             else:
-                target = "/agent-runtime/claude"
-                mounts.append((executable, target))
+                trees = runtime_roots(executable)
+                if trees:
+                    mounts.extend((tree, str(tree)) for tree in trees)
+                else:
+                    link_target = "/agent-runtime/claude"
+                    mounts.append((executable, link_target))
+            via_wrapper = True
         elif name == "go":
             code, goroot, _, timed_out = run([str(executable), "env", "GOROOT"], timeout=10)
             if code == 0 and not timed_out and pathlib.Path(goroot.strip()).is_dir():
-                target = "/agent-runtime/go-root/bin/go"
+                link_target = "/agent-runtime/go-root/bin/go"
                 mounts.append((pathlib.Path(goroot.strip()), "/agent-runtime/go-root"))
                 env["GOROOT"] = "/agent-runtime/go-root"
             else:
-                target = "/agent-runtime/go"
-                mounts.append((executable, target))
+                link_target = "/agent-runtime/go"
+                mounts.append((executable, link_target))
+            via_wrapper = True
         else:
-            target = f"/agent-runtime/{name}"
-            mounts.append((executable, target))
+            trees = runtime_roots(executable)
+            if trees:
+                mounts.extend((tree, str(tree)) for tree in trees)
+            else:
+                link_target = f"/agent-runtime/{name}"
+                mounts.append((executable, link_target))
+            via_wrapper = True
         link = root / name
-        if not link.exists() and not link.is_symlink():
-            link.symlink_to(target)
+        if link.exists() or link.is_symlink():
+            continue
+        if via_wrapper:
+            # Wrapper em vez de symlink: scripts que resolvem irmãos por `$0` (npm, bundler) precisam do caminho real.
+            link.write_text(f'#!/bin/sh\nexec {shlex.quote(link_target)} "$@"\n')
+            link.chmod(0o755)
+        else:
+            link.symlink_to(link_target)
     if work and (pathlib.Path(work) / ".venv" / "bin" / "python").exists():
-        cfg = pathlib.Path(work) / ".venv" / "pyvenv.cfg"
+        work_abs = pathlib.Path(work).resolve()
+        cfg = work_abs / ".venv" / "pyvenv.cfg"
         if cfg.is_file():
             for line in cfg.read_text(errors="replace").splitlines():
                 key, sep, value = line.partition("=")
@@ -625,9 +714,110 @@ def agent_runtime_bin(root, work=None):
             link = root / name
             if link.exists() or link.is_symlink():
                 link.unlink()
-            link.write_text(f'#!/bin/sh\nexec /work/.venv/bin/python {suffix}"$@"\n')
+            link.write_text(f'#!/bin/sh\nexec {shlex.quote(str(work_abs / ".venv" / "bin" / "python"))} {suffix}"$@"\n')
             link.chmod(0o755)
-    return root, mounts, env
+    deduped, seen_targets = [], set()
+    for host, target in mounts:
+        if target not in seen_targets:
+            seen_targets.add(target)
+            deduped.append((host, target))
+    return root, deduped, env
+
+
+FORBIDDEN_TOOL_NAME = re.compile(r"^(sidecar|codegraph)", re.I)
+FORBIDDEN_TOOL_SCOPES = ("@colbymchenry",)
+DEFAULT_TOOL_SCAN_DIRS = ("/usr/local/bin", "/usr/bin", "/usr/sbin", "/usr/local/sbin",
+                          "/usr/local/lib/node_modules", "/usr/lib/node_modules")
+
+
+def forbidden_tool_masks(mount_roots, scan_dirs=DEFAULT_TOOL_SCAN_DIRS):
+    """Caminhos de sidecar/codegraph alcançáveis DENTRO do sandbox por caminho absoluto. O filtro de PATH não os impede
+    (a campanha do CodeGraph achou o binário no controle OFF em 14/15 execuções): eles são mascarados por mount."""
+    dirs = [pathlib.Path(d) for d in scan_dirs]
+    for mount in mount_roots:
+        mount = pathlib.Path(mount)
+        dirs += [mount / "bin", mount / "lib" / "node_modules", mount / "node_modules", mount / "node_modules" / ".bin"]
+        if mount.is_file():
+            dirs.append(mount.parent)
+    found = []
+
+    def walk(directory, depth):
+        try:
+            entries = sorted(os.scandir(directory), key=lambda e: e.name)
+        except OSError:
+            return
+        for entry in entries:
+            if FORBIDDEN_TOOL_NAME.match(entry.name):
+                found.append(entry.path)
+            elif depth > 0 and (entry.name in FORBIDDEN_TOOL_SCOPES or entry.name.startswith("@")):
+                walk(entry.path, depth - 1)
+
+    for directory in dirs:
+        if directory.is_dir():
+            walk(directory, 1)
+    return sorted(dict.fromkeys(found))
+
+
+NETWORK_ENV_VARS = ("HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy")
+CA_FILE_VARS = ("SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
+
+
+def agent_network_env(environ):
+    """Proxy e CA que o cliente do modelo precisa em redes com proxy. Opt-in (`--agent-network-env`): o `--clearenv` do
+    sandbox os remove. Nunca passa credenciais de modelo; arquivos de CA entram somente leitura em /agent-ca."""
+    env, mounts = {}, []
+    for key in NETWORK_ENV_VARS:
+        if environ.get(key):
+            env[key] = environ[key]
+    for key in CA_FILE_VARS:
+        value = environ.get(key)
+        if value and pathlib.Path(value).is_file():
+            target = "/agent-ca/" + pathlib.Path(value).name
+            env[key] = target
+            if (pathlib.Path(value), target) not in mounts:
+                mounts.append((pathlib.Path(value), target))
+    return env, mounts
+
+
+RUNTIME_SMOKE = {
+    "go": [["go", "version"]],
+    "python": [["python3", "-c", "import sys, venv"]],
+    "javascript": [["node", "-e", "0"], ["npm", "--version"]],
+    "ruby": [["ruby", "-e", "0"], ["bundle", "--version"]],
+    "rust": [["cargo", "--version"]],
+    "php": [["php", "-v"]],
+    "java": [["mvn", "-v"]],
+}
+
+
+def verify_agent_runtimes(languages):
+    """Preflight: o comando de teste de cada linguagem precisa SUBIR dentro do sandbox real, antes de qualquer execução
+    paga. Sem isso o braço não consegue rodar a suíte do projeto e a comparação deixa de ser equivalente."""
+    results = {}
+    with tempfile.TemporaryDirectory(prefix="lab-runtime-check-") as tmp:
+        tmp = pathlib.Path(tmp).resolve()
+        work = tmp / "work"
+        work.mkdir()
+        scratch = tmp / "scratch"
+        scratch.mkdir()
+        bin_dir, mounts, env = agent_runtime_bin(tmp / "bin")
+        masks = forbidden_tool_masks([m for m, _ in mounts])
+        for language in sorted(set(languages)):
+            smoke = RUNTIME_SMOKE.get(language)
+            if not smoke:
+                raise LabError(f"sem verificação de runtime para a linguagem {language!r}: adicione-a a RUNTIME_SMOKE")
+            for argv in smoke:
+                command = agent_sandbox_command(argv, work, list(mounts) + [(bin_dir, "/agent-bin")],
+                                                [(scratch, "/tmp")], env, masked_paths=masks)
+                try:
+                    done = subprocess.run(command, capture_output=True, text=True, timeout=30)
+                except subprocess.TimeoutExpired:
+                    raise LabError(f"runtime {language} inutilizável no sandbox do agente: {' '.join(argv)} excedeu 30 s")
+                if done.returncode != 0:
+                    detail = (done.stderr or done.stdout).strip()[-300:]
+                    raise LabError(f"runtime {language} inutilizável no sandbox do agente: {' '.join(argv)}: {detail}")
+            results[language] = "ok"
+    return results
 
 
 BASE_AGENT_TOOLS = ["Read", "Grep", "Glob", "Edit", "Write", "Bash(ls:*)"]
@@ -686,10 +876,17 @@ def deny_flags(paths):
     return ["--disallowedTools", *rules] if rules else []
 
 
+# O corpus e os reference.patch também existem em um repositório público do GitHub. O sandbox mantém a rede aberta para a API
+# do modelo, então código executado por um comando de teste poderia baixar a resposta: o harness não fecha esse canal,
+# mas marca a execução como não comparável quando o agente ou o código que ele escreveu o menciona.
+PUBLIC_BENCHMARK_NEEDLES = ("dedeusgui/sidecar", "bench/lab/corpus")
+
+
 def touched_benchmark_data(events, deny_paths):
     """True se algum evento de ferramenta menciona dados do benchmark. Uma tentativa negada também conta:
     o braço sondou o gabarito, então a execução deixa de ser comparável."""
-    needles = [str(pathlib.Path(p).resolve()) for p in deny_paths] + ["reference.patch", "/oracle/", "validation.json", "holdout_ledger"]
+    needles = [str(pathlib.Path(p).resolve()) for p in deny_paths] + ["reference.patch", "/oracle/", "validation.json", "holdout_ledger",
+                                                                       *PUBLIC_BENCHMARK_NEEDLES]
     return any(n in (e.get(f) or "") for e in events for n in needles for f in ("key", "cmd"))
 
 
@@ -722,8 +919,9 @@ def assistant_questions(stream_text):
             continue
         if event.get("type") != "assistant":
             continue
-        message_id = event.get("uuid") or event.get("message_id") or f"message-{line_order}"
         message = event.get("message") or {}
+        # Claude Code emits one stream line per content block: they share the API message id but not the line uuid.
+        message_id = message.get("id") or event.get("uuid") or event.get("message_id") or f"message-{line_order}"
         for block_order, block in enumerate(message.get("content") or []):
             if not isinstance(block, dict) or block.get("type") != "text":
                 continue
@@ -848,7 +1046,7 @@ def merge_turns(turns):
     for turn_index, turn in enumerate(turns):
         for event in turn["tool_events"]:
             event = dict(event, turn=turn_index + 1, stream_order=event.get("order"), order=len(events))
-            if context_seen:
+            if context_seen and event.get("thread_id", "main") == "main":
                 event["after_context"] = True
             events.append(event)
         context_seen = context_seen or turn.get("hook_delivered") is True
@@ -871,11 +1069,12 @@ class ClaudeAgent:
     """Claude Code real: configuração isolada por execução, canário, verificação de init e modelo servido."""
     simulated = False
 
-    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow, deny_paths=(), turns=1):
+    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow, deny_paths=(), turns=1, network_env=False):
         sys.path.insert(0, str(HERE.parent / "agentic"))
         import real_hook_pilot as rhp
         self.rhp, self.model, self.sidecar, self.turns = rhp, model, sidecar, turns
         self.credentials, self.max_budget, self.timeout, self.tools_allow = credentials, max_budget, timeout, tools_allow
+        self.network_env = network_env
         # O agente roda como o mesmo usuário e `Read` aceita caminho absoluto: sem estas regras ele LÊ o oráculo
         # oculto. Medido (2026-11-08): sem a regra a leitura funciona; com ela Read, Grep e `ls` são negados.
         self.deny_paths = [str(pathlib.Path(p).resolve()) for p in deny_paths]
@@ -903,6 +1102,13 @@ class ClaudeAgent:
         writable_mounts = [(cfg_dir, "/agent-config"), (sandbox_home, "/home/agent"),
                            (sandbox_tmp, "/tmp"), (pathlib.Path(env["SIDECAR_HOME"]), "/sidecar-home")]
         readonly_mounts = list(runtime_mounts) + [(bin_dir, "/agent-bin")]
+        if self.network_env:
+            extra_env, ca_mounts = agent_network_env(os.environ)
+            sandbox_env.update(extra_env)
+            readonly_mounts += ca_mounts
+        # sidecar/codegraph não podem ser alcançados por caminho absoluto em nenhum braço; o binário do braço ligado entra
+        # depois, em /opt/sidecar, e por isso não é mascarado.
+        masks = forbidden_tool_masks([m for m, _ in runtime_mounts])
         if arm["engine"] is not None:
             readonly_mounts.append((self.sidecar, "/opt/sidecar"))
             sandbox_env["SIDECAR_ENGINE"] = arm["engine"]
@@ -917,8 +1123,9 @@ class ClaudeAgent:
             index_ms = None
             if arm["engine"] is not None:
                 index_started = time.perf_counter()
-                index_cmd = agent_sandbox_command(["/opt/sidecar", "index", "--root", "/work"], work,
-                                                  readonly_mounts, writable_mounts, sandbox_env)
+                # Mesmo caminho que o hook receberá como cwd: o índice é por raiz e não pode ser refeito a frio.
+                index_cmd = agent_sandbox_command(["/opt/sidecar", "index", "--root", str(pathlib.Path(work).resolve())], work,
+                                                  readonly_mounts, writable_mounts, sandbox_env, masked_paths=masks)
                 code, _, err, timed_out = run(index_cmd, cwd=work, env=env, timeout=300)
                 if code != 0 or timed_out:
                     raise LabError(f"indexação isolada falhou: {err[-300:]}")
@@ -933,7 +1140,7 @@ class ClaudeAgent:
                 denied = self.deny_paths + ["/agent-config/.credentials.json"]
                 sandboxed = agent_sandbox_command(self.command(text, settings, resume=session, tools_allow=tools_allow,
                                                                deny_paths=denied, max_budget=remaining_budget),
-                                                  work, readonly_mounts, writable_mounts, sandbox_env)
+                                                  work, readonly_mounts, writable_mounts, sandbox_env, masked_paths=masks)
                 code, out, err, to = run(sandboxed, cwd=work, env=env, timeout=self.timeout)
                 wall = time.perf_counter() - t0
                 parsed = rhp.parse_stream(out)
@@ -978,7 +1185,7 @@ class ClaudeAgent:
                     break
                 if to or code != 0 or not session and self.turns > 1:
                     break  # sem resposta da primeira volta não há o que continuar
-            leaked = workspace_mentions_benchmark(work, self.deny_paths + ["reference.patch", "holdout_ledger"])
+            leaked = workspace_mentions_benchmark(work, self.deny_paths + ["reference.patch", "holdout_ledger", *PUBLIC_BENCHMARK_NEEDLES])
             merged = merge_turns(turns)
             if leaked:
                 merged["incomparable_reasons"] = list(merged["incomparable_reasons"]) + [f"arquivo escrito pelo agente referencia dados do benchmark: {leaked}"]
@@ -1048,7 +1255,7 @@ def tool_events(stream_text, include_question_text=False):
                         ev["question"] = question
                 if ev is not None:
                     ev.update({"order": order_base + block_order, "thread_id": d.get("parent_tool_use_id") or msg.get("parent_tool_use_id") or "main",
-                               "message_id": d.get("uuid") or d.get("message_id") or msg.get("id") or f"message-{line_order}",
+                               "message_id": msg.get("id") or d.get("uuid") or d.get("message_id") or f"message-{line_order}",
                                "tool_use_id": block.get("id"), "timestamp": d.get("timestamp") or msg.get("timestamp"),
                                "completed": None, "err": None})
                     events.append(ev)
@@ -1066,7 +1273,13 @@ def tool_events(stream_text, include_question_text=False):
                     ev["err"] = re.sub(r"\d+", "#", first)[:200]
     context_order = min(context_orders) if context_orders else None
     for ev in events:
-        ev["after_context"] = None if context_order is None else ev["order"] > context_order
+        # O hook entrega o contexto à conversa principal. Um subagente parte do prompt que o agente principal escreveu:
+        # suas ações não são reação à evidência entregue e ficam fora da classificação (`context_scope` registra por quê).
+        ev["context_scope"] = "main" if ev["thread_id"] == "main" else "subagent"
+        if context_order is None:
+            ev["after_context"] = None
+        else:
+            ev["after_context"] = ev["context_scope"] == "main" and ev["order"] > context_order
     return events
 
 
@@ -1280,8 +1493,11 @@ def cmd_run(args):
         for d in deny:
             if d.resolve() == tmp_root or d.resolve() in tmp_root.parents or d.resolve() == pathlib.Path("/"):
                 raise LabError(f"--out-dir/repositório não pode ser {d}: bloquearia o workspace do agente. Use um subdiretório")
+        # Antes de qualquer gasto: o runner de testes de cada linguagem precisa subir dentro do sandbox real.
+        agent_runtimes = verify_agent_runtimes(task_languages(tasks))
         agent = ClaudeAgent(args.model, str(pathlib.Path(args.sidecar).resolve()), args.credentials, args.max_budget,
-                            args.timeout, requested_tools, deny_paths=deny, turns=getattr(args, "turns", 1))
+                            args.timeout, requested_tools, deny_paths=deny, turns=getattr(args, "turns", 1),
+                            network_env=getattr(args, "agent_network_env", False))
         est = n * args.max_budget
         if not args.yes_spend:
             print(f"Dry run: {n} execuções ({len(tasks)} tarefas × {len(arms)} braços × {args.reps}); "
@@ -1295,6 +1511,9 @@ def cmd_run(args):
             "tools_allow_by_repo": {task["repo"]: tools_allow_for(task, requested_tools) for task in tasks},
             "isolation": sandbox_prefix()[1], "oracle_network_isolation": sandbox_prefix()[1],
             "agent_filesystem_isolation": agent_isolation if args.agent == "claude" else "simulated-unrestricted",
+            "agent_runtimes": agent_runtimes if args.agent == "claude" else None,
+            "agent_network_env": bool(getattr(args, "agent_network_env", False)),
+            "agent_network": "open (a API do modelo exige rede; o gabarito público é detectado, não bloqueado)" if args.agent == "claude" else None,
             "sidecar_sha256": sha256_file(args.sidecar) if args.sidecar else None,
             "frozen_revision": getattr(args, "frozen_revision", None),
             "claude_version": run(["claude", "--version"])[1].strip() if args.agent == "claude" else None,
@@ -1587,7 +1806,7 @@ def main(argv=None):
     p.add_argument("--tools-allow", default=None, help="lista explícita que substitui a política padrão por linguagem")
     p.add_argument("--yes-spend", action="store_true"); p.add_argument("--final", action="store_true")
     p.add_argument("--frozen-revision"); p.add_argument("--frozen-binary-sha256")
-    p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--turns", type=int, choices=(1, 2), default=1, help="2 = protocolo de duas voltas com usuário simulado (R4/R5)"); p.add_argument("--rep-offset", type=int, default=0, help="índice da primeira repetição; permite processos paralelos com repetições distintas"); p.add_argument("--scripted-behaviour", default="reference")
+    p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--turns", type=int, choices=(1, 2), default=1, help="2 = protocolo de duas voltas com usuário simulado (R4/R5)"); p.add_argument("--rep-offset", type=int, default=0, help="índice da primeira repetição; permite processos paralelos com repetições distintas"); p.add_argument("--scripted-behaviour", default="reference"); p.add_argument("--agent-network-env", action="store_true", help="repassa proxy/CA (nunca credenciais) ao sandbox do agente")
     p = sub.add_parser("report"); p.add_argument("runs", nargs="+", help="um ou mais runs.jsonl (repetições de processos diferentes são juntadas)"); p.add_argument("--md"); p.add_argument("--json"); p.add_argument("--offline")
     a = ap.parse_args(argv)
     try:
