@@ -2,6 +2,8 @@
 
 **Pesquisa verificada em 2026-11-06.** Uso obrigatório **por módulo relevante**, não leitura integral em todo prompt. Este catálogo contém **fontes para engenharia e comparação**, não dependências instaladas, direitos de copiar código indiscriminadamente nem evidência de que Sidecar já é superior.
 
+**Campanha V3:** pins recentes, caminhos auditados e ressalvas dos benchmarks dos concorrentes estão em [docs/v3/upstream-references.md](v3/upstream-references.md). Este catálogo V2 permanece útil para descoberta; a V3 deve verificar SHAs/licenças antes de consultar código.
+
 ## Como consultar antes de implementar
 
 1. Partir de [product-v2.md](product-v2.md) e [roadmap.md](roadmap.md); identificar o gargalo e o contrato da funcionalidade.

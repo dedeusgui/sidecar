@@ -167,3 +167,15 @@ Reusar [reference-implementations.md](reference-implementations.md) para CodeGra
 5. Documentar qualquer desvio de escopo e dependência antes de mudar o plano. Roadmap descreve intenção; Git, testes e scorecards descrevem realidade.
 
 **Definição de pronto final:** todos os contratos essenciais da V2 integrados, adapters compatíveis validados, recuperação seletiva e segura, grooming útil em tarefas ambíguas, qualidade de patch demonstrada por oráculos, observabilidade e distribuição reversível. Nenhuma promessa de ganhos quantitativos sem experimento reproduzível.
+
+
+## 8. Transição para a V3 (após PR #18)
+
+O plano acima cobre a V2 e os milestones R1–R7. A campanha V3 **não é substituição retroativa nem resultado implementado**. Baseline da transição: PR #18 mergeado em `main` no commit `31279c3c1db35b4571cea3f6f0361c5d6e9bd40e`, corpus de 32 tarefas com 9 holdout seladas, piloto de duas voltas N=6 inconclusivo. O holdout não foi rodado; as 12 tarefas novas não têm medição agentic. Consulte:
+
+- [Contrato/arquitetura e prioridades V3](v3/README.md)
+- [Referências externas auditadas, SHAs, métricas e caveats](v3/upstream-references.md)
+- [Evals competitivos, anti-contaminação e gates de promoção](v3/evaluation-protocol.md)
+- [Instruções executáveis para Codex](v3/CODEX-HANDOFF.md)
+
+Não marcar a V3 default sem melhora de qualidade e custo/tempo por tarefa correta com testes end-to-end válidos. Atualizar os benchmarks através de `bench/registry.json` + `bench/consolidate.py`, não editar o índice gerado à mão.
