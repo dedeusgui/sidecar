@@ -1,5 +1,8 @@
 # Sidecar V3 — contrato de arquitetura e prioridades
 
+> **Transição de design:** consulte [Sidecar V3.5 Unified Context Engine](../v3.5/README.md) para a arquitetura proposta de unificação. A V3.5 **não está implementada**; esta página registra a base histórica de prioridades e evidências da V3. A implementação e os resultados atuais estão em [progress.md](progress.md).
+
+
 **Estado:** especificação para implementação, NÃO entrega de V3 nem alegação de benchmark. **Baseline inicial:** `main@31279c3c1db35b4571cea3f6f0361c5d6e9bd40e` (PR #18 mergeado, CI verde). Conferir HEAD antes de cada PR. **Atualização:** 2026-11-08.
 
 ## Fontes de verdade
