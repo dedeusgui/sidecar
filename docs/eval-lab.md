@@ -18,8 +18,10 @@ Infraestrutura para medir **tarefas de edição reais** com oráculos independen
 | Custo | só com `--yes-spend`; teto por execução (`--max-budget`) e total (`--max-total-usd`) lido de `spend.jsonl`; sem CI pago |
 | Simulação isolada | `ScriptedAgent` testa a infraestrutura; seus registros têm `evidence: simulated` e nunca entram na seção `agentic` |
 
+O caminho normal usa o inventário selado de `manifest.json` sem abrir tarefas ou oráculos de holdout. O holdout real exige, antes da leitura, `--final`, `--yes-spend`, `--frozen-revision` igual ao HEAD limpo, `--frozen-binary-sha256` e preflight do sandbox; os hashes são conferidos após o registro no ledger. Atualização do manifesto e validação direta do holdout real ficam bloqueadas durante esta etapa.
+
 ```bash
-python3 bench/lab/lab.py validate-corpus                     # prova fail-before/pass-after de cada tarefa
+python3 bench/lab/lab.py validate-corpus                     # development/validation; preserva holdout selado
 python3 bench/lab/lab.py manifest                            # corpus/manifest.json: hashes, splits, classes
 python3 bench/lab/lab.py run --agent claude --model claude-haiku-5-5 --sidecar /tmp/sidecar \
     --arms OFF,V1,V2 --reps 1 --out-dir /tmp/lab-run          # dry-run; --yes-spend executa
@@ -57,19 +59,17 @@ Seções **separadas** por nível de evidência (`agentic`, `simulated`, `offlin
 
 Falha encontrada em 2026-11-08, **depois** dos primeiros pilotos: o agente roda como o mesmo usuário e `Read` aceita caminho absoluto, então ele podia **ler o oráculo oculto e o `reference.patch`** (reproduzido: sem regra, a leitura funciona). Os pilotos `lab-dev1` e o piloto R3 foram executados **antes** da correção e sem traces de ferramentas: não há como provar que nenhum agente leu o gabarito. Tratar seus números como **possivelmente contaminados** (a probabilidade é baixa, porque os prompts não citam o caminho, mas não está medida).
 
-Correção (`ClaudeAgent`): regras `--disallowedTools` para `Read/Grep/Glob/Edit/Write` no repositório e no diretório de saída (verificado: Read, Grep e até `ls` no caminho são negados); detecção pós-execução: qualquer evento de ferramenta que cite dados do benchmark (mesmo negado), e qualquer arquivo alterado pelo agente que os referencie, tornam a execução **não comparável**; a linha de base do `setup` fica fora do workspace; `oracle.files` não pode sair de `oracle/` nem escrever em `.git`.
-
-**Risco residual, sem sandbox de SO (sem `bwrap` aqui):** código que o agente escreve e roda com `go test` lê qualquer arquivo do usuário. A detecção por varredura do workspace pega o caso comum, não um agente que monte o caminho em tempo de execução. Isolamento forte exige contêiner/usuário separado.
+O harness atual exige Linux com `bwrap` para o agente real e falha antes de uma execução paga se o preflight falhar. A raiz do agente expõe o checkout descartável, runtimes de sistema, configuração e estado temporários e, nos braços habilitados, o binário Sidecar. O PATH é filtrado; o repositório do benchmark e o diretório de resultados não são montados. Um teste de processo verifica acesso negado a um arquivo externo e ausência de Sidecar/CodeGraph no PATH. O oráculo mantém isolamento de rede separado. A integração com o cliente real ainda precisa de validação em ambiente com Claude CLI; os pilotos anteriores continuam com seu risco histórico de contaminação.
 
 Outras correções da mesma revisão: timeout agora fica nas taxas como falha (antes sumia do `pass_rate` e do custo); custo desconhecido conta como o teto por execução no limite de gasto; `*` de glob não cruza `/`; `regex_absent` falha se o arquivo foi apagado; o holdout só pode ser avaliado uma vez (`--allow-repeat-final`); `validate-task` não consome o holdout porque nenhum resultado de agente é observado; `--replay` exclui o holdout (`--include-holdout` para um relatório final).
 
 ## 5c. Protocolo de duas voltas e corpus v2
 
-`lab.py run --turns 2` retoma a sessão do cliente (`--resume`) e envia a fala de um usuário simulado, **definida pela tarefa e igual para todos os braços**: tarefa ambígua recebe `underspec.canned_answer`; as demais, uma revisão genérica (é nela que há edições não commitadas para a nota de impacto). A execução soma as duas voltas; qualquer volta contaminada ou sem modelo servido invalida tudo. Braços de funcionalidade: `V2+brief|adaptive|groom|impact`. O corpus v2 (12 tarefas, escopo com testes permitidos por glob, oráculos de 6 a 13 casos de borda) está validado mas **não foi medido com agente**.
+`lab.py run --turns 2` retoma a sessão (`--resume`). Em tarefa ambígua, a resposta predefinida só é enviada após uma pergunta relevante, observada antes de editar e com sessão disponível; caso contrário usa a revisão neutra. A pergunta em si não é gravada no registro. Métricas ausentes em uma volta tornam o total desconhecido. A trace correlaciona resultados com chamadas e só classifica ações após uma resposta de hook que entregou contexto.
 
 ## 6. Lacunas conhecidas (R1)
 
-- `--tools-allow` padrão libera só `go test`/`ls`: agentes de click/express/sinatra não conseguem rodar a suíte própria da linguagem. Igual nos três braços, mas limita a qualidade absoluta.
+- A lista padrão de ferramentas inclui runners por linguagem do repositório, igual entre braços e gravada nos registros; `--tools-allow` substitui essa lista. A disponibilidade dos runtimes deve ser conferida no ambiente de cada experimento.
 - ROI de feedback (`OFF` / `ON-no-feedback` / `ON-historical-feedback`): o feedback é indexado por raiz do repositório; o protocolo exige workspace de caminho estável por repositório e semeadura por fase de histórico. **Não implementado**; não declarado.
-- Isolamento de rede do cliente do agente: o oráculo roda sem rede, mas o `claude` precisa de rede para a API; não há `bwrap` neste ambiente cloud, então a proteção de escrita fora do workspace depende do `acceptEdits` e de `--allowedTools` restritos, não de um sandbox de SO.
+- O cliente precisa de rede para a API; o isolamento de rede do oráculo e o isolamento de filesystem do agente são registrados separadamente. A execução real com o sandbox novo ainda não foi exercida nesta sessão.
 - Amostras `cold` são poucas (uma por repositório+engine por execução do perf); aumentar exige reabrir índices.

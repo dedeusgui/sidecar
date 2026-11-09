@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from types import SimpleNamespace
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -47,6 +48,9 @@ class LabCase(unittest.TestCase):
         (self.corpus / "tasks").mkdir(parents=True)
         (self.corpus / "repos.json").write_text(json.dumps({"repos": {"toy": {
             "commit": self.commit, "source": "file://" + str(src), "license": "MIT"}}}))
+        (self.corpus / "manifest.json").write_text(json.dumps({"schema": "lab-manifest/1", "tasks": [],
+            "holdout_prompts_sha256": lab.sha256_bytes(b"")}))
+        self.holdout_prompts = {}
         self.old = (lab.CORPUS, lab.TASKS, lab.REPOS_JSON, lab.LEDGER)
         lab.CORPUS, lab.TASKS = self.corpus, self.corpus / "tasks"
         lab.REPOS_JSON, lab.LEDGER = self.corpus / "repos.json", self.corpus / "holdout_ledger.jsonl"
@@ -69,6 +73,17 @@ class LabCase(unittest.TestCase):
         (d / "task.json").write_text(json.dumps(task))
         if patch:
             (d / "reference.patch").write_text(REF)
+        manifest_path = self.corpus / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        entry = {"id": tid, "split": task["split"], "class": task["class"], "repo": task["repo"],
+                 "task_sha256": lab.sha256_file(d / "task.json"), "oracle_sha256": lab.tree_sha256(d / "oracle"),
+                 "reference_sha256": lab.sha256_file(d / "reference.patch") if (d / "reference.patch").is_file() else None,
+                 "validated": False}
+        manifest["tasks"] = [t for t in manifest["tasks"] if t["id"] != tid] + [entry]
+        if split == "holdout":
+            self.holdout_prompts[tid] = task["prompt"]
+        manifest["holdout_prompts_sha256"] = lab.sha256_bytes("\n".join(sorted(self.holdout_prompts.values())).encode())
+        manifest_path.write_text(json.dumps(manifest))
         return d
 
     def run_args(self, **kw):
@@ -176,6 +191,101 @@ class OracleTests(LabCase):
 
 
 class RunnerTests(LabCase):
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_agent_sandbox_hides_host_paths_and_limits_path(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            work = root / "work"
+            work.mkdir()
+            secret = root / "host-only.txt"
+            secret.write_text("do not read")
+            isolated_tmp = root / "isolated-tmp"
+            isolated_tmp.mkdir()
+            fake_bin = root / "fake-bin"
+            fake_bin.mkdir()
+            for name in ("sidecar", "codegraph"):
+                fake = fake_bin / name
+                fake.write_text("#!/bin/sh\nexit 0\n")
+                fake.chmod(0o755)
+            agent_home = root / "agent-home"
+            agent_home.mkdir()
+            state = root / "sidecar-home"
+            state.mkdir()
+            bin_host = root / "agent-bin"
+            with mock.patch.dict(os.environ, {"PATH": str(fake_bin) + os.pathsep + os.environ["PATH"]}):
+                bin_host, runtime_mounts, runtime_env = lab.agent_runtime_bin(bin_host)
+            command = lab.agent_sandbox_command(
+                ["sh", "-c", f"test ! -e {secret} && test ! -e {lab.HERE.parent.parent} && "
+                 "! command -v sidecar >/dev/null && ! command -v codegraph >/dev/null && "
+                 "printf sandbox-ok > /work/writable"],
+                work, readonly_paths=runtime_mounts + [(bin_host, "/agent-bin")],
+                writable_paths=[(isolated_tmp, "/tmp"), (agent_home, "/home/agent"), (state, "/sidecar-home")],
+                sandbox_env=runtime_env)
+            result = subprocess.run(command, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((work / "writable").read_text(), "sandbox-ok")
+
+    def test_agent_sandbox_fails_closed_without_bwrap(self):
+        with mock.patch.object(lab.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(lab.LabError, "filesystem sandbox"):
+                lab.agent_sandbox_command(["true"], "/tmp/work", [], [])
+
+    def test_mounts_cannot_contain_protected_data(self):
+        with self.assertRaises(lab.LabError):
+            lab.reject_sensitive_mounts(["/usr"], ["/usr/local/benchmark"])
+
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_venv_python_and_pytest_work_after_workspace_relocation(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            work = root / "work"
+            work.mkdir()
+            subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(work / ".venv")], check=True)
+            site = work / ".venv" / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
+            (site / "pytest.py").write_text("print('venv-ok')\n")
+            bin_host, mounts, sandbox_env = lab.agent_runtime_bin(root / "bin", work)
+            tmp = root / "tmp"
+            tmp.mkdir()
+            command = lab.agent_sandbox_command(["pytest"], work, mounts + [(bin_host, "/agent-bin")],
+                                                [(tmp, "/tmp")], sandbox_env)
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("venv-ok", result.stdout)
+
+    def test_failed_agent_cannot_pass_even_if_oracle_passes(self):
+        d = self.make_task()
+        task = json.loads((d / "task.json").read_text())
+        class Failed(lab.ScriptedAgent):
+            def run(self, *args):
+                result = super().run(*args)
+                result["exit"] = 1
+                return result
+        with tempfile.TemporaryDirectory() as home:
+            rec = lab.execute_one(Failed("reference"), task, d, {"name": "OFF", "engine": None, "env": {}}, 0, None, home)
+        self.assertEqual(rec["oracle"]["tests"], "pass")
+        self.assertFalse(rec["success"])
+
+    def test_language_tool_allowlists_cover_each_repository_runner(self):
+        expected = {
+            "go": "Bash(go test:*)",
+            "python": "Bash(pytest:*)",
+            "javascript": "Bash(npm test:*)",
+            "ruby": "Bash(bundle exec:*)",
+            "rust": "Bash(cargo test:*)",
+            "java": "Bash(mvn test:*)",
+            "php": "Bash(phpunit:*)",
+        }
+        for language, runner in expected.items():
+            with self.subTest(language=language):
+                allowed = lab.tools_allow_for({"language": language})
+                self.assertIn(runner, allowed)
+                self.assertIn("Read", allowed)
+                self.assertEqual(allowed, list(dict.fromkeys(allowed)))
+
+    def test_explicit_tool_allowlist_replaces_language_defaults(self):
+        self.assertEqual(lab.tools_allow_for({"language": "go"}, ["Read", "Bash(custom:*)", "Read"]),
+                         ["Read", "Bash(custom:*)"])
+
     def test_no_upstream_history_or_remote_in_checkout(self):
         d = self.make_task()
         task = json.loads((d / "task.json").read_text())
@@ -249,6 +359,9 @@ class RunnerTests(LabCase):
         runs = pathlib.Path(args.out_dir) / "runs.jsonl"
         rows = [json.loads(l) for l in runs.read_text().splitlines()]
         self.assertEqual(len(rows), 6)
+        self.assertTrue(all(row["tools_allow"] == ["Read"] for row in rows))
+        meta = json.loads((pathlib.Path(args.out_dir) / "meta.json").read_text())
+        self.assertEqual(meta["tools_allow_by_repo"], {"toy": ["Read"]})
         lab.cmd_run(args)  # retomada: nada é repetido
         self.assertEqual(len(runs.read_text().splitlines()), 6)
         rep = lab.build_report(rows)
@@ -261,6 +374,12 @@ class RunnerTests(LabCase):
         self.make_task()
         self.make_task("T-EDIT-02")
         args = self.run_args(max_total_usd=0.0)
+        lab.cmd_run(args)
+        self.assertFalse((pathlib.Path(args.out_dir) / "runs.jsonl").exists())
+
+    def test_spend_cap_reserves_the_next_execution(self):
+        self.make_task()
+        args = self.run_args(max_total_usd=0.09, max_budget=0.1)
         lab.cmd_run(args)
         self.assertFalse((pathlib.Path(args.out_dir) / "runs.jsonl").exists())
 
@@ -305,13 +424,78 @@ class ToolTraceTests(unittest.TestCase):
                         use("5", "Bash", {"command": "rg timeout"}), use("6", "Bash", {"command": "cat b.go"}),
                         {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "4", "is_error": True, "content": "FAIL line 42"}]}})
         ev = lab.tool_events(s)
-        self.assertEqual([e["kind"] for e in ev], ["read", "search", "edit", "test", "search", "read", "other"])
-        self.assertEqual(ev[-1]["err"], "fail line #")
+        self.assertEqual([e["kind"] for e in ev], ["read", "search", "edit", "test", "search", "read"])
+        self.assertEqual(ev[3]["err"], "fail line #")
+        self.assertTrue(ev[3]["completed"])
+        self.assertEqual(ev[3]["tool_use_id"], "4")
+
+    def test_tool_events_keep_order_thread_and_result_correlation(self):
+        use = {"type": "assistant", "uuid": "msg-a", "parent_tool_use_id": "agent-7", "timestamp": "t1",
+               "message": {"content": [
+                   {"type": "tool_use", "id": "read-1", "name": "Read", "input": {"file_path": "a.go"}},
+                   {"type": "tool_use", "id": "edit-1", "name": "Edit", "input": {"file_path": "a.go"}}]}}
+        results = {"type": "user", "uuid": "msg-b", "parent_tool_use_id": "agent-7", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "edit-1", "is_error": True, "content": "denied"},
+            {"type": "tool_result", "tool_use_id": "read-1", "content": "source text"}]}}
+        events = lab.tool_events(self.stream(use, results))
+        self.assertEqual([e["order"] for e in events], sorted(e["order"] for e in events))
+        self.assertTrue(all(e["thread_id"] == "agent-7" and e["message_id"] == "msg-a" for e in events))
+        by_id = {e["tool_use_id"]: e for e in events}
+        self.assertTrue(by_id["read-1"]["completed"])
+        self.assertIsNone(by_id["read-1"]["err"])
+        self.assertEqual(by_id["edit-1"]["err"], "denied")
+
+    def test_native_question_is_ephemeral_and_requires_successful_tool_result(self):
+        use = {"type": "assistant", "uuid": "q-msg", "message": {"content": [{"type": "tool_use", "id": "q1",
+               "name": "AskUserQuestion", "input": {"questions": [{"question": "Which output style?", "options": [
+                   {"label": "compact output"}, {"label": "pretty output"}]}]}}]}}
+        result = {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "q1", "content": "compact"}]}}
+        stream = self.stream(use, result)
+        persisted = lab.tool_events(stream)[0]
+        self.assertEqual(persisted["kind"], "clarify")
+        self.assertTrue(persisted["completed"])
+        self.assertNotIn("question", persisted)
+        self.assertNotIn("compact output", json.dumps(persisted))
+        ephemeral = lab.tool_events(stream, include_question_text=True)[0]
+        self.assertIn("compact output", ephemeral["question"])
+        task = {"underspec": {"canned_answer": "Use compact output.", "options": [
+            {"label": "compact output"}, {"label": "pretty output"}]}}
+        self.assertEqual(lab.followup_for(task, {"assistant_questions": [], "tool_events": [ephemeral]}),
+                         "Use compact output.")
+        failed = self.stream(use, {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "q1", "is_error": True, "content": "cancelled"}]}})
+        failed_turn = {"assistant_questions": [], "tool_events": lab.tool_events(failed, include_question_text=True)}
+        self.assertEqual(lab.followup_for(task, failed_turn), lab.DEFAULT_FOLLOWUP)
+
+    def test_post_context_requires_a_delivered_hook_response(self):
+        tool = lambda ident: {"type": "assistant", "uuid": ident, "message": {"content": [
+            {"type": "tool_use", "id": ident, "name": "Read", "input": {"file_path": ident + ".go"}}]}}
+        hook = {"type": "system", "subtype": "hook_response", "hook_event": "UserPromptSubmit",
+                "output": json.dumps({"hookSpecificOutput": {"additionalContext": "context"}})}
+        before, after = lab.tool_events(self.stream(tool("before"), hook, tool("after")))
+        self.assertFalse(before["after_context"])
+        self.assertTrue(after["after_context"])
+        with mock.patch.object(lab, "run", return_value=(0, json.dumps({"events": 1, "labels": [], "redundant": 0,
+                                                                            "exploratory": 1, "novelty_ratio": 1,
+                                                                            "stagnant_windows": 0, "longest_stagnation": 0}), "", False)) as run:
+            self.assertIsNotNone(lab.progress_report("/sidecar", [before, after]))
+            payload = run.call_args.kwargs["input_text"]
+            self.assertNotIn("before.go", payload)
+            self.assertIn("after.go", payload)
+        unobserved = lab.tool_events(self.stream(tool("unobserved")))[0]
+        self.assertIsNone(unobserved["after_context"])
+        self.assertIsNone(lab.progress_report("/sidecar", [unobserved]))
 
     def test_tool_events_tolerates_unexpected_stream_shapes(self):
         s = self.stream({"type": "system", "message": "text instead of an object"}, {"type": "user", "message": {"content": "plain string"}},
                         {"type": "assistant", "message": {"content": ["not a block", None]}})
         self.assertEqual(lab.tool_events(s), [])
+
+    def test_persisted_trace_redacts_command_and_error_text(self):
+        event = {"kind": "other", "key": "secret", "cmd": "cat secret", "err": "secret error"}
+        redacted = lab.redact_tool_events([event])[0]
+        self.assertNotIn("secret", json.dumps(redacted))
+        self.assertNotIn("cmd", redacted)
 
     def test_summarize_reports_redundancy_only_when_progress_exists(self):
         base = {"comparable": True, "success": True, "cost_usd": 0.1, "wall_s": 1.0, "tool_calls": 1, "injected_chars": 0,
@@ -321,6 +505,48 @@ class ToolTraceTests(unittest.TestCase):
         s = lab.summarize([dict(base, progress={"redundant": 2, "stagnant_windows": 0}), with_p])
         self.assertEqual(s["redundant_calls_mean"], 3)
         self.assertEqual(s["stagnant_runs"], 1)
+
+    def test_summary_totals_and_means_stay_unknown_when_any_counter_is_missing(self):
+        base = {"comparable": True, "success": True, "cost_usd": 0.1, "wall_s": 1.0, "tool_calls": 2,
+                "injected_chars": 10, "served_models": ["m"], "verdict": "pass",
+                "oracle": {"scope_ok": True, "invariants": [], "tests": "pass", "outside_scope": []}}
+        summary = lab.summarize([base, dict(base, cost_usd=None, wall_s=None, tool_calls=None, injected_chars=None)])
+        self.assertIsNone(summary["cost_total"])
+        self.assertIsNone(summary["wall_p95"])
+        self.assertIsNone(summary["tool_calls_mean"])
+        self.assertIsNone(summary["injected_chars_mean"])
+        self.assertEqual(summary["cost_unknown_runs"], 1)
+
+    def test_optional_metrics_render_only_when_fully_measured(self):
+        row = {"comparable": True, "success": True, "cost_usd": 0.1, "wall_s": 1.0, "tool_calls": 2,
+               "injected_chars": 10, "cache_read": 7, "arm": "V2", "task": "T1", "rep": 0,
+               "evidence": "agentic", "split": "development", "class": "edit", "progress": None,
+               "served_models": ["m"], "verdict": "pass",
+               "oracle": {"scope_ok": True, "invariants": [], "tests": "pass", "outside_scope": []}}
+        md = lab.render_md(lab.build_report([row]))
+        self.assertIn("Contadores e tempos observados", md)
+        self.assertIn("cache lido", md)
+        unknown = lab.summarize([dict(row, cache_read=None)])
+        self.assertNotIn("measured", unknown)
+
+
+class HookMetricTests(unittest.TestCase):
+    def test_reads_only_metadata_timings_appended_after_offset(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "hook.jsonl"
+            path.write_text(json.dumps({"total_ms": 99, "sync_ms": 90, "retrieve_ms": 8}) + "\n")
+            offset = lab.hook_log_offset(path)
+            with path.open("a") as f:
+                f.write(json.dumps({"prompt": "private", "total_ms": 12.5, "sync_ms": 4, "retrieve_ms": 3.5}) + "\n")
+                f.write(json.dumps({"total_ms": 7.5, "sync_ms": 2, "retrieve_ms": 1}) + "\n")
+            self.assertEqual(lab.hook_metrics_since(path, offset), {"hook_ms": 20.0, "sync_ms": 6, "retrieve_ms": 4.5})
+
+    def test_missing_log_stage_counter_stays_unknown(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "hook.jsonl"
+            path.write_text('{"total_ms": 12, "sync_ms": 3}\n')
+            self.assertEqual(lab.hook_metrics_since(path, 0), {"hook_ms": 12, "sync_ms": 3, "retrieve_ms": None})
+            self.assertTrue(all(v is None for v in lab.hook_metrics_since(path, path.stat().st_size).values()))
 
 
 class ReviewFixTests(LabCase):
@@ -452,6 +678,14 @@ class TwoTurnTests(unittest.TestCase):
         self.assertEqual(len(m["tool_events"]), 2)
         self.assertEqual(m["volta_injetada"], [300, 300])
 
+    def test_context_delivery_carries_over_and_event_order_spans_turns(self):
+        first = self.turn(tool_events=[{"kind": "read", "key": "a", "order": 20, "after_context": True}])
+        second = self.turn(hook_delivered=False, tool_events=[{"kind": "read", "key": "b", "order": 1, "after_context": None}])
+        events = lab.merge_turns([first, second])["tool_events"]
+        self.assertEqual([e["order"] for e in events], [0, 1])
+        self.assertEqual([e["turn"] for e in events], [1, 2])
+        self.assertTrue(events[1]["after_context"])
+
     def test_one_contaminated_or_timed_out_turn_taints_the_run(self):
         m = lab.merge_turns([self.turn(), self.turn(incomparable_reasons=["modelo servido ausente"], timed_out=True)])
         self.assertTrue(m["timed_out"])
@@ -463,11 +697,85 @@ class TwoTurnTests(unittest.TestCase):
         self.assertEqual(m["notas"], {"groom": True, "impact": True, "brief": False})
         self.assertNotIn("hook_context", m)
 
+    def test_partial_turn_metrics_remain_unknown_in_either_order(self):
+        for turns in (
+            [self.turn(cost_usd=0.01), self.turn(cost_usd=None)],
+            [self.turn(cost_usd=None), self.turn(cost_usd=0.01)],
+        ):
+            with self.subTest(turns=[turn["cost_usd"] for turn in turns]):
+                self.assertIsNone(lab.merge_turns(turns)["cost_usd"])
+
+    def test_missing_aggregate_metrics_are_not_reported_as_zero(self):
+        for key in ("wall_s", "tokens_in", "tokens_out", "tool_calls", "turns", "injected_chars"):
+            with self.subTest(key=key):
+                merged = lab.merge_turns([self.turn(**{key: 1}), self.turn(**{key: None})])
+                self.assertIsNone(merged[key])
+
+    def test_usage_and_timing_fields_sum_only_when_every_turn_is_measured(self):
+        first = self.turn(input_uncached=10, cache_read=20, cache_create=30, output=4,
+                          index_ms=5.0, hook_ms=2.0, sync_ms=1.0, retrieve_ms=0.5)
+        second = self.turn(input_uncached=2, cache_read=3, cache_create=4, output=1,
+                           index_ms=0.0, hook_ms=3.0, sync_ms=2.0, retrieve_ms=1.5)
+        merged = lab.merge_turns([first, second])
+        self.assertEqual((merged["input_uncached"], merged["cache_read"], merged["cache_create"], merged["output"]),
+                         (12, 23, 34, 5))
+        self.assertEqual((merged["index_ms"], merged["hook_ms"], merged["sync_ms"], merged["retrieve_ms"]),
+                         (5.0, 5.0, 3.0, 2.0))
+        self.assertIsNone(lab.merge_turns([first, self.turn(index_ms=None)]) ["index_ms"])
+
     def test_followup_is_defined_by_the_task_not_the_arm(self):
         self.assertEqual(lab.followup_for({"followup": "faça X"}), "faça X")
-        amb = lab.followup_for({"underspec": {"canned_answer": "usar as opções declaradas"}})
-        self.assertIn("usar as opções declaradas", amb)
+        amb = {"class": "ambiguous", "underspec": {
+            "canned_answer": "Use compact output.",
+            "options": [{"label": "compact output"}, {"label": "pretty output"}],
+        }}
+        self.assertEqual(lab.followup_for(amb), lab.DEFAULT_FOLLOWUP)
         self.assertEqual(lab.followup_for({"class": "edit"}), lab.DEFAULT_FOLLOWUP)
+
+    def test_ambiguous_answer_requires_relevant_question_before_any_edit(self):
+        task = {"class": "ambiguous", "underspec": {
+            "canned_answer": "Use compact output.",
+            "options": [{"label": "compact output"}, {"label": "pretty output"}],
+        }}
+        no_question = {"assistant_questions": [], "tool_events": []}
+        irrelevant = {"assistant_questions": [{"text": "Should I rename the package?", "order": 2}], "tool_events": []}
+        relevant_text_question = {"assistant_questions": [
+            {"text": "Should output be compact output or pretty output?", "order": 2}], "tool_events": []}
+        asked_after_edit = {"assistant_questions": [
+            {"text": "Should output be compact output or pretty output?", "order": 5}],
+            "tool_events": [{"kind": "edit", "order": 3}]}
+        relevant_tool_question = {"assistant_questions": [], "tool_events": [
+            {"kind": "clarify", "key": "Should output be compact output or pretty output?", "order": 2,
+             "completed": True, "err": None}]}
+
+        for turn in (no_question, irrelevant, asked_after_edit):
+            with self.subTest(turn=turn):
+                self.assertEqual(lab.followup_for(task, turn), lab.DEFAULT_FOLLOWUP)
+        self.assertEqual(lab.followup_for(task, relevant_text_question), "Use compact output.")
+        self.assertEqual(lab.followup_for(task, relevant_tool_question), "Use compact output.")
+
+    def test_duplicate_clarification_gets_one_answer_and_expired_session_gets_none(self):
+        task = {"class": "ambiguous", "underspec": {
+            "canned_answer": "Use compact output.",
+            "options": [{"label": "compact output"}, {"label": "pretty output"}],
+        }}
+        question = {"text": "Should output be compact output or pretty output?", "order": 1}
+        duplicate = {"assistant_questions": [question, dict(question, order=2)], "tool_events": []}
+        self.assertEqual(lab.followup_for(task, duplicate), "Use compact output.")
+        self.assertEqual(lab.followup_for(task, duplicate, session_available=False), lab.DEFAULT_FOLLOWUP)
+        self.assertEqual(lab.clarification_status(task, duplicate, session_available=False), "expired")
+        self.assertEqual(lab.followup_for(task, {"clarification_status": "answered"}), "Use compact output.")
+        self.assertEqual(lab.followup_for(task, {"clarification_status": "answered"}, session_available=False), lab.DEFAULT_FOLLOWUP)
+
+    def test_claude_text_question_is_supported_without_a_native_question_tool(self):
+        task = {"class": "ambiguous", "underspec": {
+            "canned_answer": "Use compact output.",
+            "options": [{"label": "compact output"}, {"label": "pretty output"}],
+        }}
+        stream = json.dumps({"type": "assistant", "uuid": "message-1", "message": {"content": [
+            {"type": "text", "text": "Should output be compact output or pretty output?"}]}})
+        turn = {"assistant_questions": lab.assistant_questions(stream), "tool_events": []}
+        self.assertEqual(lab.followup_for(task, turn), "Use compact output.")
 
     def test_session_id_is_read_from_the_stream(self):
         self.assertEqual(lab.session_id_of('noise\n{"type":"system","session_id":"abc-123"}\n'), "abc-123")
@@ -484,6 +792,30 @@ class TwoTurnTests(unittest.TestCase):
 
 
 class HoldoutTests(LabCase):
+    def test_real_final_requires_freeze_before_reading_holdout(self):
+        self.make_task("T-EDIT-H1", split="holdout")
+        args = self.run_args(agent="claude", model="claude-haiku-5-5", sidecar=sys.executable,
+                             splits="holdout", final=True, yes_spend=True)
+        with mock.patch.object(lab, "build_manifest", side_effect=AssertionError("holdout opened")):
+            with self.assertRaisesRegex(lab.LabError, "frozen-revision"):
+                lab.cmd_run(args)
+
+    def test_development_manifest_never_opens_holdout_task_or_oracle(self):
+        self.make_task()
+        held = self.make_task("T-EDIT-H1", split="holdout")
+        original_load, original_tree = lab.load_json, lab.tree_sha256
+        def guarded_load(path):
+            if held in pathlib.Path(path).parents:
+                raise AssertionError("holdout was opened")
+            return original_load(path)
+        def guarded_tree(path):
+            if pathlib.Path(path) == held / "oracle":
+                raise AssertionError("holdout oracle was opened")
+            return original_tree(path)
+        with mock.patch.object(lab, "load_json", side_effect=guarded_load), mock.patch.object(lab, "tree_sha256", side_effect=guarded_tree):
+            manifest = lab.build_manifest()
+        self.assertEqual(manifest["counts"]["holdout"], 1)
+
     def test_holdout_sealed_without_final_and_ledgered_with_final(self):
         self.make_task("T-EDIT-H1", split="holdout")
         self.assertFalse(lab.holdout_burned())

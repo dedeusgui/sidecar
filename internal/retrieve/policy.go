@@ -4,6 +4,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/dedeusgui/sidecar/internal/lexical"
 )
@@ -26,9 +27,64 @@ var editVerbs = regexp.MustCompile(`\b(` + editVerbAlts + `)\b`)
 // negatedEdit matches an edit verb the user forbids ("não altere nada", "don't change anything"). Such a prompt is read-only.
 var negatedEdit = regexp.MustCompile(`\b(nao|not|never|nunca|don'?t|dont|do not|sem|without)\s+(\w+\s+){0,2}(` + editVerbAlts + `)\b`)
 
+func withoutQuotedText(text string) string {
+	runes := []rune(text)
+	var out strings.Builder
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		close := rune(0)
+		switch r {
+		case '"', '`':
+			close = r
+		case '“':
+			close = '”'
+		case '‘':
+			close = '’'
+		case '\'':
+			prevWord := i > 0 && isWordRune(runes[i-1])
+			nextWord := i+1 < len(runes) && isWordRune(runes[i+1])
+			if !prevWord && nextWord {
+				close = r
+			}
+		}
+		if close == 0 {
+			out.WriteRune(r)
+			continue
+		}
+		end := quotedTextEnd(runes, i+1, close)
+		if end < 0 {
+			out.WriteRune(r)
+			continue
+		}
+		if r == '\'' && end > i+1 && isWordRune(runes[end-1]) && end+1 < len(runes) && isWordRune(runes[end+1]) {
+			out.WriteRune(r)
+			continue
+		}
+		out.WriteByte(' ')
+		i = end
+		out.WriteByte(' ')
+	}
+	return out.String()
+}
+
+func quotedTextEnd(runes []rune, start int, close rune) int {
+	for i := start; i < len(runes); i++ {
+		if runes[i] == '\\' && i+1 < len(runes) {
+			i++
+			continue
+		}
+		if runes[i] == close {
+			return i
+		}
+	}
+	return -1
+}
+
+func isWordRune(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }
+
 // IsEditRequest reports whether the prompt asks to change code or configuration.
 func IsEditRequest(prompt string) bool {
-	text := negatedEdit.ReplaceAllString(lexical.Fold(prompt), " ")
+	text := negatedEdit.ReplaceAllString(lexical.Fold(withoutQuotedText(prompt)), " ")
 	return editVerbs.MatchString(text)
 }
 
