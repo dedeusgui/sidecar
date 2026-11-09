@@ -348,6 +348,29 @@ def _bind_specs(paths):
     return specs
 
 
+COMPETITOR_TOOL_NAME = re.compile(r"^(@colbymchenry|codegraph|sidecar)([-_.].*)?$", re.I)
+
+
+def competitor_tool_paths(mounts, max_depth=5):
+    """Arquivos/pastas de Sidecar ou CodeGraph dentro de prefixos montados (ex.: `npm -g` em /opt/node). O controle OFF
+    não pode alcançá-los por caminho absoluto; o sandbox os mascara e o braço habilitado monta seu binário à parte."""
+    found = []
+    for host, target in mounts:
+        host = pathlib.Path(host)
+        if not host.is_dir():
+            continue
+        base_depth = len(host.parts)
+        for dirpath, dirnames, filenames in os.walk(host):
+            depth = len(pathlib.Path(dirpath).parts) - base_depth
+            for name in list(dirnames) + filenames:
+                if COMPETITOR_TOOL_NAME.match(name):
+                    rel = (pathlib.Path(dirpath) / name).relative_to(host)
+                    found.append(((pathlib.Path(dirpath) / name), (pathlib.PurePosixPath(target) / rel.as_posix()).as_posix()))
+            dirnames[:] = [d for d in dirnames if depth + 1 < max_depth and not COMPETITOR_TOOL_NAME.match(d)
+                           and not (pathlib.Path(dirpath) / d).is_symlink()]
+    return found
+
+
 def agent_sandbox_command(argv, work, readonly_paths=(), writable_paths=(), sandbox_env=None):
     """Executa o agente em uma raiz vazia: somente sistema, checkout e mounts explicitamente permitidos."""
     bwrap = shutil.which("bwrap")
@@ -376,6 +399,10 @@ def agent_sandbox_command(argv, work, readonly_paths=(), writable_paths=(), sand
         cmd.extend(["--bind", host, target])
     for host, target in readonly:
         cmd.extend(["--ro-bind", host, target])
+    for host, target in competitor_tool_paths(readonly_paths):
+        if any(target == dest for _, dest in readonly):
+            continue  # montado de propósito (binário do braço habilitado)
+        cmd.extend(["--tmpfs", target] if pathlib.Path(host).is_dir() else ["--ro-bind", "/dev/null", target])
     cmd.extend(["--clearenv", "--setenv", "PATH", "/agent-bin", "--setenv", "HOME", "/home/agent",
                 "--setenv", "CLAUDE_CONFIG_DIR", "/agent-config", "--setenv", "SIDECAR_HOME", "/sidecar-home",
                 "--setenv", "TMPDIR", "/tmp", "--setenv", "LANG", "C.UTF-8", "--setenv", "CI", "1",
@@ -557,6 +584,56 @@ AGENT_BIN_COMMANDS = (
 )
 
 
+PROXY_ENV_KEYS = ("HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy")
+CA_ENV_KEYS = ("NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE")
+
+
+def sandbox_network_env(environ=None):
+    """Proxy/CA do host, iguais para todos os braços: `--clearenv` remove o proxy e o cliente não alcança a API em
+    redes que exigem proxy (reproduzido em 2026-11-09). Só variáveis de rede e o arquivo de CA são repassados."""
+    environ = os.environ if environ is None else environ
+    env, mounts = {}, []
+    for key in PROXY_ENV_KEYS:
+        if environ.get(key):
+            env[key] = environ[key]
+    for key in CA_ENV_KEYS:
+        value = environ.get(key)
+        if value and pathlib.Path(value).is_file():
+            target = f"/agent-ca/{key.lower()}.pem"
+            mounts.append((pathlib.Path(value).resolve(), target))
+            env[key] = target
+    return env, mounts
+
+
+def verify_agent_auth(credentials):
+    """Preflight gratuito (sem inferência): o cliente dentro do sandbox enxerga as credenciais isoladas."""
+    with tempfile.TemporaryDirectory(prefix="lab-auth-check-") as root:
+        root = pathlib.Path(root)
+        work, cfg, tmp, home = (root / n for n in ("work", "cfg", "tmp", "home"))
+        for d in (work, cfg, tmp, home):
+            d.mkdir()
+        if credentials and pathlib.Path(credentials).is_file():
+            shutil.copy(credentials, cfg / ".credentials.json")
+            os.chmod(cfg / ".credentials.json", 0o600)
+        bin_dir, mounts, env = agent_runtime_bin(root / "bin", work)
+        net_env, net_mounts = sandbox_network_env()
+        command = agent_sandbox_command(["claude", "auth", "status"], work,
+                                        mounts + net_mounts + [(bin_dir, "/agent-bin")],
+                                        [(cfg, "/agent-config"), (home, "/home/agent"), (tmp, "/tmp")],
+                                        {**env, **net_env})
+        code, out, err, timed_out = run(command, timeout=60)
+        try:
+            status = json.loads(out)
+        except ValueError:
+            status = {}
+        if timed_out or status.get("loggedIn") is not True:
+            raise LabError("cliente Claude no sandbox não está autenticado (claude auth status: loggedIn != true); "
+                           "nenhuma execução paga foi iniciada")
+        if status.get("configDirectory") != "/agent-config":
+            raise LabError("cliente Claude no sandbox não usa a configuração isolada")
+        return status.get("authMethod") or "unknown"
+
+
 def _inside(path, root):
     try:
         pathlib.Path(path).relative_to(root)
@@ -572,6 +649,78 @@ def reject_sensitive_mounts(sources, forbidden):
             blocked = pathlib.Path(blocked).resolve()
             if source == blocked or source in blocked.parents or blocked in source.parents:
                 raise LabError(f"agent filesystem sandbox: mount sobrepõe dados protegidos: {source}")
+
+
+UNSAFE_RUNTIME_PREFIXES = {"/", "/root", "/home", "/opt", "/usr", "/var", "/tmp", "/etc"}
+
+
+def _install_prefix(path):
+    """`/opt/x/bin/tool` -> `/opt/x`; outros layouts usam o diretório do executável."""
+    path = pathlib.Path(path)
+    for parent in path.parents:
+        if parent.name == "bin":
+            return parent.parent
+    return path.parent
+
+
+def _shebang_interpreter(path):
+    try:
+        with open(path, "rb") as f:
+            head = f.read(256)
+    except OSError:
+        return None
+    if not head.startswith(b"#!"):
+        return None
+    parts = head[2:].split(b"\n", 1)[0].decode(errors="replace").split()
+    if not parts or parts[0] == "/usr/bin/env":
+        return None  # resolvido pelo PATH filtrado do sandbox
+    return pathlib.Path(parts[0])
+
+
+def _elf_library_dirs(path):
+    try:
+        with open(path, "rb") as f:
+            if f.read(4) != b"\x7fELF":
+                return []
+    except OSError:
+        return []
+    ldd = shutil.which("ldd")
+    if not ldd:
+        return []
+    code, out, _, timed_out = run([ldd, str(path)], timeout=10)
+    if code != 0 or timed_out:
+        return []
+    dirs = []
+    for line in out.splitlines():
+        m = re.search(r"=>\s+(/\S+)", line)
+        if m:
+            dirs.append(pathlib.Path(m.group(1)).resolve().parent)
+    return dirs
+
+
+def runtime_prefixes(executable, _depth=0):
+    """Prefixos mínimos (fora de /usr) para um runtime funcionar no sandbox: prefixo do executável, prefixo das
+    bibliotecas dinâmicas e do interpretador do shebang. Prefixos amplos (/, /root, $HOME) são recusados."""
+    executable = pathlib.Path(executable).resolve()
+    out = []
+    candidates = [_install_prefix(executable)]
+    candidates += [_install_prefix(d / "x") if d.name != "lib" else d.parent for d in _elf_library_dirs(executable)]
+    interp = _shebang_interpreter(executable)
+    if interp is not None and _depth < 2:
+        resolved = interp.resolve() if interp.exists() else interp
+        if not _inside(resolved, "/usr"):
+            candidates.append(_install_prefix(interp))
+            candidates += runtime_prefixes(resolved, _depth + 1)
+    home = pathlib.Path.home().resolve()
+    for prefix in candidates:
+        prefix = pathlib.Path(prefix).resolve()
+        if _inside(prefix, "/usr") or not prefix.is_dir():
+            continue
+        if str(prefix) in UNSAFE_RUNTIME_PREFIXES or prefix == home or prefix in home.parents:
+            raise LabError(f"runtime {executable} exige montar prefixo amplo demais: {prefix}")
+        if prefix not in out:
+            out.append(prefix)
+    return out
 
 
 def agent_runtime_bin(root, work=None):
@@ -606,8 +755,16 @@ def agent_runtime_bin(root, work=None):
                 target = "/agent-runtime/go"
                 mounts.append((executable, target))
         else:
-            target = f"/agent-runtime/{name}"
-            mounts.append((executable, target))
+            # Runtimes fora de /usr (rbenv, uv tools, node em /opt) dependem de bibliotecas, shebangs e pacotes do
+            # próprio prefixo: montar só o arquivo quebra ruby/npm/pytest (reproduzido em 2026-11-09 com bwrap real).
+            target = str(executable)
+            try:
+                prefixes = runtime_prefixes(executable)
+            except LabError:
+                continue  # comando indisponível para todos os braços, nunca um mount amplo do host
+            for prefix in prefixes:
+                if not any(_inside(prefix, existing) for existing, _ in mounts):
+                    mounts.append((prefix, str(prefix)))
         link = root / name
         if not link.exists() and not link.is_symlink():
             link.symlink_to(target)
@@ -902,7 +1059,9 @@ class ClaudeAgent:
         bin_dir, runtime_mounts, sandbox_env = agent_runtime_bin(cfg_dir / "runtime-bin", work)
         writable_mounts = [(cfg_dir, "/agent-config"), (sandbox_home, "/home/agent"),
                            (sandbox_tmp, "/tmp"), (pathlib.Path(env["SIDECAR_HOME"]), "/sidecar-home")]
-        readonly_mounts = list(runtime_mounts) + [(bin_dir, "/agent-bin")]
+        net_env, net_mounts = sandbox_network_env()
+        sandbox_env.update(net_env)
+        readonly_mounts = list(runtime_mounts) + list(net_mounts) + [(bin_dir, "/agent-bin")]
         if arm["engine"] is not None:
             readonly_mounts.append((self.sidecar, "/opt/sidecar"))
             sandbox_env["SIDECAR_ENGINE"] = arm["engine"]
@@ -1259,6 +1418,7 @@ def cmd_run(args):
     order = [(t, a, r + offset) for t, a, r in schedule([t["id"] for t in tasks], arms, args.reps, args.seed + offset)]
     n = len(order)
     out_dir = pathlib.Path(args.out_dir)
+    agent_auth = None
     if args.agent == "scripted":
         agent = ScriptedAgent(args.scripted_behaviour)
     else:
@@ -1283,6 +1443,8 @@ def cmd_run(args):
         agent = ClaudeAgent(args.model, str(pathlib.Path(args.sidecar).resolve()), args.credentials, args.max_budget,
                             args.timeout, requested_tools, deny_paths=deny, turns=getattr(args, "turns", 1))
         est = n * args.max_budget
+        if args.yes_spend:
+            agent_auth = verify_agent_auth(args.credentials)
         if not args.yes_spend:
             print(f"Dry run: {n} execuções ({len(tasks)} tarefas × {len(arms)} braços × {args.reps}); "
                   f"teto teórico US$ {est:.2f}; modelo {args.model}. Use --yes-spend para executar.")
@@ -1295,6 +1457,8 @@ def cmd_run(args):
             "tools_allow_by_repo": {task["repo"]: tools_allow_for(task, requested_tools) for task in tasks},
             "isolation": sandbox_prefix()[1], "oracle_network_isolation": sandbox_prefix()[1],
             "agent_filesystem_isolation": agent_isolation if args.agent == "claude" else "simulated-unrestricted",
+            "agent_auth_method": agent_auth if args.agent == "claude" else None,
+            "agent_network_env": sorted(sandbox_network_env()[0]) if args.agent == "claude" else [],
             "sidecar_sha256": sha256_file(args.sidecar) if args.sidecar else None,
             "frozen_revision": getattr(args, "frozen_revision", None),
             "claude_version": run(["claude", "--version"])[1].strip() if args.agent == "claude" else None,

@@ -225,6 +225,92 @@ class RunnerTests(LabCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((work / "writable").read_text(), "sandbox-ok")
 
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_runtime_outside_usr_keeps_its_prefix_libraries(self):
+        # Regressão 2026-11-09: ruby (rbenv), npm e pytest (uv) quebravam porque só o arquivo era montado.
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            prefix = root / "opt" / "fakeruby"
+            (prefix / "bin").mkdir(parents=True)
+            (prefix / "lib").mkdir()
+            (prefix / "lib" / "data.txt").write_text("prefix-ok")
+            tool = prefix / "bin" / "ruby"
+            tool.write_text(f"#!/bin/sh\ncat {prefix}/lib/data.txt\n")
+            tool.chmod(0o755)
+            work = root / "work"
+            work.mkdir()
+            tmp = root / "tmp"
+            tmp.mkdir()
+            with mock.patch.dict(os.environ, {"PATH": str(prefix / "bin") + os.pathsep + os.environ["PATH"]}):
+                bin_host, mounts, env = lab.agent_runtime_bin(root / "bin", work)
+            self.assertIn((prefix.resolve(), str(prefix.resolve())), mounts)
+            command = lab.agent_sandbox_command(["ruby"], work, mounts + [(bin_host, "/agent-bin")], [(tmp, "/tmp")], env)
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "prefix-ok")
+
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_off_arm_cannot_reach_global_codegraph_by_absolute_path(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            prefix = root / "opt" / "node"
+            pkg = prefix / "lib" / "node_modules" / "@colbymchenry" / "codegraph"
+            pkg.mkdir(parents=True)
+            (pkg / "index.js").write_text("leak")
+            (prefix / "bin").mkdir()
+            cg = prefix / "bin" / "codegraph"
+            cg.write_text("#!/bin/sh\necho leak\n")
+            cg.chmod(0o755)
+            (prefix / "bin" / "keep").write_text("ok")
+            work = root / "work"
+            work.mkdir()
+            command = lab.agent_sandbox_command(
+                ["/usr/bin/sh", "-c", f"test ! -s {pkg}/index.js && ! /usr/bin/sh {cg} | /usr/bin/grep -q leak && /usr/bin/cat {prefix}/bin/keep"],
+                work, [(prefix, str(prefix))], [])
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "ok")
+
+    def test_runtime_prefixes_follow_shebang_and_refuse_broad_mounts(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            venv = root / "tools" / "pytest"
+            (venv / "bin").mkdir(parents=True)
+            interp = venv / "bin" / "python"
+            interp.write_text("#!/bin/sh\n")
+            script = root / "local" / "bin" / "pytest"
+            script.parent.mkdir(parents=True)
+            script.write_text(f"#!{interp}\n")
+            prefixes = lab.runtime_prefixes(script)
+            self.assertIn(venv.resolve(), prefixes)
+            self.assertIn((root / "local").resolve(), prefixes)
+            broad = root / "bin" / "tool"
+            with mock.patch.object(lab.pathlib.Path, "home", return_value=root):
+                broad.parent.mkdir()
+                broad.write_text("#!/bin/sh\n")
+                with self.assertRaisesRegex(lab.LabError, "amplo"):
+                    lab.runtime_prefixes(broad)
+
+    def test_network_env_passes_only_proxy_and_ca(self):
+        with tempfile.NamedTemporaryFile() as ca:
+            env, mounts = lab.sandbox_network_env({"HTTPS_PROXY": "http://p:1", "NODE_EXTRA_CA_CERTS": ca.name,
+                                                   "ANTHROPIC_API_KEY": "secret", "SSL_CERT_FILE": "/missing"})
+            self.assertEqual(env, {"HTTPS_PROXY": "http://p:1", "NODE_EXTRA_CA_CERTS": "/agent-ca/node_extra_ca_certs.pem"})
+            self.assertEqual(mounts, [(pathlib.Path(ca.name).resolve(), "/agent-ca/node_extra_ca_certs.pem")])
+
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_auth_preflight_fails_closed_when_client_is_logged_out(self):
+        with tempfile.TemporaryDirectory() as root:
+            fake = pathlib.Path(root) / "claude"
+            fake.write_text('#!/bin/sh\necho \'{"loggedIn": false, "configDirectory": "/agent-config"}\'\n')
+            fake.chmod(0o755)
+            with mock.patch.dict(os.environ, {"PATH": root + os.pathsep + os.environ["PATH"]}):
+                with self.assertRaisesRegex(lab.LabError, "não está autenticado"):
+                    lab.verify_agent_auth(None)
+            fake.write_text('#!/bin/sh\necho \'{"loggedIn": true, "authMethod": "oauth", "configDirectory": "/agent-config"}\'\n')
+            with mock.patch.dict(os.environ, {"PATH": root + os.pathsep + os.environ["PATH"]}):
+                self.assertEqual(lab.verify_agent_auth(None), "oauth")
+
     def test_agent_sandbox_fails_closed_without_bwrap(self):
         with mock.patch.object(lab.shutil, "which", return_value=None):
             with self.assertRaisesRegex(lab.LabError, "filesystem sandbox"):
