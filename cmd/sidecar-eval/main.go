@@ -21,6 +21,7 @@ import (
 
 	"github.com/dedeusgui/sidecar/internal/brief"
 	"github.com/dedeusgui/sidecar/internal/ctxbuild"
+	"github.com/dedeusgui/sidecar/internal/engine"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
@@ -69,6 +70,7 @@ type callResult struct {
 	contracts []string                  // contract statuses found, e.g. TEST_EXPECTED
 	keys      []string                  // keys of the evidence returned, for the seen rerun
 	cands     []retrieve.CandidateTrace // top candidates with their factors, for replay captures
+	decision  *engine.Decision          // V3 only: the router decision, for --v3-decisions
 }
 
 // runner answers one prompt. seen, when set, reports evidence already delivered in the session.
@@ -113,6 +115,7 @@ func main() {
 	includeHoldout := flag.Bool("include-holdout", false, "with --replay: also run the holdout split (a final report; never used to choose variants)")
 	perfRuns := flag.Int("perf", 0, "measure cold/warm latency per pipeline stage with this many warm runs per case (p50/p95/p99)")
 	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
+	v3Decisions := flag.String("v3-decisions", "", "write the V3 router decision (signals, action, reasons) of every case to this JSON file")
 	reportMD := flag.String("report-md", "", "write a Markdown report to this path (includes the comparison when --compare is set)")
 	flag.Parse()
 
@@ -187,7 +190,9 @@ func main() {
 		{"v2 sem intent", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoIntent: true}})},
 		{"v2 sem contract", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoContract: true}})},
 		{"v2 sem packer", retrieveRunWith(retrieve.Options{EngineVersion: "v2", Ablate: retrieve.Ablation{NoPacker: true}})},
+		{v3Method, v3Run},
 	}
+	decisions := map[string]*engine.Decision{}
 
 	var outcomes []caseOutcome
 	for _, m := range methods {
@@ -196,6 +201,9 @@ func main() {
 			res, err := m.run(ix, c.Prompt, nil)
 			must(err)
 			o := score(m.name, c, res)
+			if res.decision != nil {
+				decisions[c.ID] = res.decision
+			}
 			if c.SeenRerun {
 				rerun, err := m.run(ix, c.Prompt, seenSet(res.keys))
 				must(err)
@@ -217,6 +225,10 @@ func main() {
 	}
 	if *reportMD != "" {
 		writeReportMD(*reportMD, methods, outcomes, cmp)
+	}
+	if *v3Decisions != "" {
+		data, _ := json.MarshalIndent(decisions, "", "  ")
+		must(os.WriteFile(*v3Decisions, data, 0o644))
 	}
 	if *outPath != "" {
 		report := map[string]any{"hardware": hardware(), "methods": methodNames(methods), "outcomes": outcomes}
@@ -272,6 +284,39 @@ func retrieveRunRender(opts retrieve.Options, taskBrief bool) runner {
 			latencyMS: float64(time.Since(t).Microseconds()) / 1000,
 			notes:     notes, contracts: contracts, keys: keys, cands: res.Trace.Candidates[:min(len(res.Trace.Candidates), 10)]}, nil
 	}
+}
+
+// v3Method names the opt-in V3 engine in every report.
+const v3Method = "v3 (relevance gate + effort router)"
+
+// v3Run runs the V3 decision layer over the V2 pipeline and renders what the hook would send.
+func v3Run(ix *index.Index, prompt string, seen ctxbuild.Seen) (callResult, error) {
+	t := time.Now()
+	res, dec, err := engine.Run(context.Background(), ix.Store(), prompt, engine.Options{Retrieve: retrieve.Options{Root: ix.Root(), Seen: seen}})
+	if err != nil {
+		return callResult{}, err
+	}
+	var hits []store.SymbolHit
+	var notes, keys []string
+	dedup := map[string]bool{}
+	for _, e := range res.Evidence {
+		key := fmt.Sprintf("%s|%s|%s|%d", e.Hit.Path, e.Hit.Kind, e.Hit.Name, e.Hit.Line)
+		if !dedup[key] {
+			dedup[key] = true
+			hits = append(hits, e.Hit)
+		}
+		if e.Note != "" {
+			notes = append(notes, e.Note)
+		}
+		keys = append(keys, e.Key())
+	}
+	var contracts []string
+	for _, f := range res.Trace.Contracts {
+		contracts = append(contracts, string(f.Status))
+	}
+	rendered := engine.Render(res, dec, nil)
+	return callResult{hits: hits, tokens: ctxbuild.EstimateTokens(rendered), latencyMS: float64(time.Since(t).Microseconds()) / 1000,
+		notes: notes, contracts: contracts, keys: keys, decision: &dec}, nil
 }
 
 // textualRun is the baseline a person would get from grep: raw prompt words (4+ letters,
