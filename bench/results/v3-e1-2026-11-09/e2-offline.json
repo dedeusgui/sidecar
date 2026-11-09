@@ -19,6 +19,11 @@
         "facts": 4,
         "chars": 4237,
         "missing": []
+      },
+      "codegraph": {
+        "facts": 4,
+        "chars": 15241,
+        "missing": []
       }
     },
     {
@@ -38,9 +43,17 @@
       },
       "explore": {
         "facts": 3,
-        "chars": 9836,
+        "chars": 9839,
         "missing": [
           "parse_args"
+        ]
+      },
+      "codegraph": {
+        "facts": 2,
+        "chars": 13697,
+        "missing": [
+          "parse_args",
+          "make_context|main"
         ]
       }
     },
@@ -63,6 +76,11 @@
         "facts": 3,
         "chars": 5667,
         "missing": []
+      },
+      "codegraph": {
+        "facts": 3,
+        "chars": 10146,
+        "missing": []
       }
     },
     {
@@ -83,6 +101,11 @@
       "explore": {
         "facts": 3,
         "chars": 5850,
+        "missing": []
+      },
+      "codegraph": {
+        "facts": 3,
+        "chars": 21529,
         "missing": []
       }
     },
@@ -108,6 +131,11 @@
           "handle(|->handle|handle ",
           "abstractprocessinghandler|write("
         ]
+      },
+      "codegraph": {
+        "facts": 4,
+        "chars": 21110,
+        "missing": []
       }
     },
     {
@@ -127,7 +155,12 @@
       },
       "explore": {
         "facts": 4,
-        "chars": 2625,
+        "chars": 2634,
+        "missing": []
+      },
+      "codegraph": {
+        "facts": 4,
+        "chars": 12769,
         "missing": []
       }
     },
@@ -152,6 +185,11 @@
         "missing": [
           "route!"
         ]
+      },
+      "codegraph": {
+        "facts": 4,
+        "chars": 19824,
+        "missing": []
       }
     }
   ],
@@ -171,8 +209,14 @@
     "explore": {
       "facts_covered": 22,
       "facts_total": 26,
-      "chars_total": 38855,
+      "chars_total": 38867,
       "tasks_all_facts": 4
+    },
+    "codegraph": {
+      "facts_covered": 24,
+      "facts_total": 26,
+      "chars_total": 114316,
+      "tasks_all_facts": 6
     }
   }
 }

@@ -35,9 +35,11 @@ def main(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument("--sidecar", required=True)
     p.add_argument("--checkout", required=True)
+    p.add_argument("--codegraph", help="codegraph CLI (ex.: node_modules/.bin/codegraph @1.6.2); adds its explore as an arm")
     p.add_argument("--json")
     p.add_argument("--md")
     a = p.parse_args(argv)
+    arms = ("v2", "v3", "explore") + (("codegraph",) if a.codegraph else ())
     rows = []
     with tempfile.TemporaryDirectory(prefix="e2-offline-") as home:
         env = dict(os.environ, SIDECAR_HOME=home, SIDECAR_FEATURES="")
@@ -56,14 +58,33 @@ def main(argv=None):
             out = run([a.sidecar, "explore", "--root", root, "--query", task["prompt"]], None, env)
             row["explore"] = {"facts": len(covered(out, facts)), "chars": len(out), "missing": [
                 f if isinstance(f, str) else "|".join(f) for f in facts if (f if isinstance(f, str) else "|".join(f)) not in covered(out, facts)]}
+            if a.codegraph:
+                # Same question on a throwaway clone: `codegraph init` writes .codegraph/ into the tree. Telemetry off.
+                with tempfile.TemporaryDirectory(prefix="e2-cg-") as clone:
+                    subprocess.run(["git", "clone", "-q", root, clone], check=True)
+                    cg_env = dict(env, CODEGRAPH_TELEMETRY="0")
+                    run([a.codegraph, "init", clone], None, cg_env)
+                    r = subprocess.run([a.codegraph, "explore", task["prompt"]], cwd=clone, capture_output=True, text=True,
+                                       timeout=600, env=cg_env)
+                    cg = r.stdout if r.returncode == 0 else ""
+                row["codegraph"] = {"facts": len(covered(cg, facts)), "chars": len(cg), "missing": [
+                    f if isinstance(f, str) else "|".join(f) for f in facts if (f if isinstance(f, str) else "|".join(f)) not in covered(cg, facts)]}
             rows.append(row)
     tot = lambda arm, k: sum(r[arm][k] for r in rows)
     nf = sum(r["facts"] for r in rows)
     summary = {arm: {"facts_covered": tot(arm, "facts"), "facts_total": nf, "chars_total": tot(arm, "chars"),
-                     "tasks_all_facts": sum(1 for r in rows if r[arm]["facts"] == r["facts"])} for arm in ("v2", "v3", "explore")}
+                     "tasks_all_facts": sum(1 for r in rows if r[arm]["facts"] == r["facts"])} for arm in arms}
     lines = ["# E2 offline — fatos do oráculo presentes no que cada braço entrega (sem modelo)", "",
              "| tarefa | split | fatos | V2 hook | V3 hook (ação) | explore | chars V2 / V3 / explore | faltam no explore |", "|---|---|---:|---:|---:|---:|---|---|"]
+    if a.codegraph:
+        lines[2] = "| tarefa | split | fatos | V2 hook | V3 hook (ação) | sidecar explore | codegraph explore | chars V2 / V3 / explore / codegraph | faltam (sidecar · codegraph) |"
+        lines[3] = "|---|---|---:|---:|---:|---:|---:|---|---|"
     for r in rows:
+        if a.codegraph:
+            lines.append(f"| {r['task']} | {r['split']} | {r['facts']} | {r['v2']['facts']} | {r['v3']['facts']} ({r['v3']['action']}) | "
+                         f"{r['explore']['facts']} | {r['codegraph']['facts']} | {r['v2']['chars']} / {r['v3']['chars']} / {r['explore']['chars']} / {r['codegraph']['chars']} | "
+                         f"{', '.join(r['explore']['missing']) or '—'} · {', '.join(r['codegraph']['missing']) or '—'} |")
+            continue
         lines.append(f"| {r['task']} | {r['split']} | {r['facts']} | {r['v2']['facts']} | {r['v3']['facts']} ({r['v3']['action']}) | "
                      f"{r['explore']['facts']} | {r['v2']['chars']} / {r['v3']['chars']} / {r['explore']['chars']} | {', '.join(r['explore']['missing']) or '—'} |")
     lines += ["", "| braço | fatos cobertos | tarefas com todos os fatos | caracteres totais |", "|---|---:|---:|---:|"]

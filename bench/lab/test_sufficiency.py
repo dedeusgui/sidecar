@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import lab  # noqa: E402
@@ -160,3 +161,72 @@ class ArmTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+FAKE_CLAUDE = r'''#!/bin/sh
+# Fake Claude Code client for no-cost lab tests: records argv, runs one explore through the arm's tool, prints stream-json.
+printf '%s\n' "$@" > /tmp/.fake_args
+out=""
+if command -v codegraph >/dev/null 2>&1; then out=$(cd /work && codegraph explore "ping" 2>/dev/null | head -c 2000); fi
+mcp=$(grep -qx -- '--mcp-config' /tmp/.fake_args && echo '[{"name":"codegraph","status":"connected"}]' || echo '[]')
+[ -n "$out" ] || { echo "codegraph explore failed" >&2; exit 3; }
+echo "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s1\",\"plugins\":[],\"mcp_servers\":$mcp}"
+echo '{"type":"result","subtype":"success","is_error":false,"result":"ok","num_turns":1,"total_cost_usd":0.0,"usage":{"input_tokens":1,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":1},"modelUsage":{"claude-haiku-5-5":{}}}'
+'''
+
+
+class CodeGraphArmTests(unittest.TestCase):
+    def test_cg_arms_parse_and_get_only_their_tools(self):
+        arms = {a["name"]: a for a in lab.parse_arms("OFF,CG,CG-mcp,V3")}
+        self.assertEqual(arms["CG"]["codegraph"], "cli")
+        self.assertIsNone(arms["CG"]["engine"])
+        self.assertEqual(lab.arm_extra_tools(arms["CG-mcp"]), ["mcp__codegraph"])
+        self.assertEqual(lab.arm_extra_tools(arms["OFF"]), [])
+        self.assertIn(("V3", "CG"), lab.comparison_plan(["OFF", "CG", "V3"]))
+
+    def test_only_the_codegraph_server_is_allowed_and_only_in_cg_mcp(self):
+        reason = "servidores MCP carregados"
+        parsed = {"init": {"mcp_servers": [{"name": "codegraph", "status": "connected"}]}}
+        self.assertEqual(lab.allow_arm_mcp([reason], parsed, {"codegraph": "mcp"}), [])
+        self.assertEqual(lab.allow_arm_mcp([reason], parsed, {"codegraph": "cli"}), [reason])
+        other = {"init": {"mcp_servers": [{"name": "codegraph"}, {"name": "github"}]}}
+        self.assertEqual(lab.allow_arm_mcp([reason], other, {"codegraph": "mcp"}), [reason])
+
+    def test_codegraph_mcp_tool_counts_as_an_explore_delivery(self):
+        text = "\n".join(json.dumps(e) for e in [
+            {"type": "assistant", "uuid": "a1", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "mcp__codegraph__codegraph_explore", "input": {"query": "x"}}]}},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": "**`lib/a.js`** — x\n1\tcode\n"}]}},
+        ])
+        ev = lab.tool_events(text)
+        self.assertEqual((ev[0]["kind"], ev[0]["returned"]), ("explore", ["lib/a.js"]))
+
+    @unittest.skipUnless(os.environ.get("LAB_CODEGRAPH_DIR") and lab.shutil.which("bwrap") and sys.platform == "linux",
+                         "requer LAB_CODEGRAPH_DIR (pacote CodeGraph instalado) e bwrap")
+    def test_cg_arm_runs_codegraph_in_the_sandbox_with_a_fake_client(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            fakebin = root / "fakebin"
+            fakebin.mkdir()
+            (fakebin / "claude").write_text(FAKE_CLAUDE)
+            (fakebin / "claude").chmod(0o755)
+            work = root / "work"
+            work.mkdir()
+            (work / "app.js").write_text("function ping() { return pong() }\nfunction pong() { return 1 }\nmodule.exports = { ping }\n")
+            subprocess.run("git init -q && git add -A && git -c user.email=a@b -c user.name=a commit -qm base", shell=True, cwd=work, check=True)
+            lab.setup_paths_file(work).write_text("[]")
+            sh = root / "sidecar-home"
+            sh.mkdir()
+            with unittest.mock.patch.dict(os.environ, {"PATH": str(fakebin) + os.pathsep + os.environ["PATH"]}):
+                agent = lab.ClaudeAgent("claude-haiku-5-5", "/bin/true", None, 0.1, 120, ["Read"], deny_paths=[str(root / "deny")],
+                                        codegraph=os.environ["LAB_CODEGRAPH_DIR"])
+                (root / "deny").mkdir()
+                for mode in ("cli", "mcp"):
+                    arm = {"name": "CG" if mode == "cli" else "CG-mcp", "engine": None, "env": {}, "codegraph": mode,
+                           "tools_allow": ["Read"] + lab.arm_extra_tools({"codegraph": mode})}
+                    res = agent.run({"id": "t", "underspec": None}, root, work, arm, {"SIDECAR_HOME": str(sh)}, "prompt")
+                    self.assertEqual(res["incomparable_reasons"], [], (mode, res["incomparable_reasons"]))
+                    self.assertIsNotNone(res["index_ms"])
+                    self.assertEqual(res["exit"], 0, "codegraph explore must run inside the arm sandbox")
+            self.assertTrue((work / ".codegraph").is_dir())
+            self.assertIn(".codegraph/", json.loads(lab.setup_paths_file(work).read_text()))
+            self.assertNotIn(".codegraph/codegraph.db", lab.changed_paths(work))

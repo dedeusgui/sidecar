@@ -353,6 +353,7 @@ def _bind_specs(paths):
     return specs
 
 
+TOOL_MOUNTS = ("/opt/sidecar", "/opt/codegraph")  # where an arm mounts the tool it is allowed to use
 COMPETITOR_TOOL_NAME = re.compile(r"^(@colbymchenry|codegraph|sidecar)([-_.].*)?$", re.I)
 
 
@@ -405,9 +406,11 @@ def agent_sandbox_command(argv, work, readonly_paths=(), writable_paths=(), sand
     for host, target in readonly:
         cmd.extend(["--ro-bind", host, target])
     intended = {dest for _, dest in readonly}
-    for host, target in competitor_tool_paths(readonly_paths):
+    tool_roots = [dest for _, dest in readonly if dest in TOOL_MOUNTS]
+    in_tool = lambda p: any(p == r or p.startswith(r.rstrip("/") + "/") for r in tool_roots)
+    for host, target in competitor_tool_paths([(h, d) for h, d in readonly if d not in TOOL_MOUNTS]):
         link = pathlib.Path(host)
-        if target in intended or link.is_symlink() and os.readlink(link) in intended:
+        if target in intended or link.is_symlink() and in_tool(os.readlink(link)):
             continue  # montado de propósito (binário do braço habilitado)
         cmd.extend(["--tmpfs", target] if pathlib.Path(host).is_dir() else ["--ro-bind", "/dev/null", target])
     cmd.extend(["--clearenv", "--setenv", "PATH", "/agent-bin", "--setenv", "HOME", "/home/agent",
@@ -593,6 +596,7 @@ AGENT_BIN_COMMANDS = (
     "claude", "git", "bash", "sh", "env", "ls", "cat", "head", "tail", "sed", "grep", "rg", "find", "timeout",
     "go", "gofmt", "python", "python3", "pytest", "npm", "node", "yarn", "pnpm", "ruby", "bundle", "rake",
     "cargo", "rustc", "mvn", "gradle", "php", "phpunit", "composer", "mkdir", "cp", "mv", "rm", "touch", "pwd",
+    "dirname", "basename", "readlink", "realpath", "uname", "wc", "sort", "uniq", "tr", "cut", "xargs",
 )
 
 
@@ -801,6 +805,19 @@ def agent_runtime_bin(root, work=None):
 
 BASE_AGENT_TOOLS = ["Read", "Grep", "Glob", "Edit", "Write", "Bash(ls:*)"]
 EXPLORE_TOOLS = ["Bash(sidecar explore:*)", "Bash(/opt/sidecar explore:*)"]  # only arms with "explore": True
+CODEGRAPH_CLI_TOOLS = ["Bash(codegraph explore:*)", "Bash(codegraph node:*)", "Bash(codegraph query:*)", "Bash(codegraph context:*)"]
+CODEGRAPH_MCP_TOOLS = ["mcp__codegraph"]
+
+
+def arm_extra_tools(arm):
+    """Tools an arm adds on top of the equal base list: its own intervention, recorded in meta."""
+    if arm.get("explore"):
+        return list(EXPLORE_TOOLS)
+    if arm.get("codegraph") == "cli":
+        return list(CODEGRAPH_CLI_TOOLS)
+    if arm.get("codegraph") == "mcp":
+        return list(CODEGRAPH_MCP_TOOLS)
+    return []
 TEST_RUNNER_TOOLS = {
     "go": ["Bash(go test:*)"],
     "python": ["Bash(pytest:*)", "Bash(python -m pytest:*)", "Bash(python3 -m pytest:*)"],
@@ -1041,6 +1058,33 @@ def merge_turns(turns):
             **optional_metrics}
 
 
+def codegraph_shim(package_dir):
+    """Path of the codegraph entry point inside an installed package dir (npm --prefix DIR), relative to it."""
+    root = pathlib.Path(package_dir)
+    for rel in ("node_modules/@colbymchenry/codegraph/npm-shim.js", "node_modules/@colbymchenry/codegraph/dist/bin/codegraph.js"):
+        if (root / rel).is_file():
+            return rel
+    raise LabError(f"codegraph não encontrado em {root} (instale com npm install --prefix DIR @colbymchenry/codegraph@VERSÃO)")
+
+
+def codegraph_version(package_dir):
+    try:
+        return load_json(pathlib.Path(package_dir) / "node_modules/@colbymchenry/codegraph/package.json").get("version")
+    except (OSError, ValueError, LabError):
+        return None
+
+
+def allow_arm_mcp(reasons, parsed, arm):
+    """MCP loaded is contamination, except the CodeGraph server in the CG-mcp arm (and nothing else)."""
+    if arm.get("codegraph") != "mcp":
+        return reasons
+    servers = (parsed.get("init") or {}).get("mcp_servers") or []
+    names = {s.get("name") if isinstance(s, dict) else str(s) for s in servers}
+    if names == {"codegraph"}:
+        return [r for r in reasons if r != "servidores MCP carregados"]
+    return list(reasons) + ([] if names else ["braço CG-mcp sem servidor codegraph carregado"])
+
+
 def merge_sufficiency(parts):
     """Sum per-turn sufficiency counts; unknown (None) when a turn has no report."""
     if not parts or any(p is None for p in parts):
@@ -1061,7 +1105,8 @@ class ClaudeAgent:
     """Claude Code real: configuração isolada por execução, canário, verificação de init e modelo servido."""
     simulated = False
 
-    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow, deny_paths=(), turns=1):
+    def __init__(self, model, sidecar, credentials, max_budget, timeout, tools_allow, deny_paths=(), turns=1, codegraph=None):
+        self.codegraph = str(pathlib.Path(codegraph).resolve()) if codegraph else None
         sys.path.insert(0, str(HERE.parent / "agentic"))
         import real_hook_pilot as rhp
         self.rhp, self.model, self.sidecar, self.turns = rhp, model, sidecar, turns
@@ -1070,7 +1115,7 @@ class ClaudeAgent:
         # oculto. Medido (2026-11-08): sem a regra a leitura funciona; com ela Read, Grep e `ls` são negados.
         self.deny_paths = [str(pathlib.Path(p).resolve()) for p in deny_paths]
 
-    def command(self, prompt, settings, resume=None, tools_allow=None, deny_paths=None, max_budget=None):
+    def command(self, prompt, settings, resume=None, tools_allow=None, deny_paths=None, max_budget=None, mcp_config=None):
         persist = self.turns > 1  # uma segunda volta precisa da sessão do cliente
         tools_allow = (self.tools_allow or []) if tools_allow is None else tools_allow
         flags = ["--output-format", "stream-json", "--verbose", "--include-hook-events", *([] if persist else ["--no-session-persistence"]),
@@ -1078,6 +1123,7 @@ class ClaudeAgent:
                  "--disable-slash-commands", "--allowedTools", *tools_allow,
                  *deny_flags(self.deny_paths if deny_paths is None else deny_paths)]
         cmd = ["claude", "-p", prompt, "--model", self.model, *flags, "--max-budget-usd", str(self.max_budget if max_budget is None else max_budget)]
+        cmd += ["--mcp-config", mcp_config] if mcp_config else []
         return cmd + (["--settings", settings] if settings else [])
 
     def run(self, task, tdir, work, arm, env, prompt):
@@ -1099,6 +1145,13 @@ class ClaudeAgent:
             readonly_mounts.append((self.sidecar, "/opt/sidecar"))
             if arm.get("explore"):
                 (bin_dir / "sidecar").symlink_to("/opt/sidecar")
+        if arm.get("codegraph"):
+            if not self.codegraph:
+                raise LabError("braço CodeGraph exige --codegraph (diretório do pacote instalado)")
+            shim = codegraph_shim(self.codegraph)
+            readonly_mounts.append((pathlib.Path(self.codegraph), "/opt/codegraph"))
+            (bin_dir / "codegraph").symlink_to("/opt/codegraph/" + shim)
+            sandbox_env["CODEGRAPH_TELEMETRY"] = "0"
             sandbox_env["SIDECAR_ENGINE"] = arm["engine"]
             sandbox_env.update({k: v for k, v in arm.get("env", {}).items() if k in ("SIDECAR_FEATURES", "SIDECAR_PROFILE")})
         try:
@@ -1118,6 +1171,21 @@ class ClaudeAgent:
                     raise LabError(f"indexação isolada falhou: {err[-300:]}")
                 index_ms = round((time.perf_counter() - index_started) * 1000, 3)
                 settings = rhp.hook_settings_json("/opt/sidecar")
+            mcp_config = None
+            if arm.get("codegraph"):
+                index_started = time.perf_counter()
+                init_cmd = agent_sandbox_command(["codegraph", "init", "/work"], work, readonly_mounts, writable_mounts, sandbox_env)
+                code, _, err, timed_out = run(init_cmd, cwd=work, env=env, timeout=900)
+                if code != 0 or timed_out:
+                    raise LabError(f"codegraph init isolado falhou: {err[-300:]}")
+                index_ms = round((time.perf_counter() - index_started) * 1000, 3)
+                baseline = setup_paths_file(work)
+                entries = set(json.loads(baseline.read_text())) if baseline.is_file() else set()
+                baseline.write_text(json.dumps(sorted(entries | {".codegraph/"})))  # the index is setup, not the agent's change
+                if arm["codegraph"] == "mcp":
+                    (cfg_dir / "mcp.json").write_text(json.dumps({"mcpServers": {"codegraph": {
+                        "command": "/agent-bin/codegraph", "args": ["serve", "--mcp"], "env": {"CODEGRAPH_TELEMETRY": "0"}}}}))
+                    mcp_config = "/agent-config/mcp.json"
             hook_log = pathlib.Path(env["SIDECAR_HOME"]) / "logs" / "hook.jsonl"
             turns, session, remaining_budget = [], None, self.max_budget
             for n in range(self.turns):
@@ -1126,7 +1194,7 @@ class ClaudeAgent:
                 t0 = time.perf_counter()
                 denied = self.deny_paths + ["/agent-config/.credentials.json"]
                 sandboxed = agent_sandbox_command(self.command(text, settings, resume=session, tools_allow=tools_allow,
-                                                               deny_paths=denied, max_budget=remaining_budget),
+                                                               deny_paths=denied, max_budget=remaining_budget, mcp_config=mcp_config),
                                                   work, readonly_mounts, writable_mounts, sandbox_env)
                 code, out, err, to = run(sandboxed, cwd=work, env=env, timeout=self.timeout)
                 wall = time.perf_counter() - t0
@@ -1134,6 +1202,7 @@ class ClaudeAgent:
                 hook_metrics = hook_metrics_since(hook_log, hook_offset)
                 session = session or session_id_of(out)
                 reasons = rhp.contamination(parsed, os.path.exists(marker), self.model)
+                reasons = allow_arm_mcp(reasons, parsed, arm)
                 raw_events = tool_events(out)
                 question_tool_events = tool_events(out, include_question_text=True) if n == 0 and self.turns > 1 else raw_events
                 if touched_benchmark_data(raw_events, self.deny_paths):
@@ -1232,6 +1301,8 @@ def tool_events(stream_text, include_question_text=False):
                     kind = ("explore" if sufficiency.EXPLORE_CMD.search(cmd) else "test" if TEST_CMD.match(cmd) else
                             "search" if SEARCH_CMD.match(cmd) else "read" if READ_CMD.match(cmd) else "other")
                     ev = {"kind": kind, "key": cmd if kind != "test" else "test", "cmd": cmd}
+                elif name.startswith("mcp__codegraph__"):
+                    ev = {"kind": "explore", "key": name}  # CodeGraph MCP tools deliver code like an explore
                 elif name in ("Agent", "Task"):
                     ev = {"kind": "delegate", "key": ""}
                 elif name in ("ToolSearch", "TodoWrite"):
@@ -1389,6 +1460,9 @@ def parse_arms(spec):
             arms.append({"name": item, "engine": "v3", "env": {}, "explore": True})
         elif item == "V3-hook":
             arms.append({"name": item, "engine": "v3", "env": {}, "explore": False})
+        elif item in ("CG", "CG-mcp"):
+            # Competitor arm: no Sidecar hook; CodeGraph indexed in setup and reachable only by this arm.
+            arms.append({"name": item, "engine": None, "env": {}, "codegraph": "mcp" if item == "CG-mcp" else "cli"})
         elif item.startswith(("V2+", "V3+")):
             feats = item[3:].split("+")
             if not feats or any(f not in KNOWN_FEATURES for f in feats):
@@ -1396,7 +1470,7 @@ def parse_arms(spec):
             engine = item[:2].lower()
             arms.append({"name": item, "engine": engine, "env": {"SIDECAR_FEATURES": ",".join(feats)}, "explore": engine == "v3"})
         else:
-            raise LabError(f"braço desconhecido: {item} (use OFF, V1, V2, V3, V3-hook, V2+<feature>, V3+<feature>)")
+            raise LabError(f"braço desconhecido: {item} (use OFF, V1, V2, V3, V3-hook, V2+<feature>, V3+<feature>, CG, CG-mcp)")
     return arms
 
 
@@ -1527,8 +1601,14 @@ def cmd_run(args):
         for d in deny:
             if d.resolve() == tmp_root or d.resolve() in tmp_root.parents or d.resolve() == pathlib.Path("/"):
                 raise LabError(f"--out-dir/repositório não pode ser {d}: bloquearia o workspace do agente. Use um subdiretório")
+        if any(a.get("codegraph") for a in arms) and not getattr(args, "codegraph", None):
+            raise LabError("braços CG/CG-mcp exigem --codegraph DIR (pacote fixado, ex.: @colbymchenry/codegraph@1.6.2)")
+        if getattr(args, "codegraph", None):
+            codegraph_shim(args.codegraph)
+            reject_sensitive_mounts([args.codegraph], deny)
         agent = ClaudeAgent(args.model, str(pathlib.Path(args.sidecar).resolve()), args.credentials, args.max_budget,
-                            args.timeout, requested_tools, deny_paths=deny, turns=getattr(args, "turns", 1))
+                            args.timeout, requested_tools, deny_paths=deny, turns=getattr(args, "turns", 1),
+                            codegraph=getattr(args, "codegraph", None))
         est = n * args.max_budget
         if args.yes_spend:
             agent_auth = verify_agent_auth(args.credentials)
@@ -1542,7 +1622,10 @@ def cmd_run(args):
     meta = {"schema": "lab-meta/1", "manifest": manifest, "arms": [a["name"] for a in arms], "seed": args.seed,
             "model_requested": getattr(agent, "model", None), "order": [[t, a["name"], r] for t, a, r in order],
             "tools_allow_by_repo": {task["repo"]: tools_allow_for(task, requested_tools) for task in tasks},
-            "explore_arms": {a["name"]: EXPLORE_TOOLS for a in arms if a.get("explore")},
+            "explore_arms": {a["name"]: arm_extra_tools(a) for a in arms if arm_extra_tools(a)},
+            "codegraph": {"package": str(pathlib.Path(args.codegraph).resolve()) if getattr(args, "codegraph", None) else None,
+                          "version": codegraph_version(args.codegraph) if getattr(args, "codegraph", None) else None,
+                          "telemetry": "disabled (CODEGRAPH_TELEMETRY=0)"},
             "isolation": sandbox_prefix()[1], "oracle_network_isolation": sandbox_prefix()[1],
             "agent_filesystem_isolation": agent_isolation if args.agent == "claude" else "simulated-unrestricted",
             "agent_auth_method": agent_auth if args.agent == "claude" else None,
@@ -1570,7 +1653,7 @@ def cmd_run(args):
                 expected = (sealed_task.get("task_sha256"), sealed_task.get("oracle_sha256"), sealed_task.get("reference_sha256"))
                 if actual != expected:
                     raise LabError("holdout difere do manifesto selado; execução interrompida")
-            arm = dict(arm, tools_allow=tools_allow_for(task, requested_tools) + (EXPLORE_TOOLS if arm.get("explore") else []))
+            arm = dict(arm, tools_allow=tools_allow_for(task, requested_tools) + arm_extra_tools(arm))
             rec = execute_one(agent, task, tdir, arm, rep, args, home)
             with runs.open("a") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
@@ -1723,6 +1806,11 @@ def comparison_plan(arms):
         if a.startswith("V2+") and "V2" in arms:
             plan.append((a, "V2"))
     for a in arms:
+        if a.startswith("V3") and "CG" in arms:
+            plan.append((a, "CG"))  # competitive question: same tasks, same base tools
+        if a.startswith("V3") and "CG-mcp" in arms:
+            plan.append((a, "CG-mcp"))
+    for a in arms:
         if a.startswith("V3") and "V2" in arms:
             plan.append((a, "V2"))  # the V3 promotion question is V3 against V2, not only against OFF
         if a.startswith("V3") and a != "V3" and "V3" in arms:
@@ -1856,6 +1944,7 @@ def main(argv=None):
     p = sub.add_parser("run")
     p.add_argument("--agent", default="claude"); p.add_argument("--model"); p.add_argument("--sidecar")
     p.add_argument("--arms", default="OFF,V1,V2"); p.add_argument("--tasks"); p.add_argument("--splits", default="development,validation")
+    p.add_argument("--codegraph", help="installed CodeGraph package dir (npm --prefix DIR) for the CG / CG-mcp arms")
     p.add_argument("--reps", type=int, default=1); p.add_argument("--seed", type=int, default=11)
     p.add_argument("--out-dir", required=True); p.add_argument("--credentials", default=str(pathlib.Path.home() / ".claude" / ".credentials.json"))
     p.add_argument("--max-budget", type=float, default=0.5, help="teto por execução (US$)")

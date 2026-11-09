@@ -30,7 +30,7 @@ shipped file was read, edited or tested afterwards in any thread).
 import re
 
 BOOKKEEPING = {"bookkeeping"}
-EXPLORE_CMD = re.compile(r"(^|[\s/;&|(])sidecar\s+explore\b")
+EXPLORE_CMD = re.compile(r"(^|[\s/;&|(])(sidecar\s+explore|codegraph\s+(explore|node|context))\b")
 PATH_IN_CONTEXT = re.compile(r"\(([\w./@+\-]+\.[A-Za-z0-9]{1,8}):\d+")
 EXPLORE_SECTION = re.compile(r"^\*\*`([^`]+)`\*\*", re.M)
 EXPLORE_NAMED = re.compile(r"\(([\w./@+\-]+\.[A-Za-z0-9]{1,8}):\d+\)|^- \[[A-Z]+\] ([\w./@+\-]+\.[A-Za-z0-9]{1,8}) ", re.M)

@@ -12,7 +12,7 @@ Atualizado em 2026-11-09. Branch `ccr-f508c6e8-0bizc9`, baseada em `main@d15aedb
 | P0-C suficiência / custo por origem | Implementado no laboratório | `bench/lab/sufficiency.py` + testes sintéticos |
 | E2 navegação (agentic) | Corpus e braços prontos; **não executado** (pago) | `bench/lab/corpus-nav` |
 | E3–E5 agentic | Infra existente + braços V3; **não executado** (pago) | comandos no fim |
-| Braço CodeGraph | **Não implementado**: transporte MCP + `codegraph init` exigem decisão (ver pendências) | — |
+| Braços CodeGraph `CG` (CLI) e `CG-mcp` | Implementados no laboratório; E2E **sem modelo** (cliente falso + CodeGraph 1.6.2 real no sandbox) | `test_cg_arm_runs_codegraph_in_the_sandbox_with_a_fake_client` |
 | Promoção da V3 | **Não promovida.** Sem evidência end-to-end | — |
 
 ## 1. P0-A — auditoria e validação do laboratório
@@ -70,7 +70,7 @@ Leitura: a V3 reduz falsos positivos e tokens sem perder recall nos repositório
 
 Contrato e limites em [docs/explore.md](../explore.md). Primeiro teste real expôs: (a) L03 (Express sem `res.send` no índice) e (b) a regra V2 “identificador exato domina” derrubando vizinhos quando `ETag` casava com uma constante de teste. O explore usa opções aditivas do `retrieve` (`ExtraExactKeys` para `res.send`→`send`, `NoExactDominance`); hook V1/V2/V3 inalterados.
 
-**E2 offline (B18, sem modelo, 7 tarefas de navegação):** fatos do oráculo presentes no que cada braço entrega — hook V2 14/26 (1/7 tarefas completas, 12,4 k chars), hook V3 13/26 (1/7, 8,1 k), **explore 22/26 (4/7, 38,9 k)**. Falhas: Monolog (handler/`write` não chegam), Sinatra (`route!`), Click (`parse_args`). É condição para economizar exploração, **não** prova de resposta correta nem de economia.
+**E2 offline (B18, sem modelo, 7 tarefas de navegação, mesmas perguntas para todos):** fatos do oráculo presentes no que cada braço entrega — hook V2 14/26 (1/7 tarefas completas, 12,4 k chars), hook V3 13/26 (1/7, 8,1 k), **sidecar explore 22/26 (4/7, 38,9 k)**, **codegraph explore 1.6.2: 24/26 (6/7, 114,3 k)**. Leitura: o CodeGraph cobre mais fatos (Monolog e Sinatra completos), o Sidecar entrega ~1/3 dos caracteres; nenhum domina. Falhas do Sidecar: Monolog (handler/`write`), Sinatra (`route!`), Click (`parse_args`, que o CodeGraph também perde). É condição para economizar exploração, **não** prova de resposta correta nem de economia.
 
 ## 5. P0-C — suficiência e custo por origem
 
@@ -80,7 +80,7 @@ Contrato e limites em [docs/explore.md](../explore.md). Primeiro teste real exp�
 
 1. **Autorização + teto de gasto** para pilotos pagos. Sem isso nada abaixo roda.
 2. E2 navegação piloto (development, 4 tarefas): `OFF,V2,V3,V3-hook` × 2 reps, Haiku; depois Sonnet. Comando abaixo.
-3. Braço CodeGraph: instalar `@colbymchenry/codegraph@1.6.2` (pin auditado `f72c9d2`), `codegraph init` como fase de setup (o `.codegraph/` entra na linha de base de escopo), MCP via `--mcp-config` com `codegraph serve --mcp`, e permitir MCP só nesse braço (hoje `contamination()` marca qualquer MCP como contaminação — precisa de exceção por braço). OFF/V3 com o binário mascarado (já implementado). **Decisão de transporte pendente**: MCP (como o benchmark do CodeGraph) ou CLI `codegraph explore` (paridade com `sidecar explore`).
+3. Braços CodeGraph prontos: `--codegraph DIR` (pacote `npm install --prefix DIR @colbymchenry/codegraph@1.6.2`, versão gravada em `meta.json`); `codegraph init` roda no sandbox como setup e `.codegraph/` entra na linha de base de escopo; `CODEGRAPH_TELEMETRY=0` (o CodeGraph coleta telemetria por padrão); `CG` permite `Bash(codegraph explore|node|query|context:*)` (paridade com `sidecar explore`); `CG-mcp` passa `--mcp-config` com `codegraph serve --mcp` e só esse servidor é aceito pela checagem de contaminação. OFF/V2/V3 não alcançam o CodeGraph (máscara). Falta: execução real com cliente autenticado.
 4. E3 edição: `OFF,V2,V2+brief,V3` no corpus v2 (32 tarefas, holdout fora), piloto de dificuldade antes de dimensionar.
 5. Reduzir FN de prompts curtos de domínio sem reabrir FPs: exige **novo** conjunto independente (o atual já foi usado).
 6. Explore: recall em Monolog/Sinatra; medir cold/reindex; E2E real.
@@ -89,9 +89,10 @@ Comandos (dry-run sem `--yes-spend`; nada pago foi executado):
 
 ```bash
 go build -o /tmp/sidecar ./cmd/sidecar
+npm install --prefix /tmp/cg @colbymchenry/codegraph@1.6.2
 LAB_CORPUS=bench/lab/corpus-nav python3 bench/lab/lab.py run --agent claude --model claude-haiku-5-5 \
-  --sidecar /tmp/sidecar --arms OFF,V2,V3,V3-hook --reps 2 --splits development --out-dir /tmp/lab-e2 \
-  --max-budget 0.5 --max-total-usd <TETO>            # + --yes-spend quando autorizado
+  --sidecar /tmp/sidecar --codegraph /tmp/cg --arms OFF,V2,V3,V3-hook,CG,CG-mcp --reps 2 --splits development \
+  --out-dir /tmp/lab-e2 --max-budget 0.5 --max-total-usd <TETO>            # + --yes-spend quando autorizado
 python3 bench/lab/lab.py run --agent claude --model claude-haiku-5-5 --sidecar /tmp/sidecar \
   --arms OFF,V2,V2+brief,V3 --reps 1 --splits development,validation --out-dir /tmp/lab-e3 --max-budget 1 --max-total-usd <TETO>
 python3 bench/lab/lab.py report /tmp/lab-e2/runs.jsonl --md /tmp/lab-e2/scorecard.md

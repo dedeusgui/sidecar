@@ -234,17 +234,17 @@
     {
       "id": "B18-explore-fact-coverage",
       "level": "offline",
-      "question": "Os fatos exigidos por um oráculo de navegação chegam ao agente pelo hook V2/V3 ou pelo sidecar explore, e a que custo?",
+      "question": "Os fatos exigidos por um oráculo de navegação chegam ao agente pelo hook V2/V3, pelo sidecar explore ou pelo codegraph explore (mesmas tarefas), e a que custo?",
       "data": "bench/lab/corpus-nav: 7 perguntas de fluxo (chi, click, express, hono, monolog, serde-json, sinatra), 26 fatos verificados por grep antes de qualquer execução",
-      "command": "python3 bench/v3/e2_offline.py --sidecar BIN --checkout DIR",
+      "command": "python3 bench/v3/e2_offline.py --sidecar BIN --checkout DIR --codegraph node_modules/.bin/codegraph",
       "artifacts": [
         "bench/results/v3-e1-2026-11-09/e2-offline.md",
         "bench/results/v3-e1-2026-11-09/e2-offline.json",
         "bench/lab/corpus-nav/manifest.json"
       ],
-      "headline": "fatos presentes: hook V2 14/26 (12,4k chars), hook V3 13/26 (8,1k), explore 22/26 com 4/7 tarefas completas (38,9k chars)",
+      "headline": "fatos presentes: hook V2 14/26 (12,4k chars), hook V3 13/26 (8,1k), sidecar explore 22/26 com 4/7 tarefas completas (38,9k), codegraph explore 1.6.2 24/26 com 6/7 (114,3k)",
       "status": "referência offline; nenhuma economia agentic demonstrada",
-      "caveat": "fato presente não é resposta correta; N=7; mesmo autor das perguntas e do explore; explore custa ~4x mais caracteres"
+      "caveat": "fato presente não é resposta correta; N=7; perguntas escritas pelo autor do Sidecar; CodeGraph via CLI (mesma saída da ferramenta MCP), telemetria desligada; nenhum resultado agentic"
     },
     {
       "id": "B19-aider-repomap-baseline",
