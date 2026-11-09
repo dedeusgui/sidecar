@@ -98,6 +98,10 @@ python3 bench/lab/lab.py run --agent claude --model claude-haiku-5-5 --sidecar /
 python3 bench/lab/lab.py report /tmp/lab-e2/runs.jsonl --md /tmp/lab-e2/scorecard.md
 ```
 
+## 6b. Falha encontrada na revisão própria
+
+Ao adicionar os braços CodeGraph, a atribuição de `SIDECAR_ENGINE`/`SIDECAR_FEATURES` ficou sob o ramo do CodeGraph: os braços V2/V3 rodariam o hook **V1** sem aviso. Encontrado antes de qualquer execução, corrigido em `d90f104` com regressão (`test_each_arm_sees_its_own_engine_and_tools_in_the_sandbox`, que falha no commit anterior).
+
 ## 7. Riscos e rollback
 
 - V3 é opt-in; `SIDECAR_ENGINE` vazio/`v1` mantém V1 e `v2` a V2. Rollback: não definir `SIDECAR_ENGINE=v3` ou reverter os commits `6e4ff2b`, `cc2ba2f`.
