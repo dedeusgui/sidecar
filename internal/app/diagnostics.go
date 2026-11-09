@@ -15,6 +15,7 @@ import (
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
+	"github.com/dedeusgui/sidecar/internal/engine"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/install"
 	"github.com/dedeusgui/sidecar/internal/lsp"
@@ -46,12 +47,14 @@ type ExplainReport struct {
 	Contracts     []retrieve.Finding        `json:"contracts,omitempty"`
 	Packing       *retrieve.PackTrace       `json:"packing,omitempty"`
 	Context       string                    `json:"context"`
+	Decision      *engine.Decision          `json:"v3_decision,omitempty"` // v3 only
 }
 
-// engineOf names the pipeline that produced a result. Only the exact value "v2" selects v2.
+// engineOf names the pipeline that produced a result. Only the exact values "v2" and "v3" select them.
 func engineOf(opts retrieve.Options) string {
-	if opts.EngineVersion == "v2" {
-		return "v2"
+	switch opts.EngineVersion {
+	case "v2", engine.Version:
+		return opts.EngineVersion
 	}
 	return "v1"
 }
@@ -103,11 +106,22 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 	if opts.LSPServer == nil {
 		opts.LSPServer = lspServerForFile
 	}
-	res, err := retrieve.Search(ctx, ix.Store(), prompt, opts)
-	if err != nil {
-		return ExplainReport{}, err
+	var res retrieve.Result
+	var decision *engine.Decision
+	if engineOf(opts) == engine.Version {
+		r, d, err := engine.Run(ctx, ix.Store(), prompt, engine.Options{Retrieve: opts})
+		if err != nil {
+			return ExplainReport{}, err
+		}
+		res, decision = r, &d
+	} else {
+		r, err := retrieve.Search(ctx, ix.Store(), prompt, opts)
+		if err != nil {
+			return ExplainReport{}, err
+		}
+		res = r
 	}
-	if engineOf(opts) == "v2" {
+	if engineOf(opts) == "v2" || decision != nil && decision.Action != engine.ActionAbstain {
 		if _, err := attachDecisions(ix.Store(), root, prompt, &res, time.Now()); err != nil {
 			return ExplainReport{}, err
 		}
@@ -135,6 +149,10 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 		TimingsMS:     map[string]float64{},
 		Candidates:    res.Trace.Candidates,
 		Context:       renderContext(res, opts),
+		Decision:      decision,
+	}
+	if decision != nil {
+		rep.Context = engine.Render(res, *decision, nil)
 	}
 	for k, d := range res.Trace.Timings {
 		rep.TimingsMS[k] = ms(d)
@@ -173,6 +191,12 @@ func WriteExplain(w io.Writer, rep ExplainReport, asJSON bool) error {
 	_, _ = fmt.Fprintf(w, "Candidatos: léxicos=%d exatos=%d estruturais=%d · orçamento=%d tokens\n", rep.Lexical, rep.Exact, rep.Structural, rep.Budget)
 	_, _ = fmt.Fprintf(w, "Intenção: %s (confiança %.2f)\n", strings.Join(rep.Intent.Kinds, ", "), rep.Intent.Confidence)
 	_, _ = fmt.Fprintf(w, "Motor: %s\n", rep.Engine)
+	if d := rep.Decision; d != nil {
+		_, _ = fmt.Fprintf(w, "Decisão V3: %s · classe %s · relevância %s · orçamento %d tokens · %d itens\n", d.Action, d.Class, d.Relevance, d.Budget, len(d.Included))
+		for _, r := range append(append([]string{}, d.AbstainReasons...), d.LowConfidence...) {
+			_, _ = fmt.Fprintf(w, "  motivo: %s\n", r)
+		}
+	}
 	if pk := rep.Packing; pk != nil {
 		_, _ = fmt.Fprintf(w, "Pacote: %d itens · %d/%d tokens · abstenção=%v %s\n", pk.Selected, pk.Used, pk.Budget, pk.Abstained, pk.Reason)
 	}

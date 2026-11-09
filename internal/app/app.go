@@ -17,6 +17,7 @@ import (
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
+	"github.com/dedeusgui/sidecar/internal/engine"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/lsp"
 	"github.com/dedeusgui/sidecar/internal/paths"
@@ -167,15 +168,29 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	ropts := hookRetrieveOptions(root, statePath)
 	rec["engine"] = engineOf(ropts)
 	t = time.Now()
-	res, err := retrieve.Search(ctx, ix.Store(), in.Prompt, ropts)
-	if err != nil {
-		return "", damaged(paths.IndexDB(root), err)
+	var res retrieve.Result
+	var decision *engine.Decision
+	if ropts.EngineVersion == engine.Version {
+		r, d, err := engine.Run(ctx, ix.Store(), in.Prompt, engine.Options{Retrieve: ropts})
+		if err != nil {
+			return "", damaged(paths.IndexDB(root), err)
+		}
+		res, decision = r, &d
+		// Decision metadata only: never the prompt, the evidence text or the locators.
+		rec["v3_action"], rec["v3_class"], rec["v3_relevance"] = string(d.Action), string(d.Class), string(d.Relevance)
+		rec["v3_budget"], rec["v3_retrieval_ran"] = d.Budget, d.RetrievalRan
+	} else {
+		r, err := retrieve.Search(ctx, ix.Store(), in.Prompt, ropts)
+		if err != nil {
+			return "", damaged(paths.IndexDB(root), err)
+		}
+		res = r
 	}
 	rec["retrieve_ms"] = ms(time.Since(t))
 	rec["evidence"] = len(res.Evidence)
 	rec["lexical"] = res.Trace.Lexical
 	rec["exact"] = res.Trace.Exact
-	if ropts.EngineVersion == "v2" {
+	if ropts.EngineVersion == "v2" || decision != nil && decision.Action != engine.ActionAbstain {
 		n, err := attachDecisions(ix.Store(), root, in.Prompt, &res, time.Now())
 		if err != nil {
 			rec["decision_error"] = err.Error() // fail open: the prompt keeps its code evidence
@@ -196,7 +211,9 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 	t = time.Now()
 	var block string
 	var used []string
-	if ropts.EngineVersion == "v2" && retrieve.FeatureEnabled("brief") {
+	if decision != nil {
+		block, used = engine.RenderSession(res, *decision, statePath)
+	} else if ropts.EngineVersion == "v2" && retrieve.FeatureEnabled("brief") {
 		var briefed bool
 		block, used, briefed = brief.RenderTaskSession(res, statePath)
 		rec["task_brief"] = briefed
@@ -223,9 +240,9 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 // memory is read only for v2, because only the v2 packer uses it.
 func hookRetrieveOptions(root, statePath string) retrieve.Options {
 	o := retrieve.Options{Root: root, Profile: os.Getenv("SIDECAR_PROFILE")}
-	if os.Getenv("SIDECAR_ENGINE") == "v2" {
-		o.EngineVersion = "v2"
-		o.Adaptive = retrieve.FeatureEnabled("adaptive")
+	if e := os.Getenv("SIDECAR_ENGINE"); e == "v2" || e == engine.Version {
+		o.EngineVersion = e
+		o.Adaptive = e == "v2" && retrieve.FeatureEnabled("adaptive") // v3 applies the policy itself
 		o.Seen = brief.SeenFor(statePath)
 		o.LSPTrusted = lsp.Trusted
 		o.LSPServer = lspServerForFile

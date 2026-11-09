@@ -13,7 +13,7 @@ func TestExplainRejectsUnknownEngine(t *testing.T) {
 	if code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
-	if !strings.Contains(errOut.String(), "v1 ou v2") {
+	if !strings.Contains(errOut.String(), "v1, v2 ou v3") {
 		t.Errorf("stderr = %q, want the engine choices", errOut.String())
 	}
 }

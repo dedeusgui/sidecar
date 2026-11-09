@@ -268,10 +268,10 @@ func cmdDoctor(out, errOut io.Writer) int {
 	return 0
 }
 
-// defaultEngine is v2 only when SIDECAR_ENGINE asks for it; the product default stays v1.
+// defaultEngine is v2 or v3 only when SIDECAR_ENGINE asks for it; the product default stays v1.
 func defaultEngine() string {
-	if os.Getenv("SIDECAR_ENGINE") == "v2" {
-		return "v2"
+	if e := os.Getenv("SIDECAR_ENGINE"); e == "v2" || e == "v3" {
+		return e
 	}
 	return "v1"
 }
@@ -281,12 +281,12 @@ func cmdExplain(args []string, in io.Reader, out, errOut io.Writer) int {
 	fs.SetOutput(errOut)
 	root := fs.String("root", ".", "folder inside the repository")
 	asJSON := fs.Bool("json", false, "print the trace as JSON")
-	engine := fs.String("engine", defaultEngine(), "retrieval pipeline: v1 or v2 (default from SIDECAR_ENGINE)")
+	engine := fs.String("engine", defaultEngine(), "retrieval pipeline: v1, v2 or v3 (default from SIDECAR_ENGINE)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if *engine != "v1" && *engine != "v2" {
-		_, _ = fmt.Fprintf(errOut, "--engine deve ser v1 ou v2, não %q\n", *engine)
+	if *engine != "v1" && *engine != "v2" && *engine != "v3" {
+		_, _ = fmt.Fprintf(errOut, "--engine deve ser v1, v2 ou v3, não %q\n", *engine)
 		return 2
 	}
 	prompt, err := io.ReadAll(io.LimitReader(in, adapter.MaxInputBytes))
