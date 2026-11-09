@@ -2,6 +2,8 @@
 
 **Estado:** experimental, opt-in, local. Implementado em `internal/explore` sobre o índice existente (`internal/index`, `internal/store`) e a recuperação V2/V3 (`internal/retrieve`, `internal/engine`). Sem daemon, MCP, rede, modelo ou embeddings. Não executa código do repositório. **Nenhuma economia end-to-end foi medida ainda** (ver [progresso V3](v3/progress.md)).
 
+> **Próxima arquitetura, ainda não implementada:** o [motor V3.5](v3.5/architecture.md) passará a reutilizar o core do Explore automaticamente no hook, em modo QuickExpand limitado. O CLI continuará disponível e compatível para investigação aprofundada, mas será **opcional**; nenhum agente precisará aprender seus comandos para receber contexto útil.
+
 ## Uso
 
 ```bash
