@@ -29,7 +29,7 @@ O problema é uma cadeia causal: a evidência precisa ser (a) relevante, (b) cor
 | B15 | 30 execuções de 2 turnos (6 tarefas × 5 braços, N=6): OFF/V2/Brief/Groom 5/6; Impact 4/6 | **Inconclusivo**; Brief teve mais tokens/chamadas; R4/R5 não promovidos. |
 | B16 | 32 tarefas validadas (12 novas, 9 holdout), oráculo falha no base e passa no patch de referência | Dificuldade **não** testada com agente; holdout não foi executado. |
 
-O core default continua V1, com V2 opt-in (verificar em código), e features `adaptive`, `brief`, `groom`, `impact` experimentais. **Atualização 2026-11-09:** a Engine V3 existe como opt-in experimental (`SIDECAR_ENGINE=v3`, `internal/engine`) e `sidecar explore` como CLI experimental (`internal/explore`); nenhum gate de promoção foi cumprido (sem evidência agentic). Estado em [progress.md](progress.md).
+O core default continua V1, com V2 opt-in (verificar em código), e features `adaptive`, `brief`, `groom`, `impact` experimentais. **Atualização 2026-11-09:** a Engine V3 existe como opt-in experimental (`SIDECAR_ENGINE=v3`, `internal/engine`) e `sidecar explore` como CLI experimental (`internal/explore`); nenhum gate de promoção foi cumprido (sem evidência agentic). Estado em [progress.md](progress.md); plano em [next-steps.md](next-steps.md).
 
 ## Diagnóstico causal e prioridades
 

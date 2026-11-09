@@ -4,7 +4,7 @@
 
 ## Campanha atual: Sidecar V3 (read-first para Codex)
 
-Após os PRs #6–#18, a baseline de código é a V1/V2 existente (PR #18 mergeado). A campanha V3 está especificada em [docs/v3/README.md](docs/v3/README.md), com [avaliação/gates](docs/v3/evaluation-protocol.md), [referências upstream pinadas](docs/v3/upstream-references.md) e [handoff executável para Codex](docs/v3/CODEX-HANDOFF.md). **Ler os quatro antes de iniciar trabalho V3**; este AGENTS.md prevalece nos invariantes de privacidade, segurança, legalidade, validação e merges. As metas V3 não são resultados comprovados. O [roadmap de R1–R7](docs/roadmap-next-iterations.md) permanece histórico para a V2.
+Após os PRs #6–#18, a baseline de código é a V1/V2 existente (PR #18 mergeado). A campanha V3 está especificada em [docs/v3/README.md](docs/v3/README.md), com [avaliação/gates](docs/v3/evaluation-protocol.md), [referências upstream pinadas](docs/v3/upstream-references.md) e [handoff executável para Codex](docs/v3/CODEX-HANDOFF.md). **Ler os quatro antes de iniciar trabalho V3**; este AGENTS.md prevalece nos invariantes de privacidade, segurança, legalidade, validação e merges. As metas V3 não são resultados comprovados. **Estado e próximos passos:** [docs/v3/next-steps.md](docs/v3/next-steps.md) (detalhes em [progress.md](docs/v3/progress.md)). O [roadmap de R1–R7](docs/roadmap-next-iterations.md) permanece histórico para a V2.
 
 ## Missão e limites
 

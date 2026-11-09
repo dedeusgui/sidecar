@@ -1,6 +1,8 @@
 # Sidecar V3 — progresso de implementação
 
-Atualizado em 2026-11-09. Branch `ccr-f508c6e8-0bizc9`, baseada em `main@d15aedb4253c444282a0cb70385f50921e410823` (PR #19 documentação V3 e PR #20 laboratório P0-A **já mergeados**; CI da `main` verde). Nenhum merge feito nesta etapa. **Custo pago: US$ 0** — nenhuma execução agentic paga, nenhum holdout aberto.
+> Resumo do que foi entregue e plano ordenado: [next-steps.md](next-steps.md).
+
+Atualizado em 2026-11-09. Trabalho feito na branch `ccr-f508c6e8-0bizc9` a partir de `main@d15aedb` e levado à `main` (`46d6d39`, PR #21) com CI verde e autorização do mantenedor. **Custo pago: US$ 0** — nenhuma execução agentic paga, nenhum holdout aberto.
 
 ## Resumo honesto
 
