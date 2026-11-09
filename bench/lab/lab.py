@@ -1143,6 +1143,8 @@ class ClaudeAgent:
         readonly_mounts = list(runtime_mounts) + list(net_mounts) + [(bin_dir, "/agent-bin")]
         if arm["engine"] is not None:
             readonly_mounts.append((self.sidecar, "/opt/sidecar"))
+            sandbox_env["SIDECAR_ENGINE"] = arm["engine"]
+            sandbox_env.update({k: v for k, v in arm.get("env", {}).items() if k in ("SIDECAR_FEATURES", "SIDECAR_PROFILE")})
             if arm.get("explore"):
                 (bin_dir / "sidecar").symlink_to("/opt/sidecar")
         if arm.get("codegraph"):
@@ -1152,8 +1154,6 @@ class ClaudeAgent:
             readonly_mounts.append((pathlib.Path(self.codegraph), "/opt/codegraph"))
             (bin_dir / "codegraph").symlink_to("/opt/codegraph/" + shim)
             sandbox_env["CODEGRAPH_TELEMETRY"] = "0"
-            sandbox_env["SIDECAR_ENGINE"] = arm["engine"]
-            sandbox_env.update({k: v for k, v in arm.get("env", {}).items() if k in ("SIDECAR_FEATURES", "SIDECAR_PROFILE")})
         try:
             reject_sensitive_mounts(["/usr", "/etc", work, cfg_dir, bin_dir, *[p for p, _ in runtime_mounts],
                                      *[p for p, _ in writable_mounts]], self.deny_paths)

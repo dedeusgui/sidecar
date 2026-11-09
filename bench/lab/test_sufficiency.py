@@ -230,3 +230,45 @@ class CodeGraphArmTests(unittest.TestCase):
             self.assertTrue((work / ".codegraph").is_dir())
             self.assertIn(".codegraph/", json.loads(lab.setup_paths_file(work).read_text()))
             self.assertNotIn(".codegraph/codegraph.db", lab.changed_paths(work))
+
+
+ENGINE_ECHO_CLAUDE = r'''#!/bin/sh
+# Fake client: reports the engine, features and tools the sandbox exposes, as the run result.
+seen="engine=${SIDECAR_ENGINE:-none};features=${SIDECAR_FEATURES:-};sidecar=$(command -v sidecar >/dev/null 2>&1 && echo yes || echo no)"
+echo '{"type":"system","subtype":"init","session_id":"s1","plugins":[],"mcp_servers":[]}'
+echo "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"$seen\",\"num_turns\":1,\"total_cost_usd\":0.0,\"usage\":{\"input_tokens\":1,\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":0,\"output_tokens\":1},\"modelUsage\":{\"claude-haiku-5-5\":{}}}"
+'''
+
+
+class ArmEnvironmentTests(unittest.TestCase):
+    @unittest.skipUnless(lab.shutil.which("bwrap") and sys.platform == "linux", "requer bwrap em Linux")
+    def test_each_arm_sees_its_own_engine_and_tools_in_the_sandbox(self):
+        # Regression: an edit moved SIDECAR_ENGINE into the CodeGraph branch, so V2/V3 arms ran the V1 hook.
+        sidecar = pathlib.Path(tempfile.mkdtemp(prefix="lab-sidecar-bin-")) / "sidecar"
+        build = subprocess.run(["go", "build", "-o", str(sidecar), "./cmd/sidecar"], cwd=lab.HERE.parent.parent,
+                               capture_output=True, text=True)
+        if build.returncode != 0:
+            self.skipTest("go build falhou: " + build.stderr[-200:])
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            fakebin = root / "fakebin"
+            fakebin.mkdir()
+            (fakebin / "claude").write_text(ENGINE_ECHO_CLAUDE)
+            (fakebin / "claude").chmod(0o755)
+            work = root / "work"
+            work.mkdir()
+            (work / "a.go").write_text("package a\n\nfunc A() int { return 1 }\n")
+            subprocess.run("git init -q && git add -A && git -c user.email=a@b -c user.name=a commit -qm base", shell=True, cwd=work, check=True)
+            lab.setup_paths_file(work).write_text("[]")
+            (root / "deny").mkdir()
+            expected = {"OFF": "engine=none;features=;sidecar=no", "V2": "engine=v2;features=;sidecar=no",
+                        "V3": "engine=v3;features=;sidecar=yes", "V3-hook": "engine=v3;features=;sidecar=no",
+                        "V2+brief": "engine=v2;features=brief;sidecar=no"}
+            with unittest.mock.patch.dict(os.environ, {"PATH": str(fakebin) + os.pathsep + os.environ["PATH"]}):
+                agent = lab.ClaudeAgent("claude-haiku-5-5", str(sidecar), None, 0.1, 120, ["Read"], deny_paths=[str(root / "deny")])
+                for arm in lab.parse_arms(",".join(expected)):
+                    sh = root / ("home-" + arm["name"].replace("+", "_"))
+                    sh.mkdir()
+                    arm = dict(arm, tools_allow=["Read"] + lab.arm_extra_tools(arm))
+                    res = agent.run({"id": "t", "underspec": None}, root, work, arm, {"SIDECAR_HOME": str(sh)}, "prompt")
+                    self.assertEqual(res["result"], expected[arm["name"]], arm["name"])
