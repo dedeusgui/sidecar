@@ -202,6 +202,70 @@ func TaskItems(res retrieve.Result) ([]ctxbuild.Item, bool) {
 	return out, true
 }
 
+// MicroBriefProposal returns a compact, evidence-backed orientation proposal
+// for the V3.5 packer. It keeps the legacy TaskItems replacement behavior
+// available to V1/V2/V3 callers while exposing independent brief lines that
+// can be packed beside selected code and tests.
+func MicroBriefProposal(res retrieve.Result) ([]ctxbuild.Item, bool) {
+	b, ok := Build(res)
+	if !ok {
+		return nil, false
+	}
+	byField := make(map[string][]Line)
+	for _, line := range b.Lines {
+		byField[line.Field] = append(byField[line.Field], line)
+	}
+
+	var lines []Line
+	appendFirst := func(fields ...string) {
+		for _, field := range fields {
+			if len(byField[field]) == 0 {
+				continue
+			}
+			lines = append(lines, byField[field][0])
+			return
+		}
+	}
+	appendFirst("goal")
+	appendFirst("entrypoint")
+	appendFirst("test")
+	appendFirst("contract")
+	if len(lines) < 4 {
+		appendFirst("unknown", "consumer", "surface", "verify")
+	}
+	if len(lines) < 2 {
+		appendFirst("consumer", "surface", "unknown", "verify")
+	}
+
+	seen := make(map[string]struct{}, len(lines))
+	items := make([]ctxbuild.Item, 0, len(lines))
+	for _, line := range lines {
+		key := line.Key
+		// Entry and relation lines summarize the same source identity as the
+		// regular evidence item, allowing the global packer to prefer code.
+		key = strings.TrimPrefix(key, "brief|entry|")
+		key = strings.TrimPrefix(key, "brief|rel|")
+		identity := key + "\x00" + line.FP
+		if _, duplicate := seen[identity]; duplicate {
+			continue
+		}
+		seen[identity] = struct{}{}
+		items = append(items, ctxbuild.Item{
+			Section:     ctxbuild.TaskBrief,
+			Key:         key,
+			Fingerprint: line.FP,
+			Text:        fmt.Sprintf("[%s] %s: %s", line.Status, line.Field, line.Text),
+			Priority:    80,
+			Source:      "brief",
+			Role:        line.Field,
+		})
+	}
+	if len(items) < 2 {
+		return nil, false
+	}
+	return items, true
+}
+
 func goalLine(res retrieve.Result) *Line {
 	in := res.Trace.Intent
 	if len(in.Kinds) == 0 || (len(in.Kinds) == 1 && in.Kinds[0] == "general") {
