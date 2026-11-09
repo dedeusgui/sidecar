@@ -141,6 +141,10 @@ As funções novas são **planejadas, não entregues**. Toda alegação de ganho
 
 `SIDECAR_ENGINE=v3` ativa um gate de relevância e um roteador de esforço determinísticos sobre a V2: abstém-se em conversa e assuntos fora do repositório, escolhe resposta enxuta, brief, verificação ou exploração sob demanda e registra o motivo de cada item. Sem modelo, rede ou embeddings. Medição offline (B17): menos falsos positivos e −29% de tokens sem perder Hit@5 nos repositórios externos, mas perda de recall em prompts curtos de domínio; **nenhum ganho end-to-end com agentes foi medido**. O default continua V1. Estado e números: [docs/v3/progress.md](docs/v3/progress.md).
 
+## Motor unificado V3.5 (proposta, não implementado)
+
+A próxima etapa é unificar as capacidades existentes sob um único motor determinístico: **Brief curto junto de código selecionado, Explore estrutural automático e limitado, Grooming, Impact, memória e sinais de sessão com um só orçamento**, sem exigir que o agente aprenda comandos Sidecar. O `sidecar explore` permanece uma ferramenta opcional para aprofundamento, não uma dependência da experiência padrão. A V1 continua default; não existe ainda `SIDECAR_ENGINE=v3.5` funcional nem ganho agentic comprovado. Consulte [a visão geral](docs/v3.5/README.md), [arquitetura](docs/v3.5/architecture.md), [implementação](docs/v3.5/implementation-plan.md) e [avaliação](docs/v3.5/evaluation.md).
+
 ## Engenharia, benchmarks e roadmap
 
 - [AGENTS.md](AGENTS.md): contrato dos agentes que desenvolvem o Sidecar (não exige regras no repositório do usuário).

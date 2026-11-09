@@ -1,5 +1,8 @@
 # Sidecar V3 — o que foi entregue e próximos passos
 
+> **Nova arquitetura planejada:** a unificação das capacidades da V3 em um motor V3.5, com Brief + código selecionado, AutoExplore e packer global, está descrita em [docs/v3.5](../v3.5/README.md). **Esta página continua sendo o registro factual da V3**; não indica que a V3.5 esteja implementada. O primeiro gate de implementação V3.5 é criar um novo conjunto E1/E2 independente *antes* de alterar o relevance gate ou o Explore.
+
+
 **Atualizado:** 2026-11-09, `main@46d6d39` (PR #21 mergeado). Detalhes, números e protocolo: [progress.md](progress.md). Regras: [AGENTS.md](../../AGENTS.md), [evaluation-protocol.md](evaluation-protocol.md).
 
 **Situação de orçamento:** sem quota para execuções agentic pagas. Tudo marcado **[grátis]** pode ser feito agora; **[pago]** só com autorização explícita e teto (`--max-total-usd`).
