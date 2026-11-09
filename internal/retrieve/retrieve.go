@@ -866,7 +866,7 @@ func pickSeeds(cands map[int64]*candidate, n int) []*candidate {
 		if ar != br {
 			return ar < br
 		}
-		return a.hit.ID < b.hit.ID
+		return stableKey(a.hit) < stableKey(b.hit)
 	})
 	if len(seeds) > n {
 		seeds = seeds[:n]
@@ -1049,8 +1049,10 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 			pool = append(pool, c)
 		}
 	}
-	idx := func(c *candidate) string { return strconv.FormatInt(c.hit.ID, 10) }
-	sort.Slice(pool, func(i, j int) bool { return pool[i].hit.ID < pool[j].hit.ID })
+	// Keys and ties use the symbol's content identity, not its row ID: IDs depend on the order the indexer
+	// wrote files, so equal scores between same-named symbols used to flip between index builds.
+	idx := func(c *candidate) string { return stableKey(c.hit) }
+	sort.Slice(pool, func(i, j int) bool { return stableKey(pool[i].hit) < stableKey(pool[j].hit) })
 
 	var lexList, exactList, covList, structList, gitList []string
 	for _, id := range lexOrder {
@@ -1142,6 +1144,12 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 
 // direct reports whether the candidate matches the prompt through its own text.
 func (c *candidate) direct() bool { return c.exact || c.coverage > 0 }
+
+// stableKey orders symbols by path, line, kind and name, independent of database row IDs. The ID is a
+// last resort for two definitions that share all four.
+func stableKey(h store.SymbolHit) string {
+	return h.Path + "\x00" + fmt.Sprintf("%09d", h.Line) + "\x00" + h.Kind + "\x00" + h.Name + "\x00" + strconv.FormatInt(h.ID, 10)
+}
 
 // feedbackMultiplier returns the feedback multiplier of c's symbol, or of its file when the
 // symbol has none of its own.
@@ -1311,7 +1319,7 @@ func traceOf(cands map[int64]*candidate) []CandidateTrace {
 		if list[i].score != list[j].score {
 			return list[i].score > list[j].score
 		}
-		return list[i].hit.ID < list[j].hit.ID
+		return stableKey(list[i].hit) < stableKey(list[j].hit)
 	})
 	if len(list) > 40 {
 		list = list[:40]

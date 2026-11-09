@@ -1,0 +1,30 @@
+{
+ "schema": "lab-task/1",
+ "id": "NAV-CHI-01",
+ "split": "development",
+ "class": "navigation",
+ "repo": "chi",
+ "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+ "prompt": "How does chi route a request through its middleware chain to the matched handler? Name the files and functions. Do not modify the repository.",
+ "oracle": {
+  "kind": "answer",
+  "answer_must_mention": [
+   "mux.go",
+   "servehttp",
+   [
+    "routehttp",
+    "findroute"
+   ],
+   [
+    "chain.go",
+    "chain("
+   ]
+  ],
+  "must_not_edit": true
+ },
+ "scope": {
+  "allowed_paths": [],
+  "invariants": []
+ },
+ "notes": "E2 navigation. Facts verified by grep at the pinned commit on 2026-11-09, before any agent run. Mux.ServeHTTP (mux.go:63) runs mx.handler, built from the middleware stack by chain(...) in chain.go; the endpoint is routeHTTP (mux.go:455), which calls tree.FindRoute."
+}

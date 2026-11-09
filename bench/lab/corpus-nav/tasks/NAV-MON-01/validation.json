@@ -1,0 +1,17 @@
+{
+  "id": "NAV-MON-01",
+  "ok": true,
+  "base": {
+    "kind": "answer",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [],
+    "isolation": null,
+    "detail": "faltando: logger.php, addrecord, handle(|->handle|handle , abstractprocessinghandler|write("
+  },
+  "reference": null,
+  "ts": 1794187696.079908,
+  "base_verdict": "fail"
+}

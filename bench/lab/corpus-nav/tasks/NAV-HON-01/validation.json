@@ -1,0 +1,17 @@
+{
+  "id": "NAV-HON-01",
+  "ok": true,
+  "base": {
+    "kind": "answer",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [],
+    "isolation": null,
+    "detail": "faltando: hono-base.ts, dispatch, compose.ts|compose("
+  },
+  "reference": null,
+  "ts": 1794187695.2276013,
+  "base_verdict": "fail"
+}

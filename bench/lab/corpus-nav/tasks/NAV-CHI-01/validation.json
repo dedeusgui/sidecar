@@ -1,0 +1,17 @@
+{
+  "id": "NAV-CHI-01",
+  "ok": true,
+  "base": {
+    "kind": "answer",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [],
+    "isolation": null,
+    "detail": "faltando: mux.go, servehttp, routehttp|findroute, chain.go|chain("
+  },
+  "reference": null,
+  "ts": 1794187694.3526433,
+  "base_verdict": "fail"
+}

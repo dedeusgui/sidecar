@@ -1,0 +1,17 @@
+{
+  "id": "NAV-SIN-01",
+  "ok": true,
+  "base": {
+    "kind": "answer",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [],
+    "isolation": null,
+    "detail": "faltando: base.rb, route!, filter!, process_route|dispatch!"
+  },
+  "reference": null,
+  "ts": 1794187696.4090972,
+  "base_verdict": "fail"
+}

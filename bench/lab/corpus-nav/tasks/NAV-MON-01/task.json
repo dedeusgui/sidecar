@@ -1,0 +1,31 @@
+{
+ "schema": "lab-task/1",
+ "id": "NAV-MON-01",
+ "split": "validation",
+ "class": "navigation",
+ "repo": "monolog",
+ "commit": "3bed304b1905fed5c30d172872f4d890cbb03c6a",
+ "prompt": "How does a message logged with Logger::info reach a handler that writes it? Name the methods and files. Do not modify the repository.",
+ "oracle": {
+  "kind": "answer",
+  "answer_must_mention": [
+   "logger.php",
+   "addrecord",
+   [
+    "handle(",
+    "->handle",
+    "handle "
+   ],
+   [
+    "abstractprocessinghandler",
+    "write("
+   ]
+  ],
+  "must_not_edit": true
+ },
+ "scope": {
+  "allowed_paths": [],
+  "invariants": []
+ },
+ "notes": "E2 navigation. Facts verified by grep at the pinned commit on 2026-11-09, before any agent run. Logger::info -> addRecord (Logger.php:340) builds the LogRecord, runs processors and calls handle() on each handler; AbstractProcessingHandler::handle (32) processes and calls write()."
+}

@@ -17,12 +17,12 @@
         "hit1": 0.525,
         "hit5": 0.975,
         "recall10": 1,
-        "mrr": 0.7102,
+        "mrr": 0.7144,
         "false_negatives_empty": 0,
         "tokens_mean_pos": 418.3,
         "tokens_mean_neg": 0,
-        "latency_p50": 19.03,
-        "latency_p95": 63.68
+        "latency_p50": 19.09,
+        "latency_p95": 72.45
       },
       "new": {
         "negatives": 10,
@@ -37,12 +37,12 @@
         "hit1": 0.525,
         "hit5": 0.975,
         "recall10": 0.975,
-        "mrr": 0.7067,
+        "mrr": 0.7108,
         "false_negatives_empty": 0,
         "tokens_mean_pos": 299.1,
         "tokens_mean_neg": 0,
-        "latency_p50": 13.04,
-        "latency_p95": 75.34
+        "latency_p50": 11.94,
+        "latency_p95": 64.05
       },
       "changes": [
         {
@@ -75,9 +75,9 @@
         "mrr": null,
         "false_negatives_empty": 0,
         "tokens_mean_pos": null,
-        "tokens_mean_neg": 60.2,
-        "latency_p50": 3.17,
-        "latency_p95": 28.12
+        "tokens_mean_neg": 60.0,
+        "latency_p50": 3.35,
+        "latency_p95": 30.48
       },
       "new": {
         "negatives": 180,
@@ -100,8 +100,8 @@
         "false_negatives_empty": 0,
         "tokens_mean_pos": null,
         "tokens_mean_neg": 14.4,
-        "latency_p50": 3.1,
-        "latency_p95": 20.41
+        "latency_p50": 2.97,
+        "latency_p95": 16.98
       },
       "changes": [
         {
@@ -239,9 +239,9 @@
         "mrr": 0.6844,
         "false_negatives_empty": 0,
         "tokens_mean_pos": 465.2,
-        "tokens_mean_neg": 224.2,
-        "latency_p50": 18.9,
-        "latency_p95": 33.4
+        "tokens_mean_neg": 217,
+        "latency_p50": 20.68,
+        "latency_p95": 36.87
       },
       "new": {
         "negatives": 6,
@@ -263,9 +263,9 @@
         "mrr": 0.6844,
         "false_negatives_empty": 0,
         "tokens_mean_pos": 339.9,
-        "tokens_mean_neg": 24.3,
-        "latency_p50": 19.72,
-        "latency_p95": 38.34
+        "tokens_mean_neg": 28.3,
+        "latency_p50": 15.57,
+        "latency_p95": 27.01
       },
       "changes": [
         {
@@ -300,10 +300,10 @@
         "recall10": 0.8833,
         "mrr": 0.6864,
         "false_negatives_empty": 0,
-        "tokens_mean_pos": 425.8,
-        "tokens_mean_neg": 119.5,
-        "latency_p50": 19.21,
-        "latency_p95": 42.26
+        "tokens_mean_pos": 424.2,
+        "tokens_mean_neg": 119.8,
+        "latency_p50": 18.38,
+        "latency_p95": 41.18
       },
       "new": {
         "negatives": 40,
@@ -322,8 +322,8 @@
         "false_negatives_empty": 0,
         "tokens_mean_pos": 293.7,
         "tokens_mean_neg": 37.2,
-        "latency_p50": 12.18,
-        "latency_p95": 31.97
+        "latency_p50": 12.21,
+        "latency_p95": 29.6
       },
       "changes": [
         {
@@ -390,10 +390,10 @@
         "recall10": 0.675,
         "mrr": 0.5354,
         "false_negatives_empty": 5,
-        "tokens_mean_pos": 276.4,
+        "tokens_mean_pos": 275.1,
         "tokens_mean_neg": 0,
-        "latency_p50": 7.32,
-        "latency_p95": 13.68
+        "latency_p50": 6.99,
+        "latency_p95": 15.65
       },
       "new": {
         "negatives": 10,
@@ -416,8 +416,8 @@
         "false_negatives_empty": 13,
         "tokens_mean_pos": 146.4,
         "tokens_mean_neg": 0,
-        "latency_p50": 6.15,
-        "latency_p95": 12.35
+        "latency_p50": 7.03,
+        "latency_p95": 13.74
       },
       "changes": [
         {
@@ -503,8 +503,8 @@
         "false_negatives_empty": 0,
         "tokens_mean_pos": 208.6,
         "tokens_mean_neg": 0,
-        "latency_p50": 5.4,
-        "latency_p95": 13.2
+        "latency_p50": 5.83,
+        "latency_p95": 14.01
       },
       "new": {
         "negatives": 2,
@@ -523,8 +523,8 @@
         "false_negatives_empty": 0,
         "tokens_mean_pos": 171.6,
         "tokens_mean_neg": 0,
-        "latency_p50": 4.7,
-        "latency_p95": 9.06
+        "latency_p50": 5.27,
+        "latency_p95": 10.24
       },
       "changes": []
     }

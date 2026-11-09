@@ -34,14 +34,16 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import sufficiency  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
-CORPUS = HERE / "corpus"
+# LAB_CORPUS selects another corpus (e.g. bench/lab/corpus-nav for the E2 navigation suite). The holdout
+# protections that key on the default corpus path keep applying to it.
+CORPUS = pathlib.Path(os.environ["LAB_CORPUS"]).resolve() if os.environ.get("LAB_CORPUS") else HERE / "corpus"
 TASKS = CORPUS / "tasks"
 REPOS_JSON = CORPUS / "repos.json"
 LEDGER = CORPUS / "holdout_ledger.jsonl"
 SCHEMA = "lab-task/1"
 RUN_SCHEMA = "lab-run/1"
 SPLITS = ("development", "validation", "holdout")
-CLASSES = ("locate", "debug", "edit", "multi-file", "contract-change", "negative", "ambiguous", "voice")
+CLASSES = ("locate", "debug", "edit", "multi-file", "contract-change", "negative", "ambiguous", "voice", "navigation")
 ORACLE_KINDS = ("tests", "answer", "no_change")
 BASE_IDENT = ["-c", "user.name=lab", "-c", "user.email=lab@invalid", "-c", "commit.gpgsign=false"]
 
@@ -493,9 +495,14 @@ def run_oracle(task, tdir, work, answer_text=""):
         res["tests"] = "pass" if not changed_before_oracle else "fail"
     elif o["kind"] == "answer":
         text = (answer_text or "").lower()
-        missing = [m for m in o["answer_must_mention"] if m.lower() not in text]
-        res["tests"] = "pass" if not missing else "fail"
+        # Each item is a required fact; a list item is satisfied by any one of its alternatives.
+        missing = [m if isinstance(m, str) else "|".join(m) for m in o["answer_must_mention"]
+                   if not any(alt.lower() in text for alt in ([m] if isinstance(m, str) else m))]
+        forbidden = [m for m in o.get("answer_must_not_mention") or [] if m.lower() in text]
+        res["tests"] = "pass" if not missing and not forbidden else "fail"
         res["detail"] = ("faltando: " + ", ".join(missing)) if missing else ""
+        if forbidden:
+            res["detail"] += " afirmação incorreta: " + ", ".join(forbidden)
         if o.get("must_not_edit", True) and changed_before_oracle:
             res["tests"] = "fail"
             res["detail"] += " edição indevida"
@@ -569,7 +576,7 @@ def validate_task(tid, keep=False):
         else:
             refwork = prepare_workspace(task, pathlib.Path(tmp) / "ref")
             apply_patch(refwork, ref)
-            answer = " ".join(o.get("answer_must_mention") or [])
+            answer = " ".join(m if isinstance(m, str) else m[0] for m in o.get("answer_must_mention") or [])
             report["reference"] = run_oracle(task, tdir, refwork, answer_text=answer)
             report["ok"] = base_v == "fail" and verdict(report["reference"]) == "pass"
         report["base_verdict"] = base_v
@@ -828,7 +835,7 @@ class ScriptedAgent:
             ref = tdir / "reference.patch"
             if ref.is_file():
                 apply_patch(work, ref)
-            text = " ".join(task["oracle"].get("answer_must_mention") or []) or "feito"
+            text = " ".join(m if isinstance(m, str) else m[0] for m in task["oracle"].get("answer_must_mention") or []) or "feito"
         elif self.behaviour == "scope_violation":
             (pathlib.Path(work) / "STRAY_FILE.txt").write_text("fora do escopo\n")
         elif self.behaviour == "crash":

@@ -1,0 +1,178 @@
+{
+  "rows": [
+    {
+      "task": "NAV-CHI-01",
+      "split": "development",
+      "repo": "chi",
+      "facts": 4,
+      "v2": {
+        "facts": 3,
+        "chars": 2192,
+        "action": null
+      },
+      "v3": {
+        "facts": 3,
+        "chars": 1391,
+        "action": "EXPLORE_AVAILABLE"
+      },
+      "explore": {
+        "facts": 4,
+        "chars": 4237,
+        "missing": []
+      }
+    },
+    {
+      "task": "NAV-CLK-01",
+      "split": "development",
+      "repo": "click",
+      "facts": 4,
+      "v2": {
+        "facts": 2,
+        "chars": 2529,
+        "action": null
+      },
+      "v3": {
+        "facts": 2,
+        "chars": 1671,
+        "action": "EXPLORE_AVAILABLE"
+      },
+      "explore": {
+        "facts": 3,
+        "chars": 9836,
+        "missing": [
+          "parse_args"
+        ]
+      }
+    },
+    {
+      "task": "NAV-EXP-01",
+      "split": "development",
+      "repo": "express",
+      "facts": 3,
+      "v2": {
+        "facts": 0,
+        "chars": 229,
+        "action": null
+      },
+      "v3": {
+        "facts": 0,
+        "chars": 229,
+        "action": "EXPLORE_AVAILABLE"
+      },
+      "explore": {
+        "facts": 3,
+        "chars": 5667,
+        "missing": []
+      }
+    },
+    {
+      "task": "NAV-HON-01",
+      "split": "development",
+      "repo": "hono",
+      "facts": 3,
+      "v2": {
+        "facts": 2,
+        "chars": 1665,
+        "action": null
+      },
+      "v3": {
+        "facts": 2,
+        "chars": 1083,
+        "action": "EXPLORE_AVAILABLE"
+      },
+      "explore": {
+        "facts": 3,
+        "chars": 5850,
+        "missing": []
+      }
+    },
+    {
+      "task": "NAV-MON-01",
+      "split": "validation",
+      "repo": "monolog",
+      "facts": 4,
+      "v2": {
+        "facts": 2,
+        "chars": 2254,
+        "action": null
+      },
+      "v3": {
+        "facts": 1,
+        "chars": 1472,
+        "action": "EXPLORE_AVAILABLE"
+      },
+      "explore": {
+        "facts": 2,
+        "chars": 4161,
+        "missing": [
+          "handle(|->handle|handle ",
+          "abstractprocessinghandler|write("
+        ]
+      }
+    },
+    {
+      "task": "NAV-SER-01",
+      "split": "validation",
+      "repo": "serde-json",
+      "facts": 4,
+      "v2": {
+        "facts": 4,
+        "chars": 1842,
+        "action": null
+      },
+      "v3": {
+        "facts": 4,
+        "chars": 1209,
+        "action": "EXPLORE_AVAILABLE"
+      },
+      "explore": {
+        "facts": 4,
+        "chars": 2625,
+        "missing": []
+      }
+    },
+    {
+      "task": "NAV-SIN-01",
+      "split": "validation",
+      "repo": "sinatra",
+      "facts": 4,
+      "v2": {
+        "facts": 1,
+        "chars": 1639,
+        "action": null
+      },
+      "v3": {
+        "facts": 1,
+        "chars": 1081,
+        "action": "EXPLORE_AVAILABLE"
+      },
+      "explore": {
+        "facts": 3,
+        "chars": 6479,
+        "missing": [
+          "route!"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "v2": {
+      "facts_covered": 14,
+      "facts_total": 26,
+      "chars_total": 12350,
+      "tasks_all_facts": 1
+    },
+    "v3": {
+      "facts_covered": 13,
+      "facts_total": 26,
+      "chars_total": 8136,
+      "tasks_all_facts": 1
+    },
+    "explore": {
+      "facts_covered": 22,
+      "facts_total": 26,
+      "chars_total": 38855,
+      "tasks_all_facts": 4
+    }
+  }
+}

@@ -135,6 +135,7 @@ const (
 	mergeGap              = 6
 	maxSnippetLines       = 60
 	maxImpactFindings     = 12
+	maxContracts          = 8
 )
 
 // BudgetFor scales the output to the repository size: a focused question on a small project must not
@@ -286,7 +287,13 @@ func Run(ctx context.Context, st *store.Store, opts Options) (Result, error) {
 		return out, err
 	}
 	for _, f := range res.Trace.Contracts {
-		out.Contracts = append(out.Contracts, f)
+		if len(out.Contracts) >= maxContracts {
+			out.Gaps = append(out.Gaps, fmt.Sprintf("%d more contract links not listed", len(res.Trace.Contracts)-maxContracts))
+			break
+		}
+		if shown[f.Path] || f.Source == "doc" || f.Status != "TEST_EXPECTED" {
+			out.Contracts = append(out.Contracts, f)
+		}
 	}
 	if opts.Impact || dec.Class == engine.ClassContractChange || dec.Class == engine.ClassMultiFile || dec.Class == engine.ClassEdit {
 		var code []string

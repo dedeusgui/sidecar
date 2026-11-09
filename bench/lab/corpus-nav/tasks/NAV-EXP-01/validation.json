@@ -1,0 +1,17 @@
+{
+  "id": "NAV-EXP-01",
+  "ok": true,
+  "base": {
+    "kind": "answer",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [],
+    "isolation": null,
+    "detail": "faltando: lib/response.js, etag fn|etagfn, setcharset|content-type"
+  },
+  "reference": null,
+  "ts": 1794187694.886519,
+  "base_verdict": "fail"
+}

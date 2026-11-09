@@ -1,0 +1,26 @@
+{
+ "schema": "lab-task/1",
+ "id": "NAV-HON-01",
+ "split": "development",
+ "class": "navigation",
+ "repo": "hono",
+ "commit": "eb754bd5ef22c63f1634a4c374a86be086f85710",
+ "prompt": "How does Hono dispatch a request through middleware and the router to a handler? Name the files and functions. Do not modify the repository.",
+ "oracle": {
+  "kind": "answer",
+  "answer_must_mention": [
+   "hono-base.ts",
+   "dispatch",
+   [
+    "compose.ts",
+    "compose("
+   ]
+  ],
+  "must_not_edit": true
+ },
+ "scope": {
+  "allowed_paths": [],
+  "invariants": []
+ },
+ "notes": "E2 navigation. Facts verified by grep at the pinned commit on 2026-11-09, before any agent run. Hono's fetch calls #dispatch (hono-base.ts:421) which matches the router and either calls the single handler or compose(...) from compose.ts over the matched middleware/handlers."
+}

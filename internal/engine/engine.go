@@ -223,7 +223,14 @@ func classify(s TaskSignals, res retrieve.Result) TaskClass {
 // route maps a class to the smallest useful action and its budget.
 func route(c TaskClass, s TaskSignals) (Action, int, int) {
 	switch c {
-	case ClassLocate, ClassSimpleQuery:
+	case ClassLocate:
+		return ActionLean, leanBudget, leanItems
+	case ClassSimpleQuery:
+		if hasKind(s, "explain") {
+			// A flow question ("how does X route requests") needs a chain, not a list: keep the block lean and
+			// offer on-demand exploration instead of pushing a large block on every such prompt.
+			return ActionExploreAvailable, leanBudget, leanItems
+		}
 		return ActionLean, leanBudget, leanItems
 	case ClassEdit:
 		return ActionBrief, briefBudget, briefItems
@@ -377,6 +384,15 @@ func measureSupport(s *TaskSignals, res retrieve.Result) {
 		}
 	}
 	sort.Strings(s.SoftwareTerms)
+}
+
+func hasKind(s TaskSignals, kind string) bool {
+	for _, k := range s.Intent.Kinds {
+		if k == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func hasLocatorKind(s TaskSignals, kind string) bool {

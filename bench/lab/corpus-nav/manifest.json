@@ -1,0 +1,137 @@
+{
+  "schema": "lab-manifest/1",
+  "repos": {
+    "chi": {
+      "language": "go",
+      "commit": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+      "source": "https://github.com/go-chi/chi",
+      "license": "MIT"
+    },
+    "click": {
+      "language": "python",
+      "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+      "source": "https://github.com/pallets/click",
+      "license": "BSD-3-Clause"
+    },
+    "express": {
+      "language": "javascript",
+      "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+      "source": "https://github.com/expressjs/express",
+      "license": "MIT"
+    },
+    "monolog": {
+      "language": "php",
+      "commit": "3bed304b1905fed5c30d172872f4d890cbb03c6a",
+      "source": "https://github.com/Seldaek/monolog",
+      "license": "MIT"
+    },
+    "sinatra": {
+      "language": "ruby",
+      "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+      "source": "https://github.com/sinatra/sinatra",
+      "license": "MIT"
+    },
+    "hono": {
+      "language": "javascript",
+      "commit": "eb754bd5ef22c63f1634a4c374a86be086f85710",
+      "source": "https://github.com/honojs/hono",
+      "license": "MIT"
+    },
+    "serde-json": {
+      "language": "rust",
+      "commit": "8c535a260ce561eaab4111aafc29038eb9f77ff3",
+      "source": "https://github.com/serde-rs/json",
+      "license": "MIT OR Apache-2.0"
+    }
+  },
+  "tasks": [
+    {
+      "id": "NAV-CHI-01",
+      "split": "development",
+      "class": "navigation",
+      "repo": "chi",
+      "task_sha256": "d487c4ef3cb949985e1b8c7f20215ef7294d5a84f6692487d1f29fe2465aec53",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "NAV-CLK-01",
+      "split": "development",
+      "class": "navigation",
+      "repo": "click",
+      "task_sha256": "1d9c368589fee4b8f2f140034443341f162cbd662944396b057d5fe6ec7ee21e",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "NAV-EXP-01",
+      "split": "development",
+      "class": "navigation",
+      "repo": "express",
+      "task_sha256": "2a9eea6a56ff40998ae7ac64e6cc0c36d9a5e4ade7432c63ca287ee94cf6e8bc",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "NAV-HON-01",
+      "split": "development",
+      "class": "navigation",
+      "repo": "hono",
+      "task_sha256": "b453ee1d67f0396baa3feaccba908a814a88987fe3925d455b6dc0c02f305884",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "NAV-MON-01",
+      "split": "validation",
+      "class": "navigation",
+      "repo": "monolog",
+      "task_sha256": "7a76231b0cad7e3a716dde3549f9f5580ec02052baa05d5114729e01c9c4ef61",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "NAV-SER-01",
+      "split": "validation",
+      "class": "navigation",
+      "repo": "serde-json",
+      "task_sha256": "b4cbe4936b1747ee493c4c8b1e1d228f8beab39da5ac20ec57f1605756ed9bd8",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    },
+    {
+      "id": "NAV-SIN-01",
+      "split": "validation",
+      "class": "navigation",
+      "repo": "sinatra",
+      "task_sha256": "78a7ea7711279fec765299d5810ad22c4ced71be7e36b8497710ab1c5db01d7c",
+      "oracle_sha256": null,
+      "reference_sha256": null,
+      "validated": true
+    }
+  ],
+  "counts": {
+    "development": 4,
+    "validation": 3,
+    "holdout": 0
+  },
+  "classes": {
+    "locate": 0,
+    "debug": 0,
+    "edit": 0,
+    "multi-file": 0,
+    "contract-change": 0,
+    "negative": 0,
+    "ambiguous": 0,
+    "voice": 0,
+    "navigation": 7
+  },
+  "holdout_prompts_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "note": "holdout selado: use --final; acessos ficam em holdout_ledger.jsonl"
+}

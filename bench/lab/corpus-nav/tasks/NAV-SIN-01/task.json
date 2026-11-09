@@ -1,0 +1,27 @@
+{
+ "schema": "lab-task/1",
+ "id": "NAV-SIN-01",
+ "split": "validation",
+ "class": "navigation",
+ "repo": "sinatra",
+ "commit": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+ "prompt": "How does Sinatra match an incoming request to a route block and run before/after filters? Name the methods. Do not modify the repository.",
+ "oracle": {
+  "kind": "answer",
+  "answer_must_mention": [
+   "base.rb",
+   "route!",
+   "filter!",
+   [
+    "process_route",
+    "dispatch!"
+   ]
+  ],
+  "must_not_edit": true
+ },
+ "scope": {
+  "allowed_paths": [],
+  "invariants": []
+ },
+ "notes": "E2 navigation. Facts verified by grep at the pinned commit on 2026-11-09, before any agent run. dispatch! (base.rb:1181) runs filter! :before, route! (base.rb:1064) iterates routes and calls process_route (1098) for pattern matching, then filter! :after."
+}

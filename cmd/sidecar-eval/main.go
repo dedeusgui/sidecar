@@ -355,7 +355,14 @@ func textualRun(ix *index.Index, prompt string, _ ctxbuild.Seen) (callResult, er
 		if list[i].score != list[j].score {
 			return list[i].score > list[j].score
 		}
-		return list[i].h.ID < list[j].h.ID
+		a, b := list[i].h, list[j].h // row IDs depend on index write order; ties use content identity
+		if a.Path != b.Path {
+			return a.Path < b.Path
+		}
+		if a.Line != b.Line {
+			return a.Line < b.Line
+		}
+		return a.Name+a.Kind < b.Name+b.Kind
 	})
 	var hits []store.SymbolHit
 	var lines []string

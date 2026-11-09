@@ -1,0 +1,17 @@
+{
+  "id": "NAV-SER-01",
+  "ok": true,
+  "base": {
+    "kind": "answer",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [],
+    "isolation": null,
+    "detail": "faltando: de.rs, from_str, deserializer|from_trait, deserialize_any|deserialize"
+  },
+  "reference": null,
+  "ts": 1794187696.255173,
+  "base_verdict": "fail"
+}

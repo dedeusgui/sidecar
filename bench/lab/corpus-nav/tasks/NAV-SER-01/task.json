@@ -1,0 +1,30 @@
+{
+ "schema": "lab-task/1",
+ "id": "NAV-SER-01",
+ "split": "validation",
+ "class": "navigation",
+ "repo": "serde-json",
+ "commit": "8c535a260ce561eaab4111aafc29038eb9f77ff3",
+ "prompt": "How does serde_json::from_str parse a string into a typed Rust value? Name the functions and types. Do not modify the repository.",
+ "oracle": {
+  "kind": "answer",
+  "answer_must_mention": [
+   "de.rs",
+   "from_str",
+   [
+    "deserializer",
+    "from_trait"
+   ],
+   [
+    "deserialize_any",
+    "deserialize"
+   ]
+  ],
+  "must_not_edit": true
+ },
+ "scope": {
+  "allowed_paths": [],
+  "invariants": []
+ },
+ "notes": "E2 navigation. Facts verified by grep at the pinned commit on 2026-11-09, before any agent run. from_str (de.rs:2709) builds a StrRead-backed Deserializer and calls from_trait, which runs T::deserialize against Deserializer and checks the end; deserialize_any dispatches on the next byte."
+}

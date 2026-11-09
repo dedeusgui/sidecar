@@ -1,0 +1,17 @@
+{
+  "id": "NAV-CLK-01",
+  "ok": true,
+  "base": {
+    "kind": "answer",
+    "changed": [],
+    "outside_scope": [],
+    "scope_ok": true,
+    "tests": "fail",
+    "invariants": [],
+    "isolation": null,
+    "detail": "faltando: core.py, parse_args, make_context|main, invoke|ctx.invoke"
+  },
+  "reference": null,
+  "ts": 1794187694.5617898,
+  "base_verdict": "fail"
+}

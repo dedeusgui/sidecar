@@ -1,0 +1,29 @@
+{
+ "schema": "lab-task/1",
+ "id": "NAV-EXP-01",
+ "split": "development",
+ "class": "navigation",
+ "repo": "express",
+ "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+ "prompt": "How does res.send decide the Content-Type and the ETag of a response? Answer with the files and functions involved. Do not modify the repository.",
+ "oracle": {
+  "kind": "answer",
+  "answer_must_mention": [
+   "lib/response.js",
+   [
+    "etag fn",
+    "etagfn"
+   ],
+   [
+    "setcharset",
+    "content-type"
+   ]
+  ],
+  "must_not_edit": true
+ },
+ "scope": {
+  "allowed_paths": [],
+  "invariants": []
+ },
+ "notes": "E2 navigation. Facts verified by grep at the pinned commit on 2026-11-09, before any agent run. res.send (lib/response.js:126) sets Content-Type per chunk type (setCharset for strings, this.type('bin'/'json')), then generates the ETag through app.get('etag fn') when no ETag header exists."
+}

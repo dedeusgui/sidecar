@@ -1,0 +1,30 @@
+{
+ "schema": "lab-task/1",
+ "id": "NAV-CLK-01",
+ "split": "development",
+ "class": "navigation",
+ "repo": "click",
+ "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+ "prompt": "How does click turn command-line arguments into the keyword arguments passed to a command callback? Name the functions. Do not modify the repository.",
+ "oracle": {
+  "kind": "answer",
+  "answer_must_mention": [
+   "core.py",
+   "parse_args",
+   [
+    "make_context",
+    "main"
+   ],
+   [
+    "invoke",
+    "ctx.invoke"
+   ]
+  ],
+  "must_not_edit": true
+ },
+ "scope": {
+  "allowed_paths": [],
+  "invariants": []
+ },
+ "notes": "E2 navigation. Facts verified by grep at the pinned commit on 2026-11-09, before any agent run. Command.main -> make_context -> parse_args (core.py:1392) uses the parser and Parameter.handle_parse_result/process_value to fill ctx.params; Command.invoke calls ctx.invoke(self.callback, **ctx.params)."
+}
