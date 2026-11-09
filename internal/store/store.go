@@ -350,6 +350,17 @@ func (s *Store) FileRecords() (map[string]FileRecord, error) {
 	return out, rows.Err()
 }
 
+// FileRecordOf returns one indexed file, or ok=false when the path is not indexed.
+func (s *Store) FileRecordOf(path string) (FileRecord, bool, error) {
+	var f FileRecord
+	err := s.db.QueryRow(`SELECT path, lang, kind, size, mtime_ns, hash, skipped, extract_ver FROM files WHERE path = ?`, path).
+		Scan(&f.Path, &f.Lang, &f.Kind, &f.Size, &f.MtimeNS, &f.Hash, &f.Skipped, &f.ExtractVer)
+	if errors.Is(err, sql.ErrNoRows) {
+		return FileRecord{}, false, nil
+	}
+	return f, err == nil, err
+}
+
 // SearchSymbols runs an FTS5 MATCH over symbol text. match must already be a valid FTS5
 // expression built by the caller. Results are ordered by bm25 (best first).
 func (s *Store) SearchSymbols(match string, limit int) ([]SymbolHit, error) {

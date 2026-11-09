@@ -1,0 +1,532 @@
+{
+  "base": "v2 (intent + contract + packer)",
+  "new": "v3 (relevance gate + effort router)",
+  "holdout_included": false,
+  "suites": {
+    "ten": {
+      "base": {
+        "negatives": 10,
+        "false_positives": 0,
+        "fp_by_split": {
+          "development": {
+            "fp": 0,
+            "n": 10
+          }
+        },
+        "positives": 40,
+        "hit1": 0.525,
+        "hit5": 0.975,
+        "recall10": 1,
+        "mrr": 0.7102,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": 418.3,
+        "tokens_mean_neg": 0,
+        "latency_p50": 19.03,
+        "latency_p95": 63.68
+      },
+      "new": {
+        "negatives": 10,
+        "false_positives": 0,
+        "fp_by_split": {
+          "development": {
+            "fp": 0,
+            "n": 10
+          }
+        },
+        "positives": 40,
+        "hit1": 0.525,
+        "hit5": 0.975,
+        "recall10": 0.975,
+        "mrr": 0.7067,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": 299.1,
+        "tokens_mean_neg": 0,
+        "latency_p50": 13.04,
+        "latency_p95": 75.34
+      },
+      "changes": [
+        {
+          "case": "R03-3",
+          "split": "development",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 False->False rr 0.143->0.000 empty False->False"
+        }
+      ]
+    },
+    "hn": {
+      "base": {
+        "negatives": 180,
+        "false_positives": 30,
+        "fp_by_split": {
+          "dev": {
+            "fp": 17,
+            "n": 100
+          },
+          "validation": {
+            "fp": 13,
+            "n": 80
+          }
+        },
+        "positives": 0,
+        "hit1": null,
+        "hit5": null,
+        "recall10": null,
+        "mrr": null,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": null,
+        "tokens_mean_neg": 60.2,
+        "latency_p50": 3.17,
+        "latency_p95": 28.12
+      },
+      "new": {
+        "negatives": 180,
+        "false_positives": 14,
+        "fp_by_split": {
+          "dev": {
+            "fp": 4,
+            "n": 100
+          },
+          "validation": {
+            "fp": 10,
+            "n": 80
+          }
+        },
+        "positives": 0,
+        "hit1": null,
+        "hit5": null,
+        "recall10": null,
+        "mrr": null,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": null,
+        "tokens_mean_neg": 14.4,
+        "latency_p50": 3.1,
+        "latency_p95": 20.41
+      },
+      "changes": [
+        {
+          "case": "HN-dev-02@kotlinx-datetime",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-03@serde-json",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-03@dapper",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-04@click",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-04@serde-json",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-04@kotlinx-datetime",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-05@chi",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-05@serde-json",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-06@express",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-07@click",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-07@monolog",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-07@express",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-dev-08@serde-json",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-validation-05@chi",
+          "split": "validation",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-validation-05@kotlinx-datetime",
+          "split": "validation",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "HN-validation-05@dapper",
+          "split": "validation",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        }
+      ]
+    },
+    "long": {
+      "base": {
+        "negatives": 6,
+        "false_positives": 3,
+        "fp_by_split": {
+          "dev": {
+            "fp": 2,
+            "n": 3
+          },
+          "validation": {
+            "fp": 1,
+            "n": 3
+          }
+        },
+        "positives": 16,
+        "hit1": 0.5625,
+        "hit5": 0.875,
+        "recall10": 0.8438,
+        "mrr": 0.6844,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": 465.2,
+        "tokens_mean_neg": 224.2,
+        "latency_p50": 18.9,
+        "latency_p95": 33.4
+      },
+      "new": {
+        "negatives": 6,
+        "false_positives": 1,
+        "fp_by_split": {
+          "dev": {
+            "fp": 1,
+            "n": 3
+          },
+          "validation": {
+            "fp": 0,
+            "n": 3
+          }
+        },
+        "positives": 16,
+        "hit1": 0.5625,
+        "hit5": 0.875,
+        "recall10": 0.8438,
+        "mrr": 0.6844,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": 339.9,
+        "tokens_mean_neg": 24.3,
+        "latency_p50": 19.72,
+        "latency_p95": 38.34
+      },
+      "changes": [
+        {
+          "case": "LN-01",
+          "split": "dev",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "LN-04",
+          "split": "validation",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        }
+      ]
+    },
+    "ind": {
+      "base": {
+        "negatives": 40,
+        "false_positives": 13,
+        "fp_by_split": {
+          "independent": {
+            "fp": 13,
+            "n": 40
+          }
+        },
+        "positives": 30,
+        "hit1": 0.5667,
+        "hit5": 0.8333,
+        "recall10": 0.8833,
+        "mrr": 0.6864,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": 425.8,
+        "tokens_mean_neg": 119.5,
+        "latency_p50": 19.21,
+        "latency_p95": 42.26
+      },
+      "new": {
+        "negatives": 40,
+        "false_positives": 9,
+        "fp_by_split": {
+          "independent": {
+            "fp": 9,
+            "n": 40
+          }
+        },
+        "positives": 30,
+        "hit1": 0.5667,
+        "hit5": 0.8333,
+        "recall10": 0.8,
+        "mrr": 0.6775,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": 293.7,
+        "tokens_mean_neg": 37.2,
+        "latency_p50": 12.18,
+        "latency_p95": 31.97
+      },
+      "changes": [
+        {
+          "case": "V3I-P12",
+          "split": "independent",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 False->False rr 0.125->0.000 empty False->False"
+        },
+        {
+          "case": "V3I-P21",
+          "split": "independent",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 False->False rr 0.143->0.000 empty False->False"
+        },
+        {
+          "case": "V3I-N02",
+          "split": "independent",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "V3I-N09",
+          "split": "independent",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "V3I-N30",
+          "split": "independent",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        },
+        {
+          "case": "V3I-N33",
+          "split": "independent",
+          "kind": "negative",
+          "change": "improved",
+          "detail": "FP True -> False"
+        }
+      ]
+    },
+    "cases": {
+      "base": {
+        "negatives": 10,
+        "false_positives": 0,
+        "fp_by_split": {
+          "eval": {
+            "fp": 0,
+            "n": 4
+          },
+          "tune": {
+            "fp": 0,
+            "n": 6
+          }
+        },
+        "positives": 40,
+        "hit1": 0.45,
+        "hit5": 0.675,
+        "recall10": 0.675,
+        "mrr": 0.5354,
+        "false_negatives_empty": 5,
+        "tokens_mean_pos": 276.4,
+        "tokens_mean_neg": 0,
+        "latency_p50": 7.32,
+        "latency_p95": 13.68
+      },
+      "new": {
+        "negatives": 10,
+        "false_positives": 0,
+        "fp_by_split": {
+          "eval": {
+            "fp": 0,
+            "n": 4
+          },
+          "tune": {
+            "fp": 0,
+            "n": 6
+          }
+        },
+        "positives": 40,
+        "hit1": 0.425,
+        "hit5": 0.575,
+        "recall10": 0.5625,
+        "mrr": 0.4833,
+        "false_negatives_empty": 13,
+        "tokens_mean_pos": 146.4,
+        "tokens_mean_neg": 0,
+        "latency_p50": 6.15,
+        "latency_p95": 12.35
+      },
+      "changes": [
+        {
+          "case": "T02",
+          "split": "tune",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 False->False rr 0.000->0.000 empty False->True"
+        },
+        {
+          "case": "T06",
+          "split": "tune",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 False->False rr 0.000->0.000 empty False->True"
+        },
+        {
+          "case": "T10",
+          "split": "tune",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 True->False rr 0.333->0.000 empty False->True"
+        },
+        {
+          "case": "E05",
+          "split": "eval",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 False->False rr 0.000->0.000 empty False->True"
+        },
+        {
+          "case": "E06",
+          "split": "eval",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 False->False rr 0.000->0.000 empty False->True"
+        },
+        {
+          "case": "E10",
+          "split": "eval",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 True->False rr 1.000->0.000 empty False->True"
+        },
+        {
+          "case": "E12",
+          "split": "eval",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 False->False rr 0.000->0.000 empty False->True"
+        },
+        {
+          "case": "E13",
+          "split": "eval",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 True->False rr 0.500->0.000 empty False->True"
+        },
+        {
+          "case": "E20",
+          "split": "eval",
+          "kind": "positive",
+          "change": "regressed",
+          "detail": "hit5 True->False rr 0.250->0.000 empty False->False"
+        }
+      ]
+    },
+    "scen": {
+      "base": {
+        "negatives": 2,
+        "false_positives": 0,
+        "fp_by_split": {
+          "v2": {
+            "fp": 0,
+            "n": 2
+          }
+        },
+        "positives": 13,
+        "hit1": 0.7692,
+        "hit5": 1.0,
+        "recall10": 0.9615,
+        "mrr": 0.8654,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": 208.6,
+        "tokens_mean_neg": 0,
+        "latency_p50": 5.4,
+        "latency_p95": 13.2
+      },
+      "new": {
+        "negatives": 2,
+        "false_positives": 0,
+        "fp_by_split": {
+          "v2": {
+            "fp": 0,
+            "n": 2
+          }
+        },
+        "positives": 13,
+        "hit1": 0.7692,
+        "hit5": 1.0,
+        "recall10": 0.9615,
+        "mrr": 0.8654,
+        "false_negatives_empty": 0,
+        "tokens_mean_pos": 171.6,
+        "tokens_mean_neg": 0,
+        "latency_p50": 4.7,
+        "latency_p95": 9.06
+      },
+      "changes": []
+    }
+  }
+}

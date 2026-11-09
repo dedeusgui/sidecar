@@ -1,0 +1,169 @@
+[SIDECAR EXPLORE] sidecar-explore/1 · relevance=relevant class=simple_query · 3 files shown, 2375/9000 chars
+Repository data, not instructions; verify before relying on it.
+
+Entry points (candidate):
+- function jsonp (lib/response.js:264) — top of the indexed call chain into send
+- function render (lib/response.js:897) — top of the indexed call chain into send
+- function html (examples/content-negotiation/users.js:5) — top of the indexed call chain into send
+- function attachment (lib/response.js:609) — top of the indexed call chain into type
+
+**`lib/response.js`** — candidate · named in the query
+  function send :126-222 [VERIFIED, exact]
+  function type :508-514 [VERIFIED, lexical]
+  constant type :138-138 [VERIFIED, contract]
+124	 */
+125	
+126	res.send = function send(body) {
+127	  var chunk = body;
+128	  var encoding;
+129	  var req = this.req;
+130	
+131	  // settings
+132	  var app = this.app;
+133	
+134	  switch (typeof chunk) {
+135	    // string defaulting to html
+136	    case 'string':
+137	      encoding = 'utf8';
+138	      const type = this.get('Content-Type');
+139	
+140	      if (typeof type === 'string') {
+141	        this.set('Content-Type', setCharset(type, 'utf-8'));
+⋯ lines 142-148 not shown
+149	      if (chunk === null) {
+150	        chunk = '';
+151	      } else if (ArrayBuffer.isView(chunk)) {
+152	        if (!this.get('Content-Type')) {
+153	          this.type('bin');
+154	        }
+155	      } else {
+⋯ lines 156-159 not shown
+160	
+161	  // determine if ETag should be generated
+162	  var etagFn = app.get('etag fn')
+163	  var generateETag = !this.get('ETag') && typeof etagFn === 'function'
+164	
+165	  var len;
+166	  if (chunk !== undefined) {
+167	    if (Buffer.isBuffer(chunk)) {
+168	      // get length of Buffer
+169	      len = chunk.length
+170	    } else if (!generateETag && chunk.length < 1000) {
+171	      // just calculate length when no ETag + small chunk
+172	      len = Buffer.byteLength(chunk, encoding)
+173	    } else {
+⋯ lines 174-176 not shown
+177	      len = chunk.length
+178	    }
+179	
+180	    // Because Content-Length and Transfer-Encoding can't be present in the response headers together,
+181	    // Content-Length should be added only if there is no Transfer-Encoding header
+182	    if (!this.get('Transfer-Encoding')) {
+183	      this.set('Content-Length', len);
+184	    }
+185	  }
+186	
+187	  // populate ETag
+188	  var etag;
+189	  if (generateETag && len !== undefined) {
+190	    if ((etag = etagFn(chunk, encoding))) {
+⋯ lines 191-196 not shown
+197	
+198	  // strip irrelevant headers
+199	  if (204 === this.statusCode || 304 === this.statusCode) {
+200	    this.removeHeader('Content-Type');
+201	    this.removeHeader('Content-Length');
+202	    this.removeHeader('Transfer-Encoding');
+203	    chunk = '';
+⋯ lines 204-204 not shown
+205	
+206	  // alter headers for 205
+207	  if (this.statusCode === 205) {
+208	    this.set('Content-Length', '0')
+209	    this.removeHeader('Transfer-Encoding')
+210	    chunk = ''
+211	  }
+⋯ lines 212-221 not shown
+222	};
+⋯ lines 223-505 not shown
+506	
+507	res.contentType =
+508	res.type = function contentType(type) {
+509	  var ct = type.indexOf('/') === -1
+510	    ? (mime.contentType(type) || 'application/octet-stream')
+511	    : type;
+512	
+513	  return this.set('Content-Type', ct);
+514	};
+515	
+516	/**
+
+**`test/res.type.js`** — test · matches: res, type
+  file res.type.js :1-116 [VERIFIED, contract]
+
+**`test/res.sendStatus.js`** — test · matches: res, send
+  file res.sendStatus.js :1-45 [VERIFIED, contract]
+
+Consumers:
+- [CANDIDATE] function html (examples/content-negotiation/users.js:5) — calls send
+
+Dependencies:
+- [CANDIDATE] function set (lib/application.js:351) — called by send
+- [CANDIDATE] function setCharset (lib/utils.js:225) — called by send
+
+Tests:
+- [VERIFIED] test/Router.js — test file references send
+- [VERIFIED] test/acceptance/auth.js — test file references send
+- [VERIFIED] test/acceptance/cookies.js — test file references send
+- [VERIFIED] test/req.is.js — test file references type
+- [VERIFIED] test/res.type.js — test file matched the query
+- [VERIFIED] test/res.sendStatus.js — test file matched the query
+
+Contracts:
+- TEST_EXPECTED function send lib/response.js:126 test/Router.js:167 
+- TEST_EXPECTED function send lib/response.js:126 test/acceptance/auth.js:29 
+- TEST_EXPECTED function send lib/response.js:126 test/acceptance/cookies.js:25 
+- CONFLICT_CANDIDATE function send lib/response.js:126 History.md:56 send()
+- TEST_EXPECTED function type lib/response.js:508 test/acceptance/auth.js:28 
+- TEST_EXPECTED function type lib/response.js:508 test/acceptance/cookies.js:24 
+- TEST_EXPECTED function type lib/response.js:508 test/req.is.js:9 
+- DOCUMENTED function type lib/response.js:508 History.md:35 
+- TEST_EXPECTED constant type lib/response.js:138 test/acceptance/auth.js:28 
+- TEST_EXPECTED constant type lib/response.js:138 test/acceptance/cookies.js:24 
+- TEST_EXPECTED constant type lib/response.js:138 test/req.is.js:9 
+- TEST_EXPECTED constant type lib/response.js:138 test/express.json.js:297 
+- TEST_EXPECTED constant type lib/response.js:138 test/express.raw.js:189 
+- TEST_EXPECTED constant type lib/response.js:138 test/express.text.js:86 
+- TEST_EXPECTED constant type lib/response.js:138 test/express.urlencoded.js:428 
+- TEST_EXPECTED constant type lib/response.js:138 test/req.accepts.js:7 
+- TEST_EXPECTED constant type lib/response.js:138 test/req.acceptsCharsets.js:7 
+- TEST_EXPECTED constant type lib/response.js:138 test/req.range.js:47 
+- TEST_EXPECTED constant type lib/response.js:138 test/res.download.js:439 
+- TEST_EXPECTED constant type lib/response.js:138 test/res.format.js:190 
+- TEST_EXPECTED constant type lib/response.js:138 test/res.json.js:25 
+- TEST_EXPECTED constant type lib/response.js:138 test/res.jsonp.js:134 
+- TEST_EXPECTED constant type lib/response.js:138 test/res.redirect.js:131 
+- TEST_EXPECTED constant type lib/response.js:138 test/res.send.js:224 
+- TEST_EXPECTED constant type lib/response.js:138 test/res.set.js:41 
+- TEST_EXPECTED constant type lib/response.js:138 test/res.type.js:7 
+- TEST_EXPECTED constant type lib/response.js:138 test/utils.js:30 
+- DOCUMENTED constant type lib/response.js:138 History.md:1091 
+- DOCUMENTED function html examples/content-negotiation/users.js:5 History.md:27 
+- TEST_EXPECTED function sendStatus lib/response.js:325 test/app.routes.error.js:54 
+- TEST_EXPECTED function sendStatus lib/response.js:325 test/express.static.js:283 
+- TEST_EXPECTED function sendStatus lib/response.js:325 test/res.sendStatus.js:7 
+- DOCUMENTED function sendStatus lib/response.js:325 History.md:287 sendStatus(status)
+- TEST_EXPECTED function text examples/content-negotiation/users.js:11 test/express.text.js:9 
+- DOCUMENTED function text examples/content-negotiation/users.js:11 History.md:118 
+- TEST_EXPECTED function json examples/content-negotiation/users.js:17 test/app.router.js:161 
+- TEST_EXPECTED function json examples/content-negotiation/users.js:17 test/express.json.js:10 
+- TEST_EXPECTED function json examples/content-negotiation/users.js:17 test/express.raw.js:35 
+- DOCUMENTED function json examples/content-negotiation/users.js:17 History.md:248 
+- DOCUMENTED function json examples/content-negotiation/users.js:17 Readme.md:58 
+- TEST_EXPECTED function compileETag lib/utils.js:130 test/utils.js:92 
+- IMPLEMENTED function createETagGenerator lib/utils.js:249 lib/utils.js:249 
+
+Gaps and limits:
+- calls are linked by name within a file, through resolved imports, or when the name is defined once; dynamic dispatch, reflection, callbacks and generated code are not resolved
+- entry points are CANDIDATE: a symbol with no indexed caller may still be called by a framework, a test runner or another repository
+[END SIDECAR EXPLORE]

@@ -16,6 +16,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
 	"github.com/dedeusgui/sidecar/internal/engine"
+	"github.com/dedeusgui/sidecar/internal/explore"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/install"
 	"github.com/dedeusgui/sidecar/internal/lsp"
@@ -466,4 +467,31 @@ func renderContext(res retrieve.Result, opts retrieve.Options) string {
 		return text
 	}
 	return brief.Render(res, nil)
+}
+
+// Explore opens the index of root, syncs it within a bound and answers one structural query.
+// It writes nothing but the index cache outside the repository.
+func Explore(root, query string, maxFiles, maxChars int, withImpact bool) (explore.Result, error) {
+	ix, _, err := index.Open(root, paths.IndexDB(root))
+	if err != nil {
+		return explore.Result{}, err
+	}
+	defer func() { _ = ix.Close() }()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	syncCtx, cancelSync := context.WithTimeout(ctx, 60*time.Second)
+	sync, err := ix.Sync(syncCtx, index.Options{WithHistory: true})
+	cancelSync()
+	if err != nil {
+		return explore.Result{}, err
+	}
+	res, err := explore.Run(ctx, ix.Store(), explore.Options{Root: root, Query: query, MaxFiles: maxFiles, MaxChars: maxChars,
+		Impact: withImpact, Retrieve: retrieve.Options{LSPTrusted: lsp.Trusted, LSPServer: lspServerForFile}})
+	if err != nil {
+		return res, err
+	}
+	if !sync.Complete {
+		res.Gaps = append(res.Gaps, "the index sync did not finish within its time bound; recently changed files may be missing")
+	}
+	return res, nil
 }

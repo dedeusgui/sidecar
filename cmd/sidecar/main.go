@@ -16,6 +16,7 @@ import (
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/app"
+	"github.com/dedeusgui/sidecar/internal/explore"
 	"github.com/dedeusgui/sidecar/internal/install"
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/progress"
@@ -51,6 +52,8 @@ func run(args []string, in io.Reader, out, errOut io.Writer) int {
 		return cmdStatus(rest, out, errOut)
 	case "doctor":
 		return cmdDoctor(out, errOut)
+	case "explore":
+		return cmdExplore(rest, out, errOut)
 	case "explain":
 		return cmdExplain(rest, in, out, errOut)
 	case "impact":
@@ -94,7 +97,9 @@ Uso:
   sidecar activity [--json] [--limit N]               últimas execuções do hook (sem prompt)
   sidecar statusline                                  linha de status (lê JSON do Claude Code)
   sidecar doctor                                      diagnóstico de instalação e ambiente
-  sidecar explain [--root DIR] [--json] [--engine v1|v2]   mostra o rastro de um prompt (lê stdin)
+  sidecar explain [--root DIR] [--json] [--engine v1|v2|v3]   mostra o rastro de um prompt (lê stdin)
+  sidecar explore --query TEXTO [--root DIR] [--json] [--max-files N] [--max-chars N] [--impact]
+                                                      exploração estrutural sob demanda (docs/explore.md)
   sidecar lsp status|doctor|trust|setup               servidores de linguagem (opt-in; veja sidecar lsp)
   sidecar memory list|add|purge [--root DIR] [--json] decisões técnicas verificáveis (opt-in)
                                                       add: --target ARQUIVO|SIMBOLO --summary TEXTO [--ttl 720h]
@@ -305,6 +310,49 @@ func cmdExplain(args []string, in io.Reader, out, errOut io.Writer) int {
 	}
 	if err := app.WriteExplain(out, rep, *asJSON); err != nil {
 		_, _ = fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	return 0
+}
+
+// cmdExplore answers an on-demand structural question from the local index. It never fails silently:
+// usage errors exit 2, runtime errors exit 1, and the answer goes to stdout only.
+func cmdExplore(args []string, out, errOut io.Writer) int {
+	fs := flag.NewFlagSet("explore", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	root := fs.String("root", ".", "folder inside the repository")
+	query := fs.String("query", "", "what to explore: a question, symbol, path or behaviour")
+	asJSON := fs.Bool("json", false, "print the sidecar-explore/1 JSON contract")
+	maxFiles := fs.Int("max-files", 0, "files whose source is shown (default scales with the repository)")
+	maxChars := fs.Int("max-chars", 0, "source character budget (default scales with the repository)")
+	withImpact := fs.Bool("impact", false, "always include change impact for the shown files")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	q := strings.TrimSpace(*query)
+	if q == "" && fs.NArg() > 0 {
+		q = strings.TrimSpace(strings.Join(fs.Args(), " "))
+	}
+	if q == "" || *maxFiles < 0 || *maxChars < 0 {
+		_, _ = fmt.Fprintln(errOut, "uso: sidecar explore --query TEXTO [--root DIR] [--json] [--max-files N] [--max-chars N] [--impact]")
+		return 2
+	}
+	abs, _ := filepath.Abs(*root)
+	rootDir, _ := repo.FindRoot(abs)
+	res, err := app.Explore(rootDir, q, *maxFiles, *maxChars, *withImpact)
+	if err != nil {
+		_, _ = fmt.Fprintln(errOut, "erro:", err)
+		return 1
+	}
+	if *asJSON {
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(res); err != nil {
+			return 1
+		}
+		return 0
+	}
+	if err := explore.WriteText(out, res); err != nil {
 		return 1
 	}
 	return 0

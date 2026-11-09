@@ -175,7 +175,18 @@ func (g *grammar) extract(src []byte) Result {
 		}
 	}
 
+	defined := map[int]map[string]bool{}
+	for _, sym := range res.Symbols {
+		if defined[sym.Line] == nil {
+			defined[sym.Line] = map[string]bool{}
+		}
+		defined[sym.Line][sym.Name] = true
+	}
 	walk(tree.RootNode(), func(n *gts.Node) {
+		if sym, ok := g.assignedFunction(n, src); ok && !defined[sym.Line][sym.Name] {
+			sym.Doc = lines.docAbove(sym.Line - 1)
+			res.Symbols = append(res.Symbols, sym)
+		}
 		if sym, ok := g.constant(n, src); ok {
 			sym.Doc = lines.docAbove(sym.Line - 1)
 			res.Symbols = append(res.Symbols, sym)
@@ -262,6 +273,54 @@ var upperConstName = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 
 // constant recognises a named constant in the grammar's own declaration shapes.
 // Only numeric and boolean literal values are returned; string values are never stored.
+// jsFunctionValues are the JavaScript/TypeScript node types of a function value.
+var jsFunctionValues = map[string]bool{"function_expression": true, "function": true, "arrow_function": true,
+	"generator_function": true}
+
+// assignedFunction extracts a JavaScript/TypeScript function assigned to a name or member, the common
+// definition style of CommonJS code: `res.send = function send(body) {…}`, `exports.x = () => {…}` and
+// `Foo.prototype.bar = function () {…}`. The tags query does not report these (gap L03), so the
+// definitions of Express-style APIs were missing from the index.
+func (g *grammar) assignedFunction(n *gts.Node, src []byte) (Symbol, bool) {
+	if n.Type(g.lang) != "assignment_expression" {
+		return Symbol{}, false
+	}
+	left, right := n.ChildByFieldName("left", g.lang), n.ChildByFieldName("right", g.lang)
+	if left == nil || right == nil || !jsFunctionValues[right.Type(g.lang)] {
+		return Symbol{}, false
+	}
+	kind, name := "function", ""
+	switch left.Type(g.lang) {
+	case "identifier":
+		name = left.Text(src)
+	case "member_expression":
+		if prop := left.ChildByFieldName("property", g.lang); prop != nil {
+			name = prop.Text(src)
+		}
+		if obj := left.ChildByFieldName("object", g.lang); obj != nil && strings.HasSuffix(obj.Text(src), ".prototype") {
+			kind = "method"
+		}
+	}
+	if name == "exports" || name == "module" || name == "" {
+		// module.exports = function createApplication() {…}: the function's own name is the definition.
+		if own := right.ChildByFieldName("name", g.lang); own != nil {
+			name = own.Text(src)
+		} else {
+			return Symbol{}, false
+		}
+	}
+	name = strings.TrimSpace(name)
+	if name == "" || strings.ContainsAny(name, " \t\n[]()") {
+		return Symbol{}, false
+	}
+	return Symbol{
+		Kind: kind, Name: name,
+		Signature: signature(src, n.StartByte(), n.EndByte()),
+		Line:      int(n.StartPoint().Row) + 1, EndLine: int(n.EndPoint().Row) + 1,
+		Parent: -1, startByte: n.StartByte(), endByte: n.EndByte(),
+	}, true
+}
+
 func (g *grammar) constant(n *gts.Node, src []byte) (Symbol, bool) {
 	typ := n.Type(g.lang)
 	var name, value string

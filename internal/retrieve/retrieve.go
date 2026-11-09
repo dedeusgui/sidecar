@@ -50,6 +50,12 @@ type Options struct {
 	// returns the server name that can confirm rel, or "" for none.
 	LSPTrusted func(root string) bool
 	LSPServer  func(ctx context.Context, root, rel string) string
+	// ExtraExactKeys are identifiers the caller already resolved (e.g. the member of `res.send`); they are
+	// matched exactly in addition to the identifiers found in the prompt. Nil keeps V1/V2 unchanged.
+	ExtraExactKeys []string
+	// NoExactDominance keeps partial word matches next to an exact identifier instead of dropping them.
+	// On-demand exploration wants the neighbourhood; the hook keeps the default (false).
+	NoExactDominance bool
 	// feedbackMults holds the post-task feedback multipliers of Root, keyed "path#symbol" or "path".
 	feedbackMults   map[string]float64
 	hasAbsentAnchor bool
@@ -247,7 +253,13 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	t = time.Now()
 	var exactHits []store.SymbolHit
 	if !opts.Ablate.NoExact {
-		exactHits, err = st.ExactSymbols(identifierKeys(prompt), 20)
+		keys := identifierKeys(prompt)
+		for _, k := range opts.ExtraExactKeys {
+			if k = store.KeyOf(k); k != "" && !hasString(keys, k) {
+				keys = append(keys, k)
+			}
+		}
+		exactHits, err = st.ExactSymbols(keys, 20)
 		if err != nil {
 			return res, err
 		}
@@ -1019,7 +1031,7 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 			c.reason = "dropped: generated file"
 			continue
 		}
-		if hasExact && !c.exact && !c.neighbor && len(c.rels) == 0 && c.coverage < 1 {
+		if hasExact && !opts.NoExactDominance && !c.exact && !c.neighbor && len(c.rels) == 0 && c.coverage < 1 {
 			c.suppressed = true
 			c.reason = "dropped: partial word match next to an exact identifier"
 			continue
