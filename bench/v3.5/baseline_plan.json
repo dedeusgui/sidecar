@@ -1,0 +1,19 @@
+{
+  "schema": "sidecar-v35-baseline-plan/1",
+  "baseline_id": "v1-v2-v3-before-v35-tuning",
+  "status": "not-captured",
+  "reason": "The dispatched Stage 0 task explicitly forbids running a benchmark campaign; capture is prepared for a later authorized local run.",
+  "sidecar_commit": "828c3c3268791b81295dc32b3f2dfcd6782d7351",
+  "extract_version": 3,
+  "engines": ["v1", "v2", "v3"],
+  "surfaces": ["explain-json", "codex-prompt-hook"],
+  "cache_states": ["cold", "warm"],
+  "repository_commit_source": "bench/v3.5/e1_cases.json and bench/v3.5/e2_navigation.json",
+  "required_per_run": [
+    "engine", "surface", "cache_state", "repo_commit", "sidecar_commit", "binary_sha256",
+    "extract_version", "index_store_sha256", "elapsed_ms", "context_sha256", "context_chars",
+    "evidence_paths_and_lines", "facts_hit", "facts_total"
+  ],
+  "capture_command": "python3 bench/v3.5/capture_baselines.py --sidecar /path/to/sidecar --checkout /path/to/pinned-repositories --suite e1,e2 --out /tmp/sidecar-v35-baseline.json --run",
+  "artifact_policy": "Keep captured outputs local under /tmp; do not commit source snippets. The result records exact output hashes and evidence paths/line ranges."
+}

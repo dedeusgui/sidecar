@@ -1,0 +1,546 @@
+{
+  "schema": "sidecar-v35-stage0-freeze/1",
+  "cohort_freeze": "2026-11-09",
+  "baseline_commit": "828c3c3268791b81295dc32b3f2dfcd6782d7351",
+  "extract_version": 3,
+  "artifacts": {
+    "e1": {
+      "path": "bench/v3.5/e1_cases.json",
+      "sha256": "0a7290c8857679fb59d94f555d073473b9f803dda7e29ba1f84d4b3a2099d938"
+    },
+    "e2": {
+      "path": "bench/v3.5/e2_navigation.json",
+      "sha256": "87d6ec1d38aae0b0121aa5817ab3e7523a4fb0535bb206b167c865a35e951ed4"
+    },
+    "baseline_plan": {
+      "path": "bench/v3.5/baseline_plan.json",
+      "sha256": "50ce9af55d3f6b00ea8cd921c6a3477bd61365511edf1222d353eee412ef9454"
+    },
+    "readme": {
+      "path": "bench/v3.5/README.md",
+      "sha256": "96775a062d3d92569b50875c46a69409d2679b07c3238e74659f8ce38493d614"
+    },
+    "freeze_tool": {
+      "path": "bench/v3.5/freeze.py",
+      "sha256": "a5edc5f564faf8c2ac360634528e1b53df5805b669be4344c81e78243679606a"
+    },
+    "capture_tool": {
+      "path": "bench/v3.5/capture_baselines.py",
+      "sha256": "bdb76cb2e5bd1ce2553433edba5b3b88f5ece00915f20b02a78ddbdd6fe40fcc"
+    },
+    "e1_converter": {
+      "path": "bench/v3.5/make_e1_manifest.py",
+      "sha256": "d435cdde41cf3a802ce33d097f28fb7de981b61aec99f9419877f9fbfe495082"
+    },
+    "tests": {
+      "path": "bench/v3.5/test_freeze.py",
+      "sha256": "dd757222103fc680a49757dd643804d316a9483694c8dd452f0d070696a8ecb1"
+    }
+  },
+  "cohorts": {
+    "e1": {
+      "id": "E1-v35-2026-11-09-a",
+      "positive_count": 30,
+      "negative_count": 40,
+      "languages": [
+        "go",
+        "javascript",
+        "php",
+        "python",
+        "rust"
+      ],
+      "prompt_languages": [
+        "en",
+        "pt-BR"
+      ],
+      "independence": "author-coupled",
+      "case_hashes": [
+        {
+          "id": "V35E1-N-AXUM-01",
+          "sha256": "9e9c1d0a51ac17eaa555711eb667df936d7a11d52ac57acf98b05a2f7db81368"
+        },
+        {
+          "id": "V35E1-N-AXUM-02",
+          "sha256": "feac1881570935d56c39a1aa0c98936a7bcd3fc9211caa29fa03d60cd4e9d653"
+        },
+        {
+          "id": "V35E1-N-AXUM-03",
+          "sha256": "3032ed49f68e34dfdc80825f3ca3b65a7e2f4ce478cf09c5a8e6447ad314a82e"
+        },
+        {
+          "id": "V35E1-N-AXUM-04",
+          "sha256": "cfaac744dfa84a5ef6152302f415c2c69eaaad237e200f08c7ca4064ad67c330"
+        },
+        {
+          "id": "V35E1-N-AXUM-05",
+          "sha256": "8803017d97573bd9ce44cbc5449b97fb3f98765d7dff10acba19a7712d9df2ba"
+        },
+        {
+          "id": "V35E1-N-AXUM-06",
+          "sha256": "a96fe7e76d9f43cfec01003c7ddff834d20793006623fb9293c697c36171b4e2"
+        },
+        {
+          "id": "V35E1-N-AXUM-07",
+          "sha256": "fa203e48c1cf2528b17235f40c078f16d09426aeedd724d78cf0902b8109e927"
+        },
+        {
+          "id": "V35E1-N-AXUM-08",
+          "sha256": "c0de01679a67100b2997617d88dfd564e255c931ffeaabf087f38462512f85d9"
+        },
+        {
+          "id": "V35E1-N-FASTAPI-01",
+          "sha256": "1c2d20856a3380b939b72a61a50938f2170fd65b92683ee054b905d4dd1ab3da"
+        },
+        {
+          "id": "V35E1-N-FASTAPI-02",
+          "sha256": "c6eaad8de9219711ef6a066a9ec0b3082e897e6a4156954766f26481a1fa1b64"
+        },
+        {
+          "id": "V35E1-N-FASTAPI-03",
+          "sha256": "04e916f30719df7d709dd7aa1698599b4b31dc61cb399a08dfd1983aa6e43363"
+        },
+        {
+          "id": "V35E1-N-FASTAPI-04",
+          "sha256": "2de19b54c4282f7eeea6cab3198be1c3e03f4286595ee3781207173347e89503"
+        },
+        {
+          "id": "V35E1-N-FASTAPI-05",
+          "sha256": "8fccd02e15c7a455d8d5c5866b43fa76f752769e1ad72f7e723b6076eab44723"
+        },
+        {
+          "id": "V35E1-N-FASTAPI-06",
+          "sha256": "3828a98886d9dd4f3da6d3e94550d01bdd5eea27e16af286f63a39cdd2919f4e"
+        },
+        {
+          "id": "V35E1-N-FASTAPI-07",
+          "sha256": "36bee287a25aea53b165cf3d7da2a06778d3a3a68c270fb4b44d47ccd579c368"
+        },
+        {
+          "id": "V35E1-N-FASTAPI-08",
+          "sha256": "246e70f42293dde3ea1b6b92302e37110c8584c92557b4c9b5a3744cbc314f08"
+        },
+        {
+          "id": "V35E1-N-GIN-01",
+          "sha256": "fda945328e0aab09d9173045103722673e6555ab1d3abf7c5bb683b718339584"
+        },
+        {
+          "id": "V35E1-N-GIN-02",
+          "sha256": "00e797a6b5c850ec111c37f1b72e60673be64bb25d0f8ff26dc6cb37fc5387a1"
+        },
+        {
+          "id": "V35E1-N-GIN-03",
+          "sha256": "5801c5ab93d90048227fa2836d24bede38438220c428579d34bef375ebff71cf"
+        },
+        {
+          "id": "V35E1-N-GIN-04",
+          "sha256": "79df91a7cd2255ac6280ed5c6042faea363d19b62fe33715d4aee12ea71fb15a"
+        },
+        {
+          "id": "V35E1-N-GIN-05",
+          "sha256": "5f650c5cbbbdc3880efa206043f04d4d4c95ac833dd5a850cb3adb846c3a47ad"
+        },
+        {
+          "id": "V35E1-N-GIN-06",
+          "sha256": "fb036afc7f619afe966acd97a11d6735b6a6703658ef8f4b5807ea781b00c0b1"
+        },
+        {
+          "id": "V35E1-N-GIN-07",
+          "sha256": "d8c472bbb6224af04e23e1564f71878763c5a92b2ab56cb672768d8496e0f5e4"
+        },
+        {
+          "id": "V35E1-N-GIN-08",
+          "sha256": "b85e973d92ef7291949e5d5e65b9cd8f75578ad3b2083483c0f19c44837bd86d"
+        },
+        {
+          "id": "V35E1-N-KOA-01",
+          "sha256": "d7f26b67daf0c705ca8d4e2225cca137c155cfa97e29abb128d43e3a9df0ad61"
+        },
+        {
+          "id": "V35E1-N-KOA-02",
+          "sha256": "55c1987dbe33d36ed3360695b456e51f8190ae90e10fbc8e406d9ab972170a35"
+        },
+        {
+          "id": "V35E1-N-KOA-03",
+          "sha256": "53f638a865f304073a0040008bb23dcab099f83f86f5a5a91e9281b574f8a11b"
+        },
+        {
+          "id": "V35E1-N-KOA-04",
+          "sha256": "9be51aec0e2870914eb416f5a213bf47c87687f57640f2e43141e35b1da79904"
+        },
+        {
+          "id": "V35E1-N-KOA-05",
+          "sha256": "2cc41f11fb9551b8182e713c329a4987e585f2464814d80dc0275c95a204661d"
+        },
+        {
+          "id": "V35E1-N-KOA-06",
+          "sha256": "c77ee19ca27861b6b2e972821925a96a7d508282d159139f70cd73f960d4fa0d"
+        },
+        {
+          "id": "V35E1-N-KOA-07",
+          "sha256": "d0703ec227bb371bb2a55f1f3114e559f7cad0238e6d083578c1a1d97ff2f189"
+        },
+        {
+          "id": "V35E1-N-KOA-08",
+          "sha256": "fdd49f1b979d6503dbf981eaae60a56ac1425447fae8a8e661e253a33d8b3cc8"
+        },
+        {
+          "id": "V35E1-N-SYMFONY-01",
+          "sha256": "00ae2182361c7840c24bed89e09ee569367843df43c572235e50b7f4567fbbc9"
+        },
+        {
+          "id": "V35E1-N-SYMFONY-02",
+          "sha256": "8ed8de71964158243765316205f430919ca5aee38130302603e1ffc93f527e2c"
+        },
+        {
+          "id": "V35E1-N-SYMFONY-03",
+          "sha256": "d3b639bd5925b9fb2a0c30990609788d03c02a99e095172d62bf07ef08e2ef79"
+        },
+        {
+          "id": "V35E1-N-SYMFONY-04",
+          "sha256": "5d4499669f5f7365eadfcf78b92ad753af63a2d43cc5f5d58e2d24e6b99eb2f5"
+        },
+        {
+          "id": "V35E1-N-SYMFONY-05",
+          "sha256": "2b6457f141fa6a8b465a96183227e0fc0306c8d81ec9734806bceccd3da74ab0"
+        },
+        {
+          "id": "V35E1-N-SYMFONY-06",
+          "sha256": "4268f8ce3ad1ec27664350edc9abd09a8c4c325a3d803e6d0f650d87abb82da8"
+        },
+        {
+          "id": "V35E1-N-SYMFONY-07",
+          "sha256": "1e5330a4ef99af14e6f4c731b51949da37b51c619a13576dff00c902895cca98"
+        },
+        {
+          "id": "V35E1-N-SYMFONY-08",
+          "sha256": "be6f3aacedb29c04a980165b89d860105eadbe5f6019943da2c0f12fcbc9a179"
+        },
+        {
+          "id": "V35E1-P-AXUM-01",
+          "sha256": "05ae24e8308df555fdedd5d7165d45f2e6a8e463b9c483a00f4bdf10aa1ea6f3"
+        },
+        {
+          "id": "V35E1-P-AXUM-02",
+          "sha256": "7429575b650b8044537a8ff7719a1b2d65e78213e1050d1ac5f07191760e5b72"
+        },
+        {
+          "id": "V35E1-P-AXUM-03",
+          "sha256": "2cd902cb92d7ef8c3bf3a24c6f22b8195bbd892170ae7b0b0f27a70310798ebf"
+        },
+        {
+          "id": "V35E1-P-AXUM-04",
+          "sha256": "de6fec315a20c89710e50d7e65c3368b9c02958c78217ef9dca3616d5c14e24a"
+        },
+        {
+          "id": "V35E1-P-AXUM-05",
+          "sha256": "ae1b246b277ba5796cbdecb5e6e1aabb4b07661cd871cb0a3c96c89d49bf6905"
+        },
+        {
+          "id": "V35E1-P-AXUM-06",
+          "sha256": "c15fe833cdf4285e1dac9075fdd191eb432059acd5c0325e8976b3f2b137be0f"
+        },
+        {
+          "id": "V35E1-P-FASTAPI-01",
+          "sha256": "67cc6aa0e85113e3c8f340a824890814493fd1e147bab71d8fea7639b662b79b"
+        },
+        {
+          "id": "V35E1-P-FASTAPI-02",
+          "sha256": "445334dc4f30113d2bde735bcd0892aa938fcab28e02b94b8c196f6755d45699"
+        },
+        {
+          "id": "V35E1-P-FASTAPI-03",
+          "sha256": "31247ae4f590b029877cde433f1140a15579fc64a72c617e7fd472f4a561985b"
+        },
+        {
+          "id": "V35E1-P-FASTAPI-04",
+          "sha256": "2208db0f20a89ddbf69e02ea97a86b32b960b51eef68308ee7d875ec4ef77194"
+        },
+        {
+          "id": "V35E1-P-FASTAPI-05",
+          "sha256": "640b95ef10b805153a694eefae419606f56bff5128719c5026228cad05ba7bc8"
+        },
+        {
+          "id": "V35E1-P-FASTAPI-06",
+          "sha256": "49cf20cec18fe4350da9bcfc5b2885203a1da3c14ca963207843306bcab478da"
+        },
+        {
+          "id": "V35E1-P-GIN-01",
+          "sha256": "00cdb0afb067628c1649bc6ea01adf0e065fe311f0552503a48684536b185ef7"
+        },
+        {
+          "id": "V35E1-P-GIN-02",
+          "sha256": "8c509aded853c536bea8f6482bbb16fd3c3b7dc0f563ef5ba32c2e552efd6cb2"
+        },
+        {
+          "id": "V35E1-P-GIN-03",
+          "sha256": "82eea166ac622c3704a831a5fdf111ad0431fdc18582078dc589a75a470a4102"
+        },
+        {
+          "id": "V35E1-P-GIN-04",
+          "sha256": "1f58f19b9a8dcc7d9a5f4025b26139e54eea838d4fae08ff1ad6214b984372c5"
+        },
+        {
+          "id": "V35E1-P-GIN-05",
+          "sha256": "807210a86653de3ad31b07f52142ee875a3ab8ac67670914fd9809fdf5e3459f"
+        },
+        {
+          "id": "V35E1-P-GIN-06",
+          "sha256": "ca31afc21f028f17e576c5e848af02b5d88c7d97d8b3dd4c19ee8f70cca52a32"
+        },
+        {
+          "id": "V35E1-P-KOA-01",
+          "sha256": "cae3967f697394abe05af61354142bae0b18299fde40e8e54ad434daf599271c"
+        },
+        {
+          "id": "V35E1-P-KOA-02",
+          "sha256": "d1c9b70cea245aa9c2299b92fde746694186eb01a54e815a67c99f867cfc9ae5"
+        },
+        {
+          "id": "V35E1-P-KOA-03",
+          "sha256": "a70ebc290d3047869598ed58a2dbfa979dbdbc7f3452691c924625e3c7fd723d"
+        },
+        {
+          "id": "V35E1-P-KOA-04",
+          "sha256": "8cb63ff060fd6f58c88bcefee0ae7e7d9d0d7874e7061865f0c5bea68342a9c6"
+        },
+        {
+          "id": "V35E1-P-KOA-05",
+          "sha256": "8a08d330dc61313bd91dc2f93ba7138f65be6c934753b1ec8c05fcbcfe8a06cc"
+        },
+        {
+          "id": "V35E1-P-KOA-06",
+          "sha256": "1aae7d119989cb88aa3cd9cd0ca75b243f8228923ea3d8a925e92f7ecece1833"
+        },
+        {
+          "id": "V35E1-P-SYMFONY-01",
+          "sha256": "34e05e6354eb5af34b8dcd7784fc2e45f984b0881ff7df6e647898011495fe1a"
+        },
+        {
+          "id": "V35E1-P-SYMFONY-02",
+          "sha256": "df6cd217f964fe90d847578a293a809cb5a549a82656fbf85fc9b3643490aa45"
+        },
+        {
+          "id": "V35E1-P-SYMFONY-03",
+          "sha256": "7712f6b72d086e6bdf9c693a9fe879dc5bb82bb7bca3c9316c2c816d97602b8f"
+        },
+        {
+          "id": "V35E1-P-SYMFONY-04",
+          "sha256": "acd7dbe5d09b896c6962ee50eeccf971e79960276cedbb1f26825a4f85e83c24"
+        },
+        {
+          "id": "V35E1-P-SYMFONY-05",
+          "sha256": "0d081f5f025c06c6024fde3c6b9987e3f641e1d2dfda44dd357152b32f0bb1e4"
+        },
+        {
+          "id": "V35E1-P-SYMFONY-06",
+          "sha256": "90d8fe95616f8ea10f8a7a64e779205e16b954cce74e247baaaa41721a32d67f"
+        }
+      ]
+    },
+    "e2": {
+      "id": "E2-v35-2026-11-09-a",
+      "split": "validation",
+      "task_count": 20,
+      "languages": [
+        "go",
+        "javascript",
+        "php",
+        "python",
+        "rust"
+      ],
+      "independence": "author-coupled",
+      "gold_status": "source-span-checked",
+      "case_hashes": [
+        {
+          "id": "V35E2-AXUM-01",
+          "sha256": "ffbdcb168eb4041fa4f238cc3001a9ebbc8de500310c6fe368e9de3b9cde1619"
+        },
+        {
+          "id": "V35E2-AXUM-02",
+          "sha256": "093c16aae34c958fc78946b8e7126b831bd47458d1a055076da0eb511f3e3bfe"
+        },
+        {
+          "id": "V35E2-AXUM-03",
+          "sha256": "078a15f8c6889501f37ffeeda155aaa39901931b271a1071e46711efa7a46d34"
+        },
+        {
+          "id": "V35E2-AXUM-04",
+          "sha256": "baceabb6d5f25bcb7f4fe7990465457730381650967eab0f31bf5452466b2814"
+        },
+        {
+          "id": "V35E2-FASTAPI-01",
+          "sha256": "bc55a30139ce66870bf141418a74679d34bf08a97cf436691976de3f96d0ec73"
+        },
+        {
+          "id": "V35E2-FASTAPI-02",
+          "sha256": "475083923b9f83d8145b8627b9b2ca9c14ff326fc1f7bed0189d2bc81399f521"
+        },
+        {
+          "id": "V35E2-FASTAPI-03",
+          "sha256": "2e5c959f8a0c08d231ecc99705108613410fdbe6a90bb3cd494d8480181f7d9a"
+        },
+        {
+          "id": "V35E2-FASTAPI-04",
+          "sha256": "48dc8b935d5e73873cc87b39841884c176e1a53f8a314903eee3bfd499407273"
+        },
+        {
+          "id": "V35E2-GIN-01",
+          "sha256": "ab3ee84e54113fcb0f595d89b19b8b8deac8f480c438afbcc7c91d36744fe7d3"
+        },
+        {
+          "id": "V35E2-GIN-02",
+          "sha256": "36a3c5099ad4a58c4c7e589a5bbfa84a61bc76314938c923c1ab49feede61b33"
+        },
+        {
+          "id": "V35E2-GIN-03",
+          "sha256": "45d9af7ee70a9015872e3aff5177fb071ab0bf268fe526740c43b40f305addf2"
+        },
+        {
+          "id": "V35E2-GIN-04",
+          "sha256": "2298de787026d9aca4effda801a58ef12dbb280acd5f2ba851b3fa20cc4942ee"
+        },
+        {
+          "id": "V35E2-KOA-01",
+          "sha256": "eab6365b95566e0ba699b89eb23ffe0c6d189b90358e583902dbc3b241344206"
+        },
+        {
+          "id": "V35E2-KOA-02",
+          "sha256": "6a8209c59ee7874dcab167edf5c05f9c62e0cdaa66b870cdc286239cd808f20d"
+        },
+        {
+          "id": "V35E2-KOA-03",
+          "sha256": "1c1c0b5ea0f5a61b29dae9babac8630acf951187549d2ce993c26d1a77a3a36b"
+        },
+        {
+          "id": "V35E2-KOA-04",
+          "sha256": "f997f4f47bf3fda82ca8b4636fe0703488c8a545454b22947859d38134bc27a8"
+        },
+        {
+          "id": "V35E2-SYMFONY-01",
+          "sha256": "735bee46694a948453bd86282a5ded278d25db3c2a2c3d301ae995db43da515a"
+        },
+        {
+          "id": "V35E2-SYMFONY-02",
+          "sha256": "1582640fdff3a9d53bce5af0eaa7a506f77fcdc6f409e2d0c9b75ded4ad24a51"
+        },
+        {
+          "id": "V35E2-SYMFONY-03",
+          "sha256": "31a03654834189fa69dd0aa010da7e9e5dc10c4fd383effb8715c97267eb8634"
+        },
+        {
+          "id": "V35E2-SYMFONY-04",
+          "sha256": "09f09e33e908960a70300f003a7fe4b6c0b504dd8c0f5446757cd8203757cba5"
+        }
+      ]
+    }
+  },
+  "repositories": {
+    "axum": {
+      "language": "rust",
+      "commit": "1a25995c13a621b627385a9b91c97583b9a6bcb0",
+      "source": "https://github.com/tokio-rs/axum",
+      "license": "MIT",
+      "gold_file_hashes": {
+        "axum/src/extract/path/mod.rs": "8310db8e626c45a148207f0b63c795703a488aef5b3e7a4c8885246e3450a36f",
+        "axum/src/middleware/from_fn.rs": "46a0505714a0a89012552e267437dcf38dcc3dbd294fd8bdf476620fa4d51bf1",
+        "axum/src/routing/mod.rs": "f46df9f07b0d3e7be279479b7a9ba6144feee470d5873f4b95c3749db6515f04"
+      },
+      "gold_span_hashes": {
+        "axum/src/extract/path/mod.rs:167-177": "a26f9a4013d7ac87d4ff7d5e25d03afff2a7bd27330137e0534151e100b51a4b",
+        "axum/src/middleware/from_fn.rs:338-349": "bde7de6ecfc4495e30ee8422875514ce839803fcfc0f86555a2eee5b4dbe1193",
+        "axum/src/routing/mod.rs:185-189": "1af55e74babf4d98e15f77f40d959f151a7443e97b59ba81d29faa2c0dc07ed4",
+        "axum/src/routing/mod.rs:304-319": "575ecc6b1e14117ec1c0ea383bd2d5674e6ef743d556d0b7f641ef8332a56d76"
+      }
+    },
+    "fastapi": {
+      "language": "python",
+      "commit": "ba5d72bae32807f0af203c45cff695f80fd0f26c",
+      "source": "https://github.com/fastapi/fastapi",
+      "license": "MIT",
+      "gold_file_hashes": {
+        "fastapi/applications.py": "a87379cc9eee7164b450471278060a9a9745ac52d08e54844069afe7f94d0cca",
+        "fastapi/dependencies/utils.py": "3f6878056d4d5f1ea3cd60fe87dded805148641fd0d4410ad6165eff856ae469",
+        "fastapi/routing.py": "ca8791eabd4420688941a1d7e5bbb65a51454409f34ffd0313a27dac6beaf4b8"
+      },
+      "gold_span_hashes": {
+        "fastapi/applications.py:1675-1686": "b9e4cb3813a0f17b2511cafb57b6795381970170fc052b50689c982a9260b7c0",
+        "fastapi/dependencies/utils.py:300-330": "6fbca471d5271272762bb28158fb47162061defbc56b396aee53f069847f991c",
+        "fastapi/dependencies/utils.py:643-712": "49a6ae1d140e42c7ec578e56931e53c0edd6e89fd31c2c3b370504695b20004c",
+        "fastapi/routing.py:320-360": "69d99624855bb6699fd55bd41766f2a491476667d3c94801b0fadce26c08d9e7"
+      }
+    },
+    "gin": {
+      "language": "go",
+      "commit": "0f09c3a9b4626d9fe9979cf4d0521d6ae32ab646",
+      "source": "https://github.com/gin-gonic/gin",
+      "license": "MIT",
+      "gold_file_hashes": {
+        "context.go": "b2336e5768f9175f2855c7df91bb48de0bbb533d74f6a6e7c3af5576491524ce",
+        "gin.go": "cf06a70af410c92214369dd0a87d8c82903af661d369b8840242c439838f40c8",
+        "routergroup.go": "f3287d308b353162d049dec7ae1d4fa92fdd85b4c8c4f1d8d658673279538a10"
+      },
+      "gold_span_hashes": {
+        "context.go:197-205": "f327063489e4863191780f2374bf9707accfbc898a4560df6024fb86581350b5",
+        "context.go:212-218": "a7b4a591aa9e2601d4e9cbd1fd1b142a3f6b21b286a2d0755eded5c0f1f62101",
+        "context.go:512-514": "e926aa074df9d7c1b7bcafa9c35b558553b1aa04c9492a3120dc4ff3ca7bec25",
+        "routergroup.go:94-102": "a550fd3c529bbe7e49bdd30b1b3b203d1f5d2b63b7538a8c9772749c1b9d9c1b"
+      }
+    },
+    "koa": {
+      "language": "javascript",
+      "commit": "b7ead6f7a2bb56e2948b1c5e1cca77483e89c885",
+      "source": "https://github.com/koajs/koa",
+      "license": "MIT",
+      "gold_file_hashes": {
+        "lib/application.js": "85bc72b9ade34d12d0be19bf19d2983ee4fb41503226f8de0c92f4f063b9aaa9",
+        "lib/context.js": "93fdd5eddf6c1c331f81fff88f624a03ec59c987c796f93835dbea804e29d831",
+        "lib/response.js": "cf8de7b8ae32b7d7b58d57dd7c88db04d68a6ebaf8e5b50e58a33f1bcdf8c511"
+      },
+      "gold_span_hashes": {
+        "lib/application.js:172-177": "3132ddf0bfc4161af5af32ddfc51a0e85319598cc1b58e9c7c5e1a6824cf0d68",
+        "lib/application.js:187-202": "d46d5a7276bfa239a61c617d9e35011c191087d657e3f7e68310ad6d279fdce7",
+        "lib/application.js:218-225": "296a2945f0dfc1d8b7b6af6ee0411ce5c11f0bd748f93e55e387aa56dfaec540",
+        "lib/response.js:148-177": "33f0eac5166031293cfa3dd01a009e0317c73331d31b2e492dc2acfb98d94070"
+      }
+    },
+    "symfony-http-kernel": {
+      "language": "php",
+      "commit": "ee98a4a10a817c96d56f442ae765d48fd4152249",
+      "source": "https://github.com/symfony/http-kernel",
+      "license": "MIT",
+      "gold_file_hashes": {
+        "Controller/ControllerResolver.php": "ef2c7df4c7bb4198eb003d9484661081c3e6e3362934f05e8be6a19b13b07642",
+        "EventListener/RouterListener.php": "281475619da7f711882f0a9c7e68890c9955b39685c48f03f91c355d026fb60e",
+        "HttpKernel.php": "33060f42ce54906dcb03d190da776fdda9fcc0e0914be38295c3d8d479e36960"
+      },
+      "gold_span_hashes": {
+        "Controller/ControllerResolver.php:54-104": "1507c62ccc636991233402768f994d2b34d9345cf8b03511dda74c882510563a",
+        "EventListener/RouterListener.php:130-194": "849dffc7a994193af1c353f604c2958b3234aa1d64bcae0a8b24ba8aadbc929e",
+        "HttpKernel.php:170-200": "731ddacb962faabb4144a20f74710d307091f12a6844f074404e8a677cd0d5b5",
+        "HttpKernel.php:73-96": "6aae4cc804eab66f1c68c50d5b9767a6f106298b58ecb33eea7434d0937f24cb"
+      }
+    }
+  },
+  "baseline_snapshots": {
+    "status": "not-captured",
+    "required_engines": [
+      "v1",
+      "v2",
+      "v3"
+    ],
+    "required_surfaces": [
+      "explain-json",
+      "codex-prompt-hook"
+    ],
+    "required_cache_states": [
+      "cold",
+      "warm"
+    ],
+    "capture_command": "python3 bench/v3.5/capture_baselines.py --sidecar /path/to/sidecar --checkout /path/to/pinned-repositories --suite e1,e2 --out /tmp/sidecar-v35-baseline.json --run"
+  },
+  "sealed_holdout_guard": {
+    "metadata_source": "bench/lab/corpus/manifest.json",
+    "published_holdout_prompts_sha256": "034c62d1305407787e35dca22c0da77c89f5637834b26aa64a97cd1a33248190",
+    "read_policy": "hash metadata only; never enumerate or open task/oracle/reference files"
+  }
+}

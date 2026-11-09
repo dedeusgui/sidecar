@@ -1,0 +1,827 @@
+{
+  "schema": "sidecar-v35-e1-cases/1",
+  "cohort_id": "E1-v35-2026-11-09-a",
+  "freeze_status": "frozen-before-tuning",
+  "authoring": {
+    "role": "implementation-agent",
+    "independent_reviewer": null,
+    "independence": "author-coupled",
+    "limitation": "New prompts and gold authored by the implementation agent; external repositories are pinned. Treat as lower-confidence validation until independently reviewed."
+  },
+  "repos": {
+    "gin": {
+      "language": "go",
+      "commit": "0f09c3a9b4626d9fe9979cf4d0521d6ae32ab646",
+      "source": "https://github.com/gin-gonic/gin",
+      "license": "MIT"
+    },
+    "fastapi": {
+      "language": "python",
+      "commit": "ba5d72bae32807f0af203c45cff695f80fd0f26c",
+      "source": "https://github.com/fastapi/fastapi",
+      "license": "MIT"
+    },
+    "koa": {
+      "language": "javascript",
+      "commit": "b7ead6f7a2bb56e2948b1c5e1cca77483e89c885",
+      "source": "https://github.com/koajs/koa",
+      "license": "MIT"
+    },
+    "axum": {
+      "language": "rust",
+      "commit": "1a25995c13a621b627385a9b91c97583b9a6bcb0",
+      "source": "https://github.com/tokio-rs/axum",
+      "license": "MIT"
+    },
+    "symfony-http-kernel": {
+      "language": "php",
+      "commit": "ee98a4a10a817c96d56f442ae765d48fd4152249",
+      "source": "https://github.com/symfony/http-kernel",
+      "license": "MIT"
+    }
+  },
+  "positives": [
+    {
+      "id": "V35E1-P-GIN-01",
+      "repo": "gin",
+      "language": "go",
+      "category": "short_domain_en",
+      "prompt": "Where does Gin serve an incoming request through its router?",
+      "relevant": [
+        {
+          "path": "gin.go",
+          "sha256": "cf06a70af410c92214369dd0a87d8c82903af661d369b8840242c439838f40c8"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-GIN-02",
+      "repo": "gin",
+      "language": "go",
+      "category": "short_domain_pt",
+      "prompt": "Onde o Gin registra middleware global no roteador?",
+      "relevant": [
+        {
+          "path": "gin.go",
+          "sha256": "cf06a70af410c92214369dd0a87d8c82903af661d369b8840242c439838f40c8"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-GIN-03",
+      "repo": "gin",
+      "language": "go",
+      "category": "short_domain_en",
+      "prompt": "How can a handler read a named URL parameter from Context?",
+      "relevant": [
+        {
+          "path": "context.go",
+          "sha256": "b2336e5768f9175f2855c7df91bb48de0bbb533d74f6a6e7c3af5576491524ce"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-GIN-04",
+      "repo": "gin",
+      "language": "go",
+      "category": "short_domain_pt",
+      "prompt": "Como o middleware interrompe os handlers restantes da cadeia?",
+      "relevant": [
+        {
+          "path": "context.go",
+          "sha256": "b2336e5768f9175f2855c7df91bb48de0bbb533d74f6a6e7c3af5576491524ce"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-GIN-05",
+      "repo": "gin",
+      "language": "go",
+      "category": "short_domain_en",
+      "prompt": "Where are route groups created with inherited handlers and a path prefix?",
+      "relevant": [
+        {
+          "path": "routergroup.go",
+          "sha256": "f3287d308b353162d049dec7ae1d4fa92fdd85b4c8c4f1d8d658673279538a10"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-GIN-06",
+      "repo": "gin",
+      "language": "go",
+      "category": "short_domain_pt",
+      "prompt": "Onde o Gin valida os proxies confiáveis para obter o IP do cliente?",
+      "relevant": [
+        {
+          "path": "gin.go",
+          "sha256": "cf06a70af410c92214369dd0a87d8c82903af661d369b8840242c439838f40c8"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-FASTAPI-01",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "short_domain_en",
+      "prompt": "Where does FastAPI include another API router with a prefix?",
+      "relevant": [
+        {
+          "path": "fastapi/applications.py",
+          "sha256": "a87379cc9eee7164b450471278060a9a9745ac52d08e54844069afe7f94d0cca"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-FASTAPI-02",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "short_domain_pt",
+      "prompt": "Onde a aplicação transforma uma função decorada em uma operação de rota?",
+      "relevant": [
+        {
+          "path": "fastapi/applications.py",
+          "sha256": "a87379cc9eee7164b450471278060a9a9745ac52d08e54844069afe7f94d0cca"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-FASTAPI-03",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "short_domain_en",
+      "prompt": "Which function validates and serializes endpoint response data?",
+      "relevant": [
+        {
+          "path": "fastapi/routing.py",
+          "sha256": "ca8791eabd4420688941a1d7e5bbb65a51454409f34ffd0313a27dac6beaf4b8"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-FASTAPI-04",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "short_domain_pt",
+      "prompt": "Onde o FastAPI monta as dependências a partir da assinatura do endpoint?",
+      "relevant": [
+        {
+          "path": "fastapi/dependencies/utils.py",
+          "sha256": "3f6878056d4d5f1ea3cd60fe87dded805148641fd0d4410ad6165eff856ae469"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-FASTAPI-05",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "short_domain_en",
+      "prompt": "Where are dependencies resolved for an incoming request?",
+      "relevant": [
+        {
+          "path": "fastapi/dependencies/utils.py",
+          "sha256": "3f6878056d4d5f1ea3cd60fe87dded805148641fd0d4410ad6165eff856ae469"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-FASTAPI-06",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "short_domain_pt",
+      "prompt": "Qual classe cria o handler de requisição para cada operação da API?",
+      "relevant": [
+        {
+          "path": "fastapi/routing.py",
+          "sha256": "ca8791eabd4420688941a1d7e5bbb65a51454409f34ffd0313a27dac6beaf4b8"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-KOA-01",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "short_domain_en",
+      "prompt": "Where does Koa register middleware on the application?",
+      "relevant": [
+        {
+          "path": "lib/application.js",
+          "sha256": "85bc72b9ade34d12d0be19bf19d2983ee4fb41503226f8de0c92f4f063b9aaa9"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-KOA-02",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "short_domain_pt",
+      "prompt": "Onde a aplicação compõe os middlewares e cria o callback HTTP?",
+      "relevant": [
+        {
+          "path": "lib/application.js",
+          "sha256": "85bc72b9ade34d12d0be19bf19d2983ee4fb41503226f8de0c92f4f063b9aaa9"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-KOA-03",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "short_domain_en",
+      "prompt": "Where is a request context created from Node's request and response?",
+      "relevant": [
+        {
+          "path": "lib/application.js",
+          "sha256": "85bc72b9ade34d12d0be19bf19d2983ee4fb41503226f8de0c92f4f063b9aaa9"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-KOA-04",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "short_domain_pt",
+      "prompt": "Onde o Koa lida com erros lançados durante uma requisição?",
+      "relevant": [
+        {
+          "path": "lib/context.js",
+          "sha256": "93fdd5eddf6c1c331f81fff88f624a03ec59c987c796f93835dbea804e29d831"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-KOA-05",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "short_domain_en",
+      "prompt": "Where is the response status code getter and setter implemented?",
+      "relevant": [
+        {
+          "path": "lib/response.js",
+          "sha256": "cf8de7b8ae32b7d7b58d57dd7c88db04d68a6ebaf8e5b50e58a33f1bcdf8c511"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-KOA-06",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "short_domain_pt",
+      "prompt": "Qual código define o comportamento quando o corpo da resposta é nulo?",
+      "relevant": [
+        {
+          "path": "lib/response.js",
+          "sha256": "cf8de7b8ae32b7d7b58d57dd7c88db04d68a6ebaf8e5b50e58a33f1bcdf8c511"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-AXUM-01",
+      "repo": "axum",
+      "language": "rust",
+      "category": "short_domain_en",
+      "prompt": "Where does Router register a method router at a path?",
+      "relevant": [
+        {
+          "path": "axum/src/routing/mod.rs",
+          "sha256": "f46df9f07b0d3e7be279479b7a9ba6144feee470d5873f4b95c3749db6515f04"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-AXUM-02",
+      "repo": "axum",
+      "language": "rust",
+      "category": "short_domain_pt",
+      "prompt": "Onde o extrator Path desserializa parâmetros da URL?",
+      "relevant": [
+        {
+          "path": "axum/src/extract/path/mod.rs",
+          "sha256": "8310db8e626c45a148207f0b63c795703a488aef5b3e7a4c8885246e3450a36f"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-AXUM-03",
+      "repo": "axum",
+      "language": "rust",
+      "category": "short_domain_en",
+      "prompt": "Where can a middleware function be wrapped as a Tower layer?",
+      "relevant": [
+        {
+          "path": "axum/src/middleware/from_fn.rs",
+          "sha256": "46a0505714a0a89012552e267437dcf38dcc3dbd294fd8bdf476620fa4d51bf1"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-AXUM-04",
+      "repo": "axum",
+      "language": "rust",
+      "category": "short_domain_pt",
+      "prompt": "Qual método aplica uma camada apenas às rotas correspondentes?",
+      "relevant": [
+        {
+          "path": "axum/src/routing/mod.rs",
+          "sha256": "f46df9f07b0d3e7be279479b7a9ba6144feee470d5873f4b95c3749db6515f04"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-AXUM-05",
+      "repo": "axum",
+      "language": "rust",
+      "category": "short_domain_en",
+      "prompt": "How does the Path extractor reject invalid URL parameter values?",
+      "relevant": [
+        {
+          "path": "axum/src/extract/path/mod.rs",
+          "sha256": "8310db8e626c45a148207f0b63c795703a488aef5b3e7a4c8885246e3450a36f"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-AXUM-06",
+      "repo": "axum",
+      "language": "rust",
+      "category": "short_domain_pt",
+      "prompt": "Onde o middleware chama o próximo serviço e devolve a resposta?",
+      "relevant": [
+        {
+          "path": "axum/src/middleware/from_fn.rs",
+          "sha256": "46a0505714a0a89012552e267437dcf38dcc3dbd294fd8bdf476620fa4d51bf1"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-SYMFONY-01",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "short_domain_en",
+      "prompt": "Where does HttpKernel handle a request and convert a caught exception?",
+      "relevant": [
+        {
+          "path": "HttpKernel.php",
+          "sha256": "33060f42ce54906dcb03d190da776fdda9fcc0e0914be38295c3d8d479e36960"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-SYMFONY-02",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "short_domain_pt",
+      "prompt": "Onde o kernel despacha eventos antes de chamar o controller?",
+      "relevant": [
+        {
+          "path": "HttpKernel.php",
+          "sha256": "33060f42ce54906dcb03d190da776fdda9fcc0e0914be38295c3d8d479e36960"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-SYMFONY-03",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "short_domain_en",
+      "prompt": "Which resolver turns the request's _controller attribute into a callable?",
+      "relevant": [
+        {
+          "path": "Controller/ControllerResolver.php",
+          "sha256": "ef2c7df4c7bb4198eb003d9484661081c3e6e3362934f05e8be6a19b13b07642"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-SYMFONY-04",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "short_domain_pt",
+      "prompt": "Onde a rota é combinada com a URI e os atributos são colocados na requisição?",
+      "relevant": [
+        {
+          "path": "EventListener/RouterListener.php",
+          "sha256": "281475619da7f711882f0a9c7e68890c9955b39685c48f03f91c355d026fb60e"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-P-SYMFONY-05",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "short_domain_en",
+      "prompt": "Where are response and finish-request events dispatched?",
+      "relevant": [
+        {
+          "path": "HttpKernel.php",
+          "sha256": "33060f42ce54906dcb03d190da776fdda9fcc0e0914be38295c3d8d479e36960"
+        }
+      ],
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-P-SYMFONY-06",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "short_domain_pt",
+      "prompt": "Onde o kernel converte uma exceção em resposta HTTP usando listeners?",
+      "relevant": [
+        {
+          "path": "HttpKernel.php",
+          "sha256": "33060f42ce54906dcb03d190da776fdda9fcc0e0914be38295c3d8d479e36960"
+        }
+      ],
+      "prompt_language": "pt-BR"
+    }
+  ],
+  "negatives": [
+    {
+      "id": "V35E1-N-GIN-01",
+      "repo": "gin",
+      "language": "go",
+      "category": "near_miss",
+      "prompt": "Em qual módulo o Gin persiste resultados de consultas SQL no banco embutido?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-GIN-02",
+      "repo": "gin",
+      "language": "go",
+      "category": "near_miss",
+      "prompt": "Where does Gin coordinate Kafka consumer group rebalancing?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-GIN-03",
+      "repo": "gin",
+      "language": "go",
+      "category": "unrelated",
+      "prompt": "Qual é a capital da Islândia?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-GIN-04",
+      "repo": "gin",
+      "language": "go",
+      "category": "unrelated",
+      "prompt": "Write a short poem about a blue bicycle.",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-GIN-05",
+      "repo": "gin",
+      "language": "go",
+      "category": "near_miss",
+      "prompt": "Onde o roteador do Gin executa diretivas de schema GraphQL?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-GIN-06",
+      "repo": "gin",
+      "language": "go",
+      "category": "near_miss",
+      "prompt": "Which package schedules delayed background jobs for Gin handlers?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-GIN-07",
+      "repo": "gin",
+      "language": "go",
+      "category": "unrelated",
+      "prompt": "Traduza a palavra “window” para português.",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-GIN-08",
+      "repo": "gin",
+      "language": "go",
+      "category": "unrelated",
+      "prompt": "How many seconds are there in three minutes?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-FASTAPI-01",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "near_miss",
+      "prompt": "Onde o FastAPI cria revisões de migração para SQLAlchemy?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-FASTAPI-02",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "near_miss",
+      "prompt": "Which module handles Kafka consumer group rebalancing in FastAPI?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-FASTAPI-03",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "unrelated",
+      "prompt": "Qual é a raiz quadrada de 144?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-FASTAPI-04",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "unrelated",
+      "prompt": "Suggest a picnic menu for a rainy day.",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-FASTAPI-05",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "near_miss",
+      "prompt": "Onde o projeto implementa uma fila distribuída de tarefas integrada?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-FASTAPI-06",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "near_miss",
+      "prompt": "Which file applies database schema migrations when the app starts?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-FASTAPI-07",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "unrelated",
+      "prompt": "Diga dois planetas que têm anéis.",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-FASTAPI-08",
+      "repo": "fastapi",
+      "language": "python",
+      "category": "unrelated",
+      "prompt": "What is 19 plus 23?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-KOA-01",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "near_miss",
+      "prompt": "Onde o Koa mantém seu pool SQL embutido de conexões?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-KOA-02",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "near_miss",
+      "prompt": "Which file defines Koa's GraphQL schema compiler?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-KOA-03",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "unrelated",
+      "prompt": "Qual é o maior oceano da Terra?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-KOA-04",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "unrelated",
+      "prompt": "Give me a synonym for 'careful'.",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-KOA-05",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "near_miss",
+      "prompt": "Onde o framework agenda tarefas recorrentes em segundo plano?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-KOA-06",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "near_miss",
+      "prompt": "Which module owns a Redis-backed session store in Koa core?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-KOA-07",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "unrelated",
+      "prompt": "Quantos lados tem um octógono?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-KOA-08",
+      "repo": "koa",
+      "language": "javascript",
+      "category": "unrelated",
+      "prompt": "Translate 'good morning' into French.",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-AXUM-01",
+      "repo": "axum",
+      "language": "rust",
+      "category": "near_miss",
+      "prompt": "Onde o Axum executa migrações PostgreSQL ao iniciar o servidor?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-AXUM-02",
+      "repo": "axum",
+      "language": "rust",
+      "category": "near_miss",
+      "prompt": "Which module implements the built-in Redis session database?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-AXUM-03",
+      "repo": "axum",
+      "language": "rust",
+      "category": "unrelated",
+      "prompt": "Qual é o ponto de ebulição da água em Celsius ao nível do mar?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-AXUM-04",
+      "repo": "axum",
+      "language": "rust",
+      "category": "unrelated",
+      "prompt": "Write a two-line thank-you note.",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-AXUM-05",
+      "repo": "axum",
+      "language": "rust",
+      "category": "near_miss",
+      "prompt": "Onde o Axum implementa um broker distribuído para assinaturas GraphQL?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-AXUM-06",
+      "repo": "axum",
+      "language": "rust",
+      "category": "near_miss",
+      "prompt": "Which file defines the framework's built-in background job queue?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-AXUM-07",
+      "repo": "axum",
+      "language": "rust",
+      "category": "unrelated",
+      "prompt": "Qual é o próximo número primo depois de 11?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-AXUM-08",
+      "repo": "axum",
+      "language": "rust",
+      "category": "unrelated",
+      "prompt": "Name a mammal that lays eggs.",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-SYMFONY-01",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "near_miss",
+      "prompt": "Onde o HttpKernel gera schemas OpenAPI a partir das rotas do controller?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-SYMFONY-02",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "near_miss",
+      "prompt": "Which file runs Doctrine migrations against the application's database?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-SYMFONY-03",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "unrelated",
+      "prompt": "Qual moeda é usada no Japão?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-SYMFONY-04",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "unrelated",
+      "prompt": "Give me a six-letter word that starts with 'p'.",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-SYMFONY-05",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "near_miss",
+      "prompt": "Onde o HttpKernel gerencia offsets de consumidores Kafka?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-SYMFONY-06",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "near_miss",
+      "prompt": "Which class provides a built-in Redis-backed cache implementation?",
+      "no_gold": true,
+      "prompt_language": "en"
+    },
+    {
+      "id": "V35E1-N-SYMFONY-07",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "unrelated",
+      "prompt": "Quanto é 8 vezes 7?",
+      "no_gold": true,
+      "prompt_language": "pt-BR"
+    },
+    {
+      "id": "V35E1-N-SYMFONY-08",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "category": "unrelated",
+      "prompt": "Suggest a quiet indoor activity for a child.",
+      "no_gold": true,
+      "prompt_language": "en"
+    }
+  ]
+}
