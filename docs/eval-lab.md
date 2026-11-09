@@ -18,6 +18,8 @@ Infraestrutura para medir **tarefas de edição reais** com oráculos independen
 | Custo | só com `--yes-spend`; teto por execução (`--max-budget`) e total (`--max-total-usd`) lido de `spend.jsonl`; sem CI pago |
 | Simulação isolada | `ScriptedAgent` testa a infraestrutura; seus registros têm `evidence: simulated` e nunca entram na seção `agentic` |
 
+O caminho normal usa o inventário selado de `manifest.json` sem abrir tarefas ou oráculos de holdout. O holdout real exige, antes da leitura, `--final`, `--yes-spend`, `--frozen-revision` igual ao HEAD limpo, `--frozen-binary-sha256` e preflight do sandbox. O manifesto só recalcula dados do holdout com `--include-holdout` explícito.
+
 ```bash
 python3 bench/lab/lab.py validate-corpus                     # development/validation; preserva holdout selado
 python3 bench/lab/lab.py manifest                            # corpus/manifest.json: hashes, splits, classes

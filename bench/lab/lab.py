@@ -1104,6 +1104,22 @@ def spend_total(path):
     return sum((json.loads(l).get("cost_usd") or 0.0) for l in path.read_text().splitlines() if l.strip())
 
 
+def verify_final_freeze(args):
+    """Require an explicitly identified clean revision and binary before opening the real holdout."""
+    revision = getattr(args, "frozen_revision", None)
+    binary_hash = getattr(args, "frozen_binary_sha256", None)
+    if not args.yes_spend or not revision or not binary_hash or not args.sidecar:
+        raise LabError("holdout final exige --yes-spend, --frozen-revision e --frozen-binary-sha256")
+    root = HERE.parent.parent
+    code, head, _, _ = run(["git", "rev-parse", "HEAD"], cwd=root)
+    status_code, status, _, _ = run(["git", "status", "--porcelain"], cwd=root)
+    if code != 0 or status_code != 0 or status.strip() or head.strip() != revision:
+        raise LabError("holdout final exige revisão congelada igual ao HEAD e checkout limpo")
+    if not pathlib.Path(args.sidecar).is_file() or sha256_file(args.sidecar) != binary_hash:
+        raise LabError("hash do binário não corresponde ao candidato congelado")
+    verify_agent_sandbox()
+
+
 def execute_one(agent, task, tdir, arm, rep, args, home):
     with tempfile.TemporaryDirectory(prefix="lab-run-") as tmp:
         work = prepare_workspace(task, pathlib.Path(tmp) / "work")
@@ -1154,6 +1170,8 @@ def cmd_run(args):
     splits = set(args.splits.split(","))
     if "holdout" in splits and not args.final:
         raise LabError("holdout selado: use --final (uma única avaliação final, sem tuning depois)")
+    if "holdout" in splits and args.agent == "claude":
+        verify_final_freeze(args)
     manifest = build_manifest(include_holdout="holdout" in splits)
     wanted = set(args.tasks.split(",")) if args.tasks else {t["id"] for t in manifest["tasks"]}
     tasks = [t for t in manifest["tasks"] if t["id"] in wanted and t["split"] in splits]
@@ -1202,6 +1220,7 @@ def cmd_run(args):
             "isolation": sandbox_prefix()[1], "oracle_network_isolation": sandbox_prefix()[1],
             "agent_filesystem_isolation": agent_isolation if args.agent == "claude" else "simulated-unrestricted",
             "sidecar_sha256": sha256_file(args.sidecar) if args.sidecar else None,
+            "frozen_revision": getattr(args, "frozen_revision", None),
             "claude_version": run(["claude", "--version"])[1].strip() if args.agent == "claude" else None,
             "hardware": {"cpus": os.cpu_count(), "platform": sys.platform}, "cost_cap_usd": args.max_total_usd,
             "started": time.time()}
@@ -1484,6 +1503,7 @@ def main(argv=None):
     p.add_argument("--max-total-usd", type=float, default=None); p.add_argument("--timeout", type=int, default=600)
     p.add_argument("--tools-allow", default=None, help="lista explícita que substitui a política padrão por linguagem")
     p.add_argument("--yes-spend", action="store_true"); p.add_argument("--final", action="store_true")
+    p.add_argument("--frozen-revision"); p.add_argument("--frozen-binary-sha256")
     p.add_argument("--allow-unvalidated", action="store_true"); p.add_argument("--allow-repeat-final", action="store_true"); p.add_argument("--turns", type=int, choices=(1, 2), default=1, help="2 = protocolo de duas voltas com usuário simulado (R4/R5)"); p.add_argument("--rep-offset", type=int, default=0, help="índice da primeira repetição; permite processos paralelos com repetições distintas"); p.add_argument("--scripted-behaviour", default="reference")
     p = sub.add_parser("report"); p.add_argument("runs", nargs="+", help="um ou mais runs.jsonl (repetições de processos diferentes são juntadas)"); p.add_argument("--md"); p.add_argument("--json"); p.add_argument("--offline")
     a = ap.parse_args(argv)

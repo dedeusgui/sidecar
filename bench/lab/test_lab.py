@@ -737,6 +737,14 @@ class TwoTurnTests(unittest.TestCase):
 
 
 class HoldoutTests(LabCase):
+    def test_real_final_requires_freeze_before_reading_holdout(self):
+        self.make_task("T-EDIT-H1", split="holdout")
+        args = self.run_args(agent="claude", model="claude-haiku-5-5", sidecar=sys.executable,
+                             splits="holdout", final=True, yes_spend=True)
+        with mock.patch.object(lab, "build_manifest", side_effect=AssertionError("holdout opened")):
+            with self.assertRaisesRegex(lab.LabError, "frozen-revision"):
+                lab.cmd_run(args)
+
     def test_development_manifest_never_opens_holdout_task_or_oracle(self):
         self.make_task()
         held = self.make_task("T-EDIT-H1", split="holdout")

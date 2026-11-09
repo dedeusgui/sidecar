@@ -13,7 +13,7 @@ Atualizado em 2026-11-09. Branch `codex/v3-p0-lab`, baseada em `24323a8ef4f93f51
 
 ## Limites e próximos passos
 
-- P0-A ainda precisa de revisão final e de gates automáticos de congelamento para o holdout final. A compatibilidade do sandbox com a instalação real do Claude e todos os runtimes de teste continua sem prova neste ambiente.
+- O holdout real exige `--final`, `--yes-spend`, revisão limpa identificada por `--frozen-revision`, SHA-256 do binário e preflight do sandbox antes de abrir tarefas. A compatibilidade do sandbox com a instalação real do Claude e todos os runtimes de teste continua sem prova neste ambiente; P0-A ainda precisa de revisão final.
 - Implementar a política seletiva V3 opt-in, `sidecar explore`, calibração de Brief/Groom/Impact/Session Intelligence e controles competitivos; não há evidência de superioridade end-to-end nesta sessão.
 - Próximo passo: implementar o gate V3 opt-in e medir E1 em development/validation, sem usar o holdout.
 - Nenhuma chamada paga e nenhuma avaliação final do holdout foram executadas. Custo pago: US$ 0. O holdout final exige autorização, isolamento validado e versão congelada.
