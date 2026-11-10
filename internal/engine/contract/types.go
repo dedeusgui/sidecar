@@ -4,10 +4,12 @@ package contract
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -130,25 +132,50 @@ const (
 	VerificationLSP   VerificationKind = "lsp"
 )
 
-// VerificationProof identifies the concrete resolver result behind a
-// VERIFIED label. A non-empty reference is required; a confidence label alone
-// is never accepted as proof.
+// VerificationProof identifies a concrete resolver result by stable index ID
+// and the content hash of the source that was resolved.
 type VerificationProof struct {
 	Kind      VerificationKind
 	Reference string
 }
 
-// Valid reports whether the proof names a supported resolver and result.
+// Valid reports whether the proof uses a resolver reference with a stable ID
+// and a full source hash. Opaque labels cannot substantiate VERIFIED.
 func (proof VerificationProof) Valid() bool {
-	if strings.TrimSpace(proof.Reference) == "" {
-		return false
-	}
 	switch proof.Kind {
-	case VerificationIndex, VerificationAST, VerificationLSP:
-		return true
+	case VerificationIndex:
+		if strings.HasPrefix(proof.Reference, "symbol:") {
+			parts := strings.Split(proof.Reference, ":")
+			return len(parts) == 3 && positiveID(parts[1]) && validSourceHash(parts[2])
+		}
+		if strings.HasPrefix(proof.Reference, "relation:") {
+			last := strings.LastIndexByte(proof.Reference, ':')
+			if last <= len("relation:") || !validSourceHash(proof.Reference[last+1:]) {
+				return false
+			}
+			previous := strings.LastIndexByte(proof.Reference[:last], ':')
+			return previous > len("relation:") && positiveID(proof.Reference[previous+1:last])
+		}
+	case VerificationAST, VerificationLSP:
+		prefix := string(proof.Kind) + ":"
+		parts := strings.Split(proof.Reference, ":")
+		return len(parts) == 3 && parts[0]+":" == prefix && positiveID(parts[1]) && validSourceHash(parts[2])
 	default:
+	}
+	return false
+}
+
+func positiveID(value string) bool {
+	id, err := strconv.ParseInt(value, 10, 64)
+	return err == nil && id > 0
+}
+
+func validSourceHash(value string) bool {
+	if len(value) != 64 {
 		return false
 	}
+	_, err := hex.DecodeString(value)
+	return err == nil
 }
 
 // EvidenceRef is safe metadata identifying a fact. Fingerprint should be a

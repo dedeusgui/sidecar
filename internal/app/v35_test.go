@@ -11,8 +11,12 @@ import (
 	"time"
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
+	"github.com/dedeusgui/sidecar/internal/brief"
 	"github.com/dedeusgui/sidecar/internal/ctxbuild"
 	"github.com/dedeusgui/sidecar/internal/engine"
+	"github.com/dedeusgui/sidecar/internal/engine/contract"
+	"github.com/dedeusgui/sidecar/internal/paths"
+	"github.com/dedeusgui/sidecar/internal/progress"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 )
 
@@ -112,6 +116,37 @@ func TestV35ZeroBudgetAndInjectedErrorAreFailOpen(t *testing.T) {
 	data, _ := os.ReadFile(logPath)
 	if !strings.Contains(string(data), `"status":"error"`) {
 		t.Fatalf("injected failure was not handled by the hook fail-open path: %s", data)
+	}
+}
+
+func TestV35SessionProposalUsesClientCapabilityMatrix(t *testing.T) {
+	root := makeV35Project(t)
+	now := time.Now()
+	const sessionID, revision = "shared-session", "head-1"
+	scope := contract.Scope{RepoRoot: root, WorktreeID: root, SessionID: sessionID, WorktreeRevision: revision}
+	signals := brief.NewSignals(revision, now)
+	signals.ScopeFingerprint = brief.ScopeFingerprint(observerScope(root, sessionID, revision))
+	signals.Trace = []progress.Event{{Kind: "read", Key: "router/router.go"}, {Kind: "read", Key: "router/router.go"}}
+	for _, agent := range []adapter.Agent{adapter.Claude, adapter.Codex} {
+		if err := brief.SaveSignals(paths.ObserverState(root, string(agent), sessionID), signals); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	claudeCapabilities := adapter.CapabilitiesFor(adapter.Claude)
+	claudeObservation := v35Observability(root, adapter.Claude, scope, now, claudeCapabilities.Observability)
+	claudeRegistry := contract.NewEvidenceRegistry[retrieve.Evidence](scope)
+	claudeProposal := ProposeObserverGuidance(scope, adapter.Claude, claudeObservation, contract.PhaseEdit, now, claudeRegistry)
+	if len(claudeProposal) != 1 {
+		t.Fatalf("Claude did not deliver the observed session proposal: observability=%+v proposals=%+v", claudeObservation, claudeProposal)
+	}
+
+	codexCapabilities := adapter.CapabilitiesFor(adapter.Codex)
+	codexObservation := v35Observability(root, adapter.Codex, scope, now, codexCapabilities.Observability)
+	codexRegistry := contract.NewEvidenceRegistry[retrieve.Evidence](scope)
+	codexProposal := ProposeObserverGuidance(scope, adapter.Codex, codexObservation, contract.PhaseEdit, now, codexRegistry)
+	if codexObservation.ToolEvents == contract.ObservationSeen || len(codexProposal) != 0 {
+		t.Fatalf("Codex received guidance without tool-event capability: observability=%+v proposals=%+v", codexObservation, codexProposal)
 	}
 }
 

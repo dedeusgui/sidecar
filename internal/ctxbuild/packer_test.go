@@ -14,7 +14,7 @@ func packFixture(t *testing.T, codeText string) (contract.Scope, *contract.Evide
 	ref, _, err := registry.Add(contract.EvidenceRef{
 		Key: "run", Path: "src/run.go", Fingerprint: "source-v1", LineStart: 10, LineEnd: 14,
 		Confidence: contract.ConfidenceVerified, Freshness: contract.FreshnessCurrent, CostEstimate: 50,
-		Proof: contract.VerificationProof{Kind: contract.VerificationIndex, Reference: "symbol:run"},
+		Proof: contract.VerificationProof{Kind: contract.VerificationIndex, Reference: "symbol:1:" + strings.Repeat("a", 64)},
 	}, Item{Section: Code, Key: "function|src/run.go|Run", Fingerprint: "source-v1", Text: codeText})
 	if err != nil {
 		t.Fatal(err)
@@ -135,5 +135,62 @@ func TestPackPreservesQualifierAndProvenanceWhenTruncating(t *testing.T) {
 	}
 	if got.EstimatedTokens > plan.BudgetTokens {
 		t.Fatalf("truncated output exceeded budget: %+v", got)
+	}
+}
+
+func TestPackCanonicalizesProviderProposalKinds(t *testing.T) {
+	scope, registry, key := packFixture(t, "Run")
+	kinds := []struct {
+		proposalKind string
+		itemText     string
+	}{
+		{proposalKind: "CHANGE_IMPACT", itemText: "impact finding"},
+		{proposalKind: "MEMORY_DECISION", itemText: "remembered decision"},
+		{proposalKind: "SESSION_GUIDANCE", itemText: "observed session signal"},
+	}
+	plan := contract.OutputPlan{Scope: scope, BudgetTokens: 300, MaxItems: len(kinds)}
+	proposals := make([]GuidanceProposal, 0, len(kinds))
+	for _, kind := range kinds {
+		plan.Sections = append(plan.Sections, contract.SectionAllocation{
+			Section: kind.proposalKind, BudgetTokens: 80, MaxItems: 1, EvidenceKeys: []string{key},
+		})
+		proposals = append(proposals, GuidanceProposal{
+			Proposal: contract.GuidanceProposal{Kind: kind.proposalKind, EvidenceKeys: []string{key}, TokenEstimate: 20},
+			Items:    []Item{{Section: kind.proposalKind, Text: kind.itemText}},
+		})
+	}
+	got := Pack(plan, registry, nil, proposals, nil)
+	for _, want := range []string{ChangeImpact + "\n- impact finding", Memory + "\n- remembered decision", Session + "\n- observed session signal"} {
+		if !strings.Contains(got.Text, want) {
+			t.Errorf("canonical provider section missing %q:\n%s", want, got.Text)
+		}
+	}
+	if len(got.Items) != len(kinds) {
+		t.Fatalf("packed %d provider items, want %d: %+v", len(got.Items), len(kinds), got.Items)
+	}
+}
+
+func TestPackMaxItemsCountsEmittedItemsGloballyAndPerSection(t *testing.T) {
+	scope, registry, key := packFixture(t, "Run")
+	plan := contract.OutputPlan{Scope: scope, BudgetTokens: 400, MaxItems: 1, Sections: []contract.SectionAllocation{
+		{Section: Code, BudgetTokens: 150, MaxItems: 1, EvidenceKeys: []string{key}},
+		{Section: Explore, BudgetTokens: 150, MaxItems: 1, EvidenceKeys: []string{key}},
+	}}
+	mapper := func(entry contract.EvidenceEntry[Item]) []Item {
+		return []Item{
+			{Section: Code, Key: "code-a", Text: "first code item"},
+			{Section: Code, Key: "code-b", Text: "second code item"},
+			{Section: Explore, Key: "explore-a", Text: "first explore item"},
+			{Section: Explore, Key: "explore-b", Text: "second explore item"},
+		}
+	}
+	got := Pack(plan, registry, mapper, nil, nil)
+	if len(got.Items) != 1 {
+		t.Fatalf("global MaxItems=1 emitted %d mapper items: %+v", len(got.Items), got.Items)
+	}
+	plan.MaxItems = 4
+	got = Pack(plan, registry, mapper, nil, nil)
+	if len(got.Items) != 2 {
+		t.Fatalf("per-section MaxItems=1 emitted %d items across two sections, want 2: %+v", len(got.Items), got.Items)
 	}
 }

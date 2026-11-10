@@ -28,13 +28,12 @@ type PackResult struct {
 
 type packSection struct {
 	budget   int
-	maxUnits int
+	maxItems int
 	groups   []map[string]struct{}
 }
 
 type packCandidate struct {
 	item     Item
-	unit     string
 	sequence int
 }
 
@@ -71,20 +70,21 @@ func Pack[T any](
 	var candidates []packCandidate
 	sequence := 0
 	for _, allocation := range plan.Sections {
-		if !knownPackSection(allocation.Section) {
+		sectionName := canonicalPackSection(allocation.Section)
+		if !knownPackSection(sectionName) {
 			result.NotDelivered = append(result.NotDelivered, contract.PlanReason{Code: "section_unsupported", Kind: allocation.Section})
 			continue
 		}
 		if allocation.BudgetTokens <= 0 || allocation.MaxItems <= 0 {
 			continue
 		}
-		section := sections[allocation.Section]
+		section := sections[sectionName]
 		if section == nil {
 			section = &packSection{}
-			sections[allocation.Section] = section
+			sections[sectionName] = section
 		}
 		section.budget += allocation.BudgetTokens
-		section.maxUnits += allocation.MaxItems
+		section.maxItems += allocation.MaxItems
 		group := make(map[string]struct{}, len(allocation.EvidenceKeys))
 		for _, key := range allocation.EvidenceKeys {
 			group[key] = struct{}{}
@@ -93,10 +93,11 @@ func Pack[T any](
 				continue
 			}
 			for _, item := range mapEvidence(entry) {
-				if item.Section != "" && item.Section != allocation.Section {
+				itemSection := canonicalPackSection(item.Section)
+				if item.Section != "" && itemSection != sectionName {
 					continue
 				}
-				item.Section = allocation.Section
+				item.Section = sectionName
 				if item.Key == "" {
 					item.Key = entry.Ref.Key
 				}
@@ -107,7 +108,7 @@ func Pack[T any](
 					continue
 				}
 				candidates = append(candidates, packCandidate{
-					item: item, unit: "evidence:" + allocation.Section + ":" + key, sequence: sequence,
+					item: item, sequence: sequence,
 				})
 				sequence++
 			}
@@ -129,7 +130,8 @@ func Pack[T any](
 	})
 	for _, proposal := range orderedProposals {
 		metadata := proposal.Proposal
-		section := sections[metadata.Kind]
+		sectionName := canonicalPackSection(metadata.Kind)
+		section := sections[sectionName]
 		if section == nil || metadata.TokenEstimate <= 0 || len(metadata.EvidenceKeys) == 0 {
 			continue
 		}
@@ -164,12 +166,12 @@ func Pack[T any](
 			result.NotDelivered = append(result.NotDelivered, contract.PlanReason{Code: "proposal_evidence_unavailable", Kind: metadata.Kind})
 			continue
 		}
-		unit := "guidance:" + metadata.Kind + ":" + strings.Join(keys, "\x00") + ":" + metadata.DeliveryReason
+		unit := "guidance:" + sectionName + ":" + strings.Join(keys, "\x00") + ":" + metadata.DeliveryReason
 		for index, item := range proposal.Items {
-			if item.Section != "" && item.Section != metadata.Kind {
+			if item.Section != "" && canonicalPackSection(item.Section) != sectionName {
 				continue
 			}
-			item.Section = metadata.Kind
+			item.Section = sectionName
 			if item.Key == "" {
 				item.Key = unit + ":" + fmt.Sprint(index)
 			}
@@ -180,7 +182,7 @@ func Pack[T any](
 			if item.Source == "" {
 				item.Source = "guidance"
 			}
-			candidates = append(candidates, packCandidate{item: item, unit: unit, sequence: sequence})
+			candidates = append(candidates, packCandidate{item: item, sequence: sequence})
 			sequence++
 		}
 	}
@@ -217,8 +219,7 @@ func Pack[T any](
 
 	selected := make(map[string][]Item)
 	selectedIdentities := make(map[string]struct{})
-	selectedUnits := make(map[string]struct{})
-	sectionUnits := make(map[string]map[string]struct{})
+	sectionItemCounts := make(map[string]int)
 	for _, candidate := range candidates {
 		item := sanitizePackItem(candidate.item)
 		if item.Text == "" || seen != nil && seen(item.Key, item.Fingerprint) {
@@ -229,17 +230,13 @@ func Pack[T any](
 			continue
 		}
 		section := sections[item.Section]
-		if section == nil || section.budget <= 0 || section.maxUnits <= 0 {
+		if section == nil || section.budget <= 0 || section.maxItems <= 0 {
 			continue
 		}
-		if sectionUnits[item.Section] == nil {
-			sectionUnits[item.Section] = make(map[string]struct{})
-		}
-		_, unitAlreadySelected := selectedUnits[candidate.unit]
-		if !unitAlreadySelected && len(selectedUnits) >= plan.MaxItems {
+		if len(result.Items) >= plan.MaxItems {
 			continue
 		}
-		if _, inSection := sectionUnits[item.Section][candidate.unit]; !inSection && len(sectionUnits[item.Section]) >= section.maxUnits {
+		if sectionItemCounts[item.Section] >= section.maxItems {
 			continue
 		}
 
@@ -255,10 +252,7 @@ func Pack[T any](
 		}
 		selected = trial
 		selectedIdentities[identity] = struct{}{}
-		if !unitAlreadySelected {
-			selectedUnits[candidate.unit] = struct{}{}
-			sectionUnits[item.Section][candidate.unit] = struct{}{}
-		}
+		sectionItemCounts[item.Section]++
 		result.Items = append(result.Items, item)
 	}
 
@@ -278,6 +272,19 @@ func Pack[T any](
 func knownPackSection(section string) bool {
 	_, ok := sectionRanks[section]
 	return ok
+}
+
+func canonicalPackSection(section string) string {
+	switch section {
+	case "CHANGE_IMPACT":
+		return ChangeImpact
+	case "MEMORY_DECISION":
+		return Memory
+	case "SESSION_GUIDANCE":
+		return Session
+	default:
+		return section
+	}
 }
 
 var sectionRanks = map[string]int{

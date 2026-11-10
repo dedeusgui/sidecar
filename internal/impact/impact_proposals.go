@@ -4,14 +4,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/dedeusgui/sidecar/internal/engine/contract"
+	"github.com/dedeusgui/sidecar/internal/repo"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
 )
+
+const maxImpactProofSourceBytes = 8 << 20
 
 // Guidance keeps the impact findings as provider payload while exposing a
 // budgeted, provenance-linked candidate to the planner. Findings are
@@ -45,31 +49,42 @@ func Propose(report Report, scope contract.Scope, phase contract.TaskPhase, actu
 		sum := sha256.Sum256([]byte(scopeIdentity(scope) + "\x00" + identity))
 		key := "impact:" + hex.EncodeToString(sum[:])[:24]
 		confidence := contract.ConfidenceCandidate
+		freshness := contract.FreshnessUnknown
 		proof := contract.VerificationProof{}
+		var value retrieve.Evidence
 		switch finding.Status {
 		case Confirmed, Conflict:
-			confidence = contract.ConfidenceVerified
-			proof = contract.VerificationProof{Kind: contract.VerificationIndex, Reference: key}
+			if sourceRef, sourceEvidence, current := currentImpactProof(finding, scope, registry); current {
+				confidence = contract.ConfidenceVerified
+				freshness = contract.FreshnessCurrent
+				proof = sourceRef.Proof
+				value = sourceEvidence
+			}
 		case Unknown:
 			confidence = contract.ConfidenceUnknown
+		}
+		if value.Hit.Path == "" {
+			value = retrieve.Evidence{
+				ID: key,
+				Hit: store.SymbolHit{Kind: "impact_" + finding.Kind, Name: finding.Symbol,
+					Path: finding.Path, Line: finding.Line},
+				Verdict: string(finding.Status), Source: "impact_index",
+			}
 		}
 		ref := contract.EvidenceRef{
 			Key:          key,
 			Path:         finding.Path,
 			LineStart:    finding.Line,
 			LineEnd:      finding.Line,
+			Fingerprint:  value.Hit.FileHash,
 			Origin:       "impact_index",
 			Confidence:   confidence,
-			Freshness:    contract.FreshnessUnknown,
+			Freshness:    freshness,
 			CostEstimate: max(1, estimateFinding(finding)),
 			Proof:        proof,
 		}
-		canonical, _, err := registry.Add(ref, retrieve.Evidence{
-			ID:      key,
-			Hit:     store.SymbolHit{Kind: "impact_" + finding.Kind, Name: finding.Symbol, Path: finding.Path, Line: finding.Line},
-			Verdict: string(finding.Status),
-			Source:  "impact_index",
-		})
+		value.ID = key
+		canonical, _, err := registry.Add(ref, value)
 		if err != nil {
 			continue
 		}
@@ -95,6 +110,41 @@ func Propose(report Report, scope contract.Scope, phase contract.TaskPhase, actu
 		Phase:          phase,
 	}
 	return Guidance{Proposal: proposal, Evidence: refs, Findings: findings}, true
+}
+
+func currentImpactProof(finding Finding, scope contract.Scope, registry *contract.EvidenceRegistry[retrieve.Evidence]) (contract.EvidenceRef, retrieve.Evidence, bool) {
+	if finding.Path == "" || scope.RepoRoot == "" {
+		return contract.EvidenceRef{}, retrieve.Evidence{}, false
+	}
+	rel := filepath.Clean(filepath.FromSlash(finding.Path))
+	if !filepath.IsLocal(rel) {
+		return contract.EvidenceRef{}, retrieve.Evidence{}, false
+	}
+	abs := filepath.Join(scope.RepoRoot, rel)
+	if !repo.Contained(scope.RepoRoot, abs) {
+		return contract.EvidenceRef{}, retrieve.Evidence{}, false
+	}
+	source, reason := repo.ReadSource(abs, maxImpactProofSourceBytes)
+	if reason != "" {
+		return contract.EvidenceRef{}, retrieve.Evidence{}, false
+	}
+	digest := sha256.Sum256(source)
+	currentHash := hex.EncodeToString(digest[:])
+	for _, entry := range registry.Snapshot() {
+		hit := entry.Value.Hit
+		if filepath.Clean(filepath.FromSlash(hit.Path)) != rel || hit.ID <= 0 || hit.FileHash != currentHash ||
+			entry.Ref.Freshness != contract.FreshnessCurrent || entry.Ref.Confidence != contract.ConfidenceVerified || !entry.Ref.Proof.Valid() {
+			continue
+		}
+		if finding.Line > 0 && hit.Line != finding.Line || finding.Symbol != "" && hit.Name != finding.Symbol {
+			continue
+		}
+		if !strings.HasSuffix(entry.Ref.Proof.Reference, fmt.Sprintf(":%d:%s", hit.ID, currentHash)) {
+			continue
+		}
+		return entry.Ref, entry.Value, true
+	}
+	return contract.EvidenceRef{}, retrieve.Evidence{}, false
 }
 
 func selectedFindings(findings []Finding) []Finding {

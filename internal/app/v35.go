@@ -68,11 +68,12 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 	if err != nil {
 		return v35Output{}, err
 	}
-	observability := v35Observability(root, agent, scope, now)
+	capabilities := adapter.CapabilitiesFor(agent)
+	observability := v35Observability(root, agent, scope, now, capabilities.Observability)
 	phase := v35Phase(decision, observability)
 	task := contract.TaskContext[engine.TaskSignals]{
 		Scope: scope, QuerySignals: decision.Signals, Phase: phase,
-		Observability: observability, ExploreCapability: contract.CapabilityUnverified,
+		Observability: observability, ExploreCapability: capabilities.ExploreCapability,
 		Evidence: append([]contract.EvidenceRef(nil), baseRefs...),
 		Guidance: []contract.GuidanceProposal{}, Uncertainties: []contract.Gap{},
 	}
@@ -155,10 +156,7 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 				if ok {
 					items := impactItems(guidance)
 					if len(items) > 0 {
-						proposal := canonicalV35Proposal(guidance.Proposal)
-						for i := range items {
-							items[i].Section = proposal.Kind
-						}
+						proposal := guidance.Proposal
 						task.Guidance = append(task.Guidance, proposal)
 						proposals = append(proposals, ctxbuild.GuidanceProposal{Proposal: proposal, Items: items})
 					}
@@ -176,18 +174,16 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 		return v35Output{}, err
 	}
 	for _, guidance := range memory {
-		proposal := canonicalV35Proposal(guidance.Proposal)
+		proposal := guidance.Proposal
 		item := memoryItem(guidance)
-		item.Section = proposal.Kind
 		task.Guidance = append(task.Guidance, proposal)
 		proposals = append(proposals, ctxbuild.GuidanceProposal{Proposal: proposal, Items: []ctxbuild.Item{item}})
 	}
 
 	if observability.ToolEvents == contract.ObservationSeen || observability.PreCompact == contract.ObservationSeen {
 		for _, guidance := range ProposeObserverGuidance(scope, agent, observability, phase, now, registry) {
-			proposal := canonicalV35Proposal(guidance.Proposal)
+			proposal := guidance.Proposal
 			item := sessionItem(guidance)
-			item.Section = proposal.Kind
 			task.Guidance = append(task.Guidance, proposal)
 			proposals = append(proposals, ctxbuild.GuidanceProposal{Proposal: proposal, Items: []ctxbuild.Item{item}})
 		}
@@ -247,7 +243,8 @@ func registerV35Evidence(st *store.Store, root string, result retrieve.Result, r
 		}
 		if evidence.Verdict == "VERIFIED" && evidence.Hit.Path != "" && evidence.Hit.ID != 0 && evidence.Hit.Line > 0 {
 			ref.Confidence = contract.ConfidenceVerified
-			ref.Proof = contract.VerificationProof{Kind: contract.VerificationIndex, Reference: evidence.ID}
+			ref.Proof = contract.VerificationProof{Kind: contract.VerificationIndex,
+				Reference: fmt.Sprintf("symbol:%d:%s", evidence.Hit.ID, evidence.Hit.FileHash)}
 		}
 		if evidence.Hit.Path == "" || evidence.Note != "" {
 			ref.Freshness = contract.FreshnessCurrent
@@ -272,23 +269,33 @@ func registerV35Evidence(st *store.Store, root string, result retrieve.Result, r
 	return refs, nil
 }
 
-func v35Observability(root string, agent adapter.Agent, scope contract.Scope, now time.Time) contract.Observability {
+func v35Observability(root string, agent adapter.Agent, scope contract.Scope, now time.Time, supported contract.Observability) contract.Observability {
+	out := contract.Observability{
+		ToolEvents: notObserved(supported.ToolEvents),
+		PreCompact: notObserved(supported.PreCompact),
+	}
 	if scope.SessionID == "" {
-		return contract.Observability{ToolEvents: contract.ObservationUnsupported, PreCompact: contract.ObservationUnsupported}
+		return out
 	}
 	statePath := paths.ObserverState(root, string(agent), scope.SessionID)
 	signals := brief.LoadSignals(statePath, scope.WorktreeRevision, now)
 	if signals.ScopeFingerprint != brief.ScopeFingerprint(observerScope(root, scope.SessionID, scope.WorktreeRevision)) {
-		return contract.Observability{ToolEvents: contract.ObservationUnsupported, PreCompact: contract.ObservationUnsupported}
+		return out
 	}
-	out := contract.Observability{ToolEvents: contract.ObservationUnsupported, PreCompact: contract.ObservationUnsupported}
-	if len(signals.Trace) > 0 {
+	if supported.ToolEvents == contract.ObservationSeen && len(signals.Trace) > 0 {
 		out.ToolEvents = contract.ObservationSeen
 	}
-	if signals.Compactions > 0 {
+	if supported.PreCompact == contract.ObservationSeen && signals.Compactions > 0 {
 		out.PreCompact = contract.ObservationSeen
 	}
 	return out
+}
+
+func notObserved(capability contract.ObservationState) contract.ObservationState {
+	if capability == contract.ObservationSeen {
+		return contract.ObservationNotSeen
+	}
+	return capability
 }
 
 func v35Phase(decision engine.Decision, observability contract.Observability) contract.TaskPhase {
@@ -399,7 +406,7 @@ func impactItems(guidance impact.Guidance) []ctxbuild.Item {
 
 func memoryItem(guidance MemoryGuidance) ctxbuild.Item {
 	decision := guidance.Decision
-	text := fmt.Sprintf("[explicit user decision] %s (%s): %s", decision.SymbolOrPath, decision.FilePath, decision.Summary)
+	text := memoryDecisionText(decision)
 	return ctxbuild.Item{Section: ctxbuild.Memory, Key: fmt.Sprintf("memory|%d|%s", decision.ID, decision.FileHash),
 		Fingerprint: textFingerprint(text), Text: text, Priority: guidance.Proposal.Priority,
 		Source: "memory", Role: "explicit_decision", Qualifier: "hash and TTL validated", Provenance: decision.FilePath}
@@ -490,18 +497,6 @@ func packedSourceEvidenceKeys(items []ctxbuild.Item) []string {
 		}
 	}
 	return keys
-}
-
-func canonicalV35Proposal(proposal contract.GuidanceProposal) contract.GuidanceProposal {
-	switch proposal.Kind {
-	case "CHANGE_IMPACT":
-		proposal.Kind = ctxbuild.ChangeImpact
-	case "MEMORY_DECISION":
-		proposal.Kind = ctxbuild.Memory
-	case "SESSION_GUIDANCE":
-		proposal.Kind = ctxbuild.Session
-	}
-	return proposal
 }
 
 func textFingerprint(value string) string {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dedeusgui/sidecar/internal/ctxbuild"
 	"github.com/dedeusgui/sidecar/internal/engine/contract"
 	"github.com/dedeusgui/sidecar/internal/progress"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
@@ -56,7 +57,7 @@ func ProposeSessionGuidance(scope contract.Scope, signals SessionSignals, observ
 			reason = "session.observed_repeated_navigation"
 		}
 		if reason != "" {
-			proposal, refs, ok := addSessionProposal(scope, registry, reason, phase, contract.ObservationToolEvents, traceFingerprint(epoch), 18)
+			proposal, refs, ok := addSessionProposal(scope, registry, reason, phase, contract.ObservationToolEvents, traceFingerprint(epoch))
 			if ok {
 				out = append(out, SessionGuidance{Proposal: proposal, Evidence: refs})
 			}
@@ -65,7 +66,7 @@ func ProposeSessionGuidance(scope contract.Scope, signals SessionSignals, observ
 	if signals.Compactions > 0 && phase == contract.PhaseResume && observability.PreCompact == contract.ObservationSeen {
 		resumePhase := contract.PhaseResume
 		key := fmt.Sprintf("compaction:%d", signals.Compactions)
-		proposal, refs, ok := addSessionProposal(scope, registry, "session.observed_precompact", resumePhase, contract.ObservationPreCompact, key, 14)
+		proposal, refs, ok := addSessionProposal(scope, registry, "session.observed_precompact", resumePhase, contract.ObservationPreCompact, key)
 		if ok {
 			out = append(out, SessionGuidance{Proposal: proposal, Evidence: refs})
 		}
@@ -98,7 +99,7 @@ func traceFingerprint(events []progress.Event) string {
 	return hex.EncodeToString(sum[:])[:24]
 }
 
-func addSessionProposal(scope contract.Scope, registry *contract.EvidenceRegistry[retrieve.Evidence], reason string, phase contract.TaskPhase, required contract.ObservationEvent, signalKey string, tokens int) (contract.GuidanceProposal, []contract.EvidenceRef, bool) {
+func addSessionProposal(scope contract.Scope, registry *contract.EvidenceRegistry[retrieve.Evidence], reason string, phase contract.TaskPhase, required contract.ObservationEvent, signalKey string) (contract.GuidanceProposal, []contract.EvidenceRef, bool) {
 	identity := ScopeFingerprint(scope) + "\x00" + reason + "\x00" + signalKey
 	sum := sha256.Sum256([]byte(identity))
 	key := "session:" + hex.EncodeToString(sum[:])[:24]
@@ -121,10 +122,24 @@ func addSessionProposal(scope contract.Scope, registry *contract.EvidenceRegistr
 		Kind:                "SESSION_GUIDANCE",
 		EvidenceKeys:        []string{canonical.Key},
 		Priority:            35,
-		TokenEstimate:       tokens,
+		TokenEstimate:       sessionTokenEstimate(reason),
 		DeliveryReason:      reason,
 		Phase:               phase,
 		RequiresObservation: required,
 	}
 	return proposal, []contract.EvidenceRef{canonical}, true
+}
+
+func sessionTokenEstimate(reason string) int {
+	text := "Session observation was recorded."
+	switch reason {
+	case "session.observed_repeated_error":
+		text = "A repeated test or tool error was observed in this session; recheck the relevant source before retrying."
+	case "session.observed_repeated_navigation":
+		text = "Repeated navigation was observed in this session; prioritize the relevant source evidence."
+	case "session.observed_precompact":
+		text = "The session compacted; re-establish evidence validated for the current repository snapshot."
+	}
+	rendered := fmt.Sprintf("%s\n- %s [observed] (source: %s)\n", ctxbuild.Session, text, reason)
+	return max(1, ctxbuild.EstimateTokens(rendered))
 }

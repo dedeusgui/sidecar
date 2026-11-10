@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -9,8 +10,10 @@ import (
 	"time"
 
 	"github.com/dedeusgui/sidecar/internal/engine/contract"
+	"github.com/dedeusgui/sidecar/internal/explore/core"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
+	"github.com/dedeusgui/sidecar/internal/store"
 )
 
 func indexedProject(t *testing.T) (string, *index.Index) {
@@ -37,6 +40,31 @@ func indexedProject(t *testing.T) (string, *index.Index) {
 	return root, ix
 }
 
+func TestRelationEvidenceNeedsBothCurrentEndpointsForVerifiedStatus(t *testing.T) {
+	_, ix := indexedProject(t)
+	edge := core.Edge{
+		From: core.Ref{Name: "Settle", Path: "scale.go", Line: 3},
+		To:   core.Ref{Name: "TestSettle", Path: "scale_test.go", Line: 5},
+		Kind: "calls", Status: "VERIFIED", Basis: "same_file",
+	}
+	get := func(current map[string]bool) []retrieve.Evidence {
+		return relationEvidence(context.Background(), ix.Store(), edge, map[string][]store.SymbolHit{}, map[string]bool{}, current)
+	}
+	partial := get(map[string]bool{"scale.go": true})
+	if len(partial) != 2 {
+		t.Fatalf("partial relation endpoints = %d, want two indexed endpoints", len(partial))
+	}
+	for _, evidence := range partial {
+		if evidence.Verdict == "VERIFIED" {
+			t.Fatalf("one-current-endpoint relation retained VERIFIED: %+v", evidence)
+		}
+	}
+	complete := get(map[string]bool{"scale.go": true, "scale_test.go": true})
+	if len(complete) != 2 || complete[0].Verdict != "VERIFIED" || complete[1].Verdict != "VERIFIED" {
+		t.Fatalf("current endpoints did not retain verified relation: %+v", complete)
+	}
+}
+
 func verifiedRegistry(t *testing.T, root string, ix *index.Index) (*contract.EvidenceRegistry[retrieve.Evidence], contract.EvidenceRef) {
 	t.Helper()
 	result, err := retrieve.Search(context.Background(), ix.Store(), "Settle", retrieve.Options{Root: root})
@@ -53,7 +81,8 @@ func verifiedRegistry(t *testing.T, root string, ix *index.Index) (*contract.Evi
 			Fingerprint: evidence.Hit.FileHash, Origin: "retrieve:index",
 			Confidence: contract.ConfidenceVerified, Freshness: contract.FreshnessCurrent,
 			CostEstimate: max(1, evidence.TokenEstimate),
-			Proof:        contract.VerificationProof{Kind: contract.VerificationIndex, Reference: "symbol:" + evidence.ID},
+			Proof: contract.VerificationProof{Kind: contract.VerificationIndex,
+				Reference: fmt.Sprintf("symbol:%d:%s", evidence.Hit.ID, evidence.Hit.FileHash)},
 		}, evidence)
 		if err != nil {
 			t.Fatal(err)

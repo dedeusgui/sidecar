@@ -97,15 +97,20 @@ func memoryDecisionProposal(decision store.DecisionRecord, registry *contract.Ev
 	if err != nil {
 		return MemoryGuidance{}, false
 	}
-	text := fmt.Sprintf("[DECISION] %s (hash=%s): %s", decision.SymbolOrPath, shortHash(decision.FileHash), decision.Summary)
+	text := memoryDecisionText(decision)
+	rendered := fmt.Sprintf("%s\n- %s [hash and TTL validated] (source: %s)\n", ctxbuild.Memory, text, decision.FilePath)
 	proposal := contract.GuidanceProposal{
 		Kind:           "MEMORY_DECISION",
 		EvidenceKeys:   []string{canonical.Key},
 		Priority:       90,
-		TokenEstimate:  max(1, ctxbuild.EstimateTokens(text)),
+		TokenEstimate:  max(1, ctxbuild.EstimateTokens(rendered)),
 		DeliveryReason: "memory.explicit_decision_valid_hash_ttl",
 	}
 	return MemoryGuidance{Proposal: proposal, Evidence: []contract.EvidenceRef{canonical}, Decision: decision}, true
+}
+
+func memoryDecisionText(decision store.DecisionRecord) string {
+	return fmt.Sprintf("[DECISION] %s (hash=%s): %s", decision.SymbolOrPath, shortHash(decision.FileHash), decision.Summary)
 }
 
 func shortHash(value string) string {

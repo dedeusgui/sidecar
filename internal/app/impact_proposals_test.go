@@ -46,3 +46,14 @@ func TestProposeImpactRequiresTheReportStillMatchUncommittedFiles(t *testing.T) 
 		t.Fatalf("clean worktree retained an impact proposal: ok=%v err=%v", ok, err)
 	}
 }
+
+func TestProposeImpactRejectsDifferentRootBeforeReadingDiff(t *testing.T) {
+	root := t.TempDir()
+	gitIn(t, root, "init", "-q")
+	scope := contract.Scope{RepoRoot: filepath.Join(root, "other"), WorktreeID: filepath.Join(root, "other"), SessionID: "s1"}
+	registry := contract.NewEvidenceRegistry[retrieve.Evidence](scope)
+	_, ok, err := ProposeImpact(context.Background(), root, impact.Report{Changed: []string{"a.go"}}, scope, contract.PhaseVerify, true, registry)
+	if err == nil || ok {
+		t.Fatalf("cross-root report = ok %v err %v; want rejection before the diff read", ok, err)
+	}
+}

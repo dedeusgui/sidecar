@@ -2,8 +2,14 @@ package contract
 
 import (
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 )
+
+func proofRef(id int64) string {
+	return "symbol:" + strconv.FormatInt(id, 10) + ":" + strings.Repeat("a", 64)
+}
 
 func TestEvidenceRegistryRequiresProofForVerified(t *testing.T) {
 	tests := []struct {
@@ -14,8 +20,9 @@ func TestEvidenceRegistryRequiresProofForVerified(t *testing.T) {
 	}{
 		{name: "verified without proof demotes to candidate", confidence: ConfidenceVerified, want: ConfidenceCandidate},
 		{name: "unsupported proof demotes to candidate", confidence: ConfidenceVerified, proof: VerificationProof{Kind: "guess", Reference: "symbol"}, want: ConfidenceCandidate},
-		{name: "index resolution verifies", confidence: ConfidenceVerified, proof: VerificationProof{Kind: VerificationIndex, Reference: "symbol:fn"}, want: ConfidenceVerified},
-		{name: "candidate stays candidate", confidence: ConfidenceCandidate, proof: VerificationProof{Kind: VerificationAST, Reference: "symbol:fn"}, want: ConfidenceCandidate},
+		{name: "opaque index reference demotes to candidate", confidence: ConfidenceVerified, proof: VerificationProof{Kind: VerificationIndex, Reference: "opaque"}, want: ConfidenceCandidate},
+		{name: "index resolution verifies", confidence: ConfidenceVerified, proof: VerificationProof{Kind: VerificationIndex, Reference: proofRef(1)}, want: ConfidenceVerified},
+		{name: "candidate stays candidate", confidence: ConfidenceCandidate, proof: VerificationProof{Kind: VerificationAST, Reference: "ast:1:" + strings.Repeat("a", 64)}, want: ConfidenceCandidate},
 		{name: "invalid label becomes unknown", confidence: "certain", want: ConfidenceUnknown},
 	}
 	for _, test := range tests {
@@ -54,7 +61,7 @@ func TestEvidenceRegistryDeduplicatesCanonicalFacts(t *testing.T) {
 	second, inserted, err := registry.Add(EvidenceRef{
 		Path: "internal/x.go", Fingerprint: "sha256:abc", LineStart: 4, LineEnd: 8,
 		Origin: "index", Confidence: ConfidenceVerified,
-		Proof:     VerificationProof{Kind: VerificationIndex, Reference: "symbol:fn"},
+		Proof:     VerificationProof{Kind: VerificationIndex, Reference: proofRef(1)},
 		Freshness: FreshnessCurrent, CostEstimate: 12,
 	}, "duplicate")
 	if err != nil || inserted {

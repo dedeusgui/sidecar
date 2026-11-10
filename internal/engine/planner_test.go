@@ -2,6 +2,7 @@ package engine
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dedeusgui/sidecar/internal/engine/contract"
@@ -20,7 +21,7 @@ func plannerFixture(t *testing.T) (PlanInput, string) {
 	ref, inserted, err := registry.Add(contract.EvidenceRef{
 		Path: "internal/router.go", Fingerprint: "sha256:route", LineStart: 10, LineEnd: 15,
 		Origin: "index", Confidence: contract.ConfidenceVerified,
-		Proof:     contract.VerificationProof{Kind: contract.VerificationIndex, Reference: "function:route"},
+		Proof:     contract.VerificationProof{Kind: contract.VerificationIndex, Reference: "symbol:1:" + strings.Repeat("a", 64)},
 		Freshness: contract.FreshnessCurrent, CostEstimate: 20,
 	}, retrieve.Evidence{ID: "evidence-1", Verdict: "VERIFIED"})
 	if err != nil || !inserted {

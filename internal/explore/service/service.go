@@ -342,7 +342,7 @@ func collect(ctx context.Context, st *store.Store, explored core.Result, seeds [
 		if ctx.Err() != nil {
 			return empty("timeout")
 		}
-		for _, ev := range relationEvidence(ctx, st, edge, symbolCache, loadedPaths) {
+		for _, ev := range relationEvidence(ctx, st, edge, symbolCache, loadedPaths, currentPaths) {
 			if ctx.Err() != nil {
 				return empty("timeout")
 			}
@@ -386,9 +386,10 @@ func collect(ctx context.Context, st *store.Store, explored core.Result, seeds [
 	return out
 }
 
-func relationEvidence(ctx context.Context, st *store.Store, edge core.Edge, symbolCache map[string][]store.SymbolHit, loadedPaths map[string]bool) []retrieve.Evidence {
+func relationEvidence(ctx context.Context, st *store.Store, edge core.Edge, symbolCache map[string][]store.SymbolHit, loadedPaths, currentPaths map[string]bool) []retrieve.Evidence {
 	verdict, confidence := statusValues(edge.Status)
-	if edge.Status == "VERIFIED" && !verifiedRelationBasis(edge.Basis) {
+	if edge.Status == "VERIFIED" && (!verifiedRelationBasis(edge.Basis) ||
+		!currentPaths[edge.From.Path] || !currentPaths[edge.To.Path]) {
 		verdict, confidence = "INFERRED", 0.55
 	}
 	proofRelation := edge.Kind + ":" + edge.Basis + ":" + edge.From.Path + ":" + edge.From.Name + ":" +
