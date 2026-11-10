@@ -16,6 +16,7 @@ import (
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
+	"github.com/dedeusgui/sidecar/internal/engine/contract"
 	"github.com/dedeusgui/sidecar/internal/gitx"
 	"github.com/dedeusgui/sidecar/internal/paths"
 	"github.com/dedeusgui/sidecar/internal/progress"
@@ -88,7 +89,13 @@ func Observe(agent adapter.Agent, event string, in io.Reader) (exit int) {
 		return 0
 	}
 	statePath := paths.ObserverState(root, string(agent), call.Session)
-	s := brief.LoadSignals(statePath, worktreeVersion(root), start)
+	version := worktreeVersion(root)
+	scope := observerScope(root, call.Session, version)
+	s := brief.LoadSignals(statePath, version, start)
+	if s.ScopeFingerprint != "" && s.ScopeFingerprint != brief.ScopeFingerprint(scope) {
+		s = brief.NewSignals(version, start)
+	}
+	s.ScopeFingerprint = brief.ScopeFingerprint(scope)
 	if call.Phase == "compact" {
 		// The agent lost what it saw before the compaction, so evidence suppressed as already
 		// sent must be sent again; reads before it are not loops after it.
@@ -244,11 +251,32 @@ func InjectionAllowed(agent adapter.Agent, invocation int) bool {
 	return agent != adapter.Antigravity || invocation == 0
 }
 
+// ObservationStateFromCoverage treats missing or unknown coverage as
+// unsupported/unobserved. It only reports Seen for an event explicitly
+// recorded by the observer.
+func ObservationStateFromCoverage(coverage string) contract.ObservationState {
+	switch strings.ToLower(strings.TrimSpace(coverage)) {
+	case "observed", "seen":
+		return contract.ObservationSeen
+	case "not_observed", "not_seen":
+		return contract.ObservationNotSeen
+	default:
+		return contract.ObservationUnsupported
+	}
+}
+
 // recordEvidence notes in the session signals what the prompt was given: a count, the files
 // and the symbols, all as hashes. It is bookkeeping, so failures are ignored.
 func recordEvidence(root string, agent adapter.Agent, session string, sent []string) {
 	statePath := paths.ObserverState(root, string(agent), session)
-	s := brief.LoadSignals(statePath, worktreeVersion(root), time.Now())
+	now := time.Now()
+	version := worktreeVersion(root)
+	scope := observerScope(root, session, version)
+	s := brief.LoadSignals(statePath, version, now)
+	if s.ScopeFingerprint != "" && s.ScopeFingerprint != brief.ScopeFingerprint(scope) {
+		s = brief.NewSignals(version, now)
+	}
+	s.ScopeFingerprint = brief.ScopeFingerprint(scope)
 	s.EvidenceSent += len(sent)
 	for _, key := range sent {
 		parts := strings.SplitN(key, "|", 3)
@@ -265,6 +293,10 @@ func recordEvidence(root string, agent adapter.Agent, session string, sent []str
 		}
 	}
 	_ = brief.SaveSignals(statePath, s)
+}
+
+func observerScope(root, session, revision string) contract.Scope {
+	return contract.NormalizeScope(contract.Scope{RepoRoot: root, WorktreeID: root, SessionID: session, WorktreeRevision: revision})
 }
 
 func schemaV1(c adapter.ToolCall, root string, elapsed time.Duration) EventV1 {

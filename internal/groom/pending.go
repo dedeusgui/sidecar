@@ -21,9 +21,10 @@ type Pending struct {
 
 // State is the grooming memory of one session.
 type SessionState struct {
-	Asked   int      `json:"asked"`
-	Turn    int      `json:"turn"`
-	Pending *Pending `json:"pending,omitempty"`
+	Asked            int      `json:"asked"`
+	Turn             int      `json:"turn"`
+	Pending          *Pending `json:"pending,omitempty"`
+	ScopeFingerprint string   `json:"scope_fingerprint,omitempty"`
 }
 
 // PendingTurns is how many prompts a pending question waits for its answer.
