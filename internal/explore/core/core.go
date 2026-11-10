@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -127,6 +128,10 @@ type Result struct {
 const (
 	maxRelationsPerSymbol = 6
 	maxSeedsForRelations  = 4
+	maxExpansionSeeds     = 2
+	maxExpansionDepth     = 3
+	maxExpansionNodes     = 10
+	maxExpansionMembers   = 64
 	maxRefs               = 10
 	contextLines          = 2
 	mergeGap              = 6
@@ -199,6 +204,8 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 	out.Gaps = append(out.Gaps, input.Gaps...)
 	maxFiles, maxChars := out.Budget.MaxFiles, out.Budget.MaxChars
 	res := input.Evidence
+	terms := focusTerms(opts.Query)
+	res.Evidence = queryEvidence(res.Evidence, terms)
 	if len(res.Evidence) == 0 {
 		out.Gaps = append(out.Gaps, "no indexed symbol matched the query; try a symbol name, a path or the project's own words")
 		out.ElapsedMS = ms(time.Since(start))
@@ -224,9 +231,23 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 		}
 		g.items = append(g.items, ev)
 	}
-	perFile := maxChars / max(1, min(maxFiles, len(groups)))
-	used := 0
 	var seeds []store.SymbolHit
+	for _, g := range groups {
+		for _, ev := range g.items {
+			if ev.Hit.Kind != "file" && ev.Hit.Kind != "section" && len(seeds) < maxSeedsForRelations {
+				seeds = append(seeds, ev.Hit)
+			}
+		}
+	}
+	plan, err := planExpansion(st, seeds, res.Evidence, terms)
+	if err != nil {
+		return out, err
+	}
+	perFile := maxChars / max(1, min(maxFiles, len(groups)))
+	if len(plan.roots) > 0 {
+		perFile /= 2 // reserve half the source budget for the bounded call-chain bodies
+	}
+	used := 0
 	for i, g := range groups {
 		if err := ctx.Err(); err != nil {
 			return out, err
@@ -246,9 +267,6 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 		for _, ev := range g.items {
 			f.Symbols = append(f.Symbols, Symbol{Name: ev.Hit.Name, Kind: ev.Hit.Kind, Line: ev.Hit.Line, EndLine: ev.Hit.EndLine,
 				Signature: ev.Hit.Signature, Verdict: ev.Verdict, Source: ev.Source, Confidence: ev.Confidence, Reason: reasonOf(ev)})
-			if ev.Hit.Kind != "file" && ev.Hit.Kind != "section" && len(seeds) < maxSeedsForRelations && rec.Kind != "test" {
-				seeds = append(seeds, ev.Hit)
-			}
 		}
 		data, readErr := os.ReadFile(filepath.Join(opts.Root, filepath.FromSlash(g.path)))
 		switch {
@@ -263,7 +281,16 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 				out.Gaps = append(out.Gaps, g.path+": changed on disk since indexing; line numbers may be off until the next sync")
 			}
 			budget := min(perFile, maxChars-used)
-			f.Snippets = snippets(string(data), g.items, budget, focusTerms(opts.Query))
+			snippetItems := g.items
+			if len(plan.classAnchors) > 0 {
+				snippetItems = append([]retrieve.Evidence(nil), g.items...)
+				for j := range snippetItems {
+					if plan.classAnchors[snippetItems[j].Hit.ID] {
+						snippetItems[j].Hit.EndLine = min(snippetItems[j].Hit.EndLine, snippetItems[j].Hit.Line+3)
+					}
+				}
+			}
+			f.Snippets = snippets(string(data), snippetItems, budget, terms)
 			for _, s := range f.Snippets {
 				used += len(s.Text)
 			}
@@ -282,6 +309,9 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 		shown[f.Path] = true
 	}
 	if err := relate(ctx, st, seeds, shown, &out); err != nil {
+		return out, err
+	}
+	if err := expandCallChain(ctx, st, opts.Root, terms, plan, recs, maxFiles, maxChars, &out); err != nil {
 		return out, err
 	}
 	for _, f := range res.Trace.Contracts {
@@ -320,6 +350,319 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 		"entry points are CANDIDATE: a symbol with no indexed caller may still be called by a framework, a test runner or another repository")
 	out.ElapsedMS = ms(time.Since(start))
 	return out, nil
+}
+
+type expansionSeed struct {
+	hit       store.SymbolHit
+	parent    store.SymbolHit
+	hasParent bool
+	basis     string
+	score     int
+}
+
+type expansionPlan struct {
+	roots        []expansionSeed
+	classAnchors map[int64]bool
+}
+
+type expansionNode struct {
+	hit     store.SymbolHit
+	parent  store.SymbolHit
+	hasFrom bool
+	basis   string
+	reason  string
+	depth   int
+}
+
+func queryEvidence(in []retrieve.Evidence, terms []string) []retrieve.Evidence {
+	out := make([]retrieve.Evidence, 0, len(in))
+	for _, ev := range in {
+		if ev.Note != "" || ev.Hit.Path == "" {
+			out = append(out, ev)
+			continue
+		}
+		if ev.Source == "exact" || hasOwnQueryMatch(ev, terms) {
+			out = append(out, ev)
+		}
+	}
+	return out
+}
+
+func hasOwnQueryMatch(ev retrieve.Evidence, terms []string) bool {
+	text := strings.ToLower(ev.Hit.Name + " " + ev.Hit.Signature + " " + ev.Hit.Doc)
+	if queryTermScore(text, terms) > 0 {
+		return true
+	}
+	for _, matched := range ev.Matched {
+		if parts := strings.SplitN(matched, "→", 2); len(parts) == 2 {
+			matched = parts[1]
+		}
+		if matched != "" && strings.Contains(text, strings.ToLower(matched)) {
+			return true
+		}
+	}
+	return false
+}
+
+func planExpansion(st *store.Store, seeds []store.SymbolHit, evidence []retrieve.Evidence, terms []string) (expansionPlan, error) {
+	plan := expansionPlan{classAnchors: map[int64]bool{}}
+	verified := map[int64]bool{}
+	for _, ev := range evidence {
+		verified[ev.Hit.ID] = ev.Verdict == "VERIFIED" || ev.Source == "exact"
+	}
+	var candidates []expansionSeed
+	for _, seed := range seeds {
+		if seed.Kind == "class" {
+			if !verified[seed.ID] {
+				continue
+			}
+			members, err := st.MembersOf(seed.ID, maxExpansionMembers)
+			if err != nil {
+				return plan, err
+			}
+			for _, member := range members {
+				score := queryTermScore(member.Name+" "+member.Signature+" "+member.Doc, terms)
+				if score > 0 {
+					candidates = append(candidates, expansionSeed{hit: member.SymbolHit, parent: seed, hasParent: true, basis: member.Basis, score: score})
+				}
+			}
+			continue
+		}
+		if (seed.Kind == "function" || seed.Kind == "method" || seed.Kind == "route") && verified[seed.ID] {
+			if score := queryTermScore(seed.Name+" "+seed.Signature+" "+seed.Doc, terms); score > 0 {
+				candidates = append(candidates, expansionSeed{hit: seed, score: score})
+			}
+		}
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
+		}
+		if candidates[i].hit.Path != candidates[j].hit.Path {
+			return candidates[i].hit.Path < candidates[j].hit.Path
+		}
+		if candidates[i].hit.Line != candidates[j].hit.Line {
+			return candidates[i].hit.Line < candidates[j].hit.Line
+		}
+		return candidates[i].hit.Name < candidates[j].hit.Name
+	})
+	for _, candidate := range candidates[:min(maxExpansionSeeds, len(candidates))] {
+		plan.roots = append(plan.roots, candidate)
+		if candidate.hasParent {
+			plan.classAnchors[candidate.parent.ID] = true
+		}
+	}
+	return plan, nil
+}
+
+func expandCallChain(ctx context.Context, st *store.Store, root string, terms []string, plan expansionPlan,
+	records map[string]store.FileRecord, maxFiles, maxChars int, out *Result) error {
+	if len(plan.roots) == 0 {
+		return nil
+	}
+	selected := make(map[string]expansionNode)
+	seenEdges := map[string]bool{}
+	for _, edge := range out.Relations {
+		seenEdges[edgeKey(edge)] = true
+	}
+	var order []string
+	queue := make([]expansionNode, 0, maxExpansionNodes)
+	add := func(node expansionNode) bool {
+		key := symbolKey(node.hit)
+		if _, exists := selected[key]; exists || len(selected) >= maxExpansionNodes {
+			return false
+		}
+		selected[key] = node
+		order = append(order, key)
+		queue = append(queue, node)
+		return true
+	}
+	for _, seed := range plan.roots {
+		if seed.hasParent {
+			add(expansionNode{hit: seed.hit, parent: seed.parent, hasFrom: true, basis: seed.basis,
+				reason: "member of " + seed.parent.Name + "; selected by query terms"})
+		} else {
+			add(expansionNode{hit: seed.hit, reason: "verified query seed"})
+		}
+	}
+	for i := 0; i < len(queue); i++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		current := queue[i]
+		if current.depth >= maxExpansionDepth {
+			continue
+		}
+		callers, err := st.CallersOf(current.hit.ID, maxRelationsPerSymbol)
+		if err != nil {
+			return err
+		}
+		callees, err := st.CalleesOf(current.hit.ID, maxRelationsPerSymbol)
+		if err != nil {
+			return err
+		}
+		candidates := make([]expansionNode, 0, len(callers)+len(callees))
+		for _, rel := range callers {
+			candidates = append(candidates, expansionNode{hit: rel.SymbolHit, parent: current.hit, hasFrom: true, basis: rel.Basis,
+				reason: "calls " + current.hit.Name, depth: current.depth + 1})
+		}
+		for _, rel := range callees {
+			candidates = append(candidates, expansionNode{hit: rel.SymbolHit, parent: current.hit, basis: rel.Basis,
+				reason: "called by " + current.hit.Name, depth: current.depth + 1})
+		}
+		sort.Slice(candidates, func(i, j int) bool {
+			si := queryTermScore(candidates[i].hit.Name+" "+candidates[i].hit.Signature+" "+candidates[i].hit.Doc, terms)
+			sj := queryTermScore(candidates[j].hit.Name+" "+candidates[j].hit.Signature+" "+candidates[j].hit.Doc, terms)
+			if si != sj {
+				return si > sj
+			}
+			vi, vj := candidates[i].basis != "unique_name", candidates[j].basis != "unique_name"
+			if vi != vj {
+				return vi
+			}
+			if candidates[i].hit.Path != candidates[j].hit.Path {
+				return candidates[i].hit.Path < candidates[j].hit.Path
+			}
+			if candidates[i].hit.Line != candidates[j].hit.Line {
+				return candidates[i].hit.Line < candidates[j].hit.Line
+			}
+			return candidates[i].hit.Name < candidates[j].hit.Name
+		})
+		added := 0
+		for _, candidate := range candidates {
+			if candidate.hit.Kind != "function" && candidate.hit.Kind != "method" && candidate.hit.Kind != "route" {
+				continue
+			}
+			if rec, ok := records[candidate.hit.Path]; ok && rec.Kind == "test" {
+				continue
+			}
+			if candidate.basis == "unique_name" && queryTermScore(candidate.hit.Name+" "+candidate.hit.Signature+" "+candidate.hit.Doc, terms) == 0 {
+				continue
+			}
+			edge := callEdge(candidate)
+			if _, exists := selected[symbolKey(candidate.hit)]; exists {
+				if !seenEdges[edgeKey(edge)] {
+					out.Relations = append(out.Relations, edge)
+					seenEdges[edgeKey(edge)] = true
+					added++
+				}
+				if added >= 2 {
+					break
+				}
+				continue
+			}
+			if add(candidate) {
+				if !seenEdges[edgeKey(edge)] {
+					out.Relations = append(out.Relations, edge)
+					seenEdges[edgeKey(edge)] = true
+				}
+				added++
+				if added >= 2 || len(selected) >= maxExpansionNodes {
+					break
+				}
+			}
+		}
+	}
+	shown := make(map[string]int, len(out.Files))
+	for i := range out.Files {
+		shown[out.Files[i].Path] = i
+	}
+	knownSymbols := map[string]bool{}
+	for _, f := range out.Files {
+		for _, s := range f.Symbols {
+			knownSymbols[f.Path+"#"+s.Kind+"#"+s.Name+"#"+strconv.Itoa(s.Line)] = true
+		}
+	}
+	for _, key := range order {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		node := selected[key]
+		if maxChars-out.Budget.UsedChars <= 0 {
+			break
+		}
+		fi, exists := shown[node.hit.Path]
+		if !exists {
+			if len(out.Files) >= maxFiles {
+				continue
+			}
+			rec, ok := records[node.hit.Path]
+			if !ok {
+				continue
+			}
+			fi = len(out.Files)
+			shown[node.hit.Path] = fi
+			out.Files = append(out.Files, File{Path: node.hit.Path, Lang: rec.Lang, Kind: rec.Kind, Role: "candidate",
+				Reason: "verified call-chain neighbor"})
+		}
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(node.hit.Path)))
+		if err != nil {
+			continue
+		}
+		rec := records[node.hit.Path]
+		tokenTerms := append(append([]string{}, terms...), strings.ToLower(node.hit.Name))
+		for _, term := range lexical.Analyze(node.hit.Name) {
+			tokenTerms = append(tokenTerms, term)
+		}
+		evidence := retrieve.Evidence{Hit: node.hit, Verdict: statusOfBasis(node.basis), Source: "structural", Confidence: 0.9}
+		snips := snippets(string(data), []retrieve.Evidence{evidence}, maxChars-out.Budget.UsedChars, tokenTerms)
+		if len(snips) == 0 {
+			continue
+		}
+		out.Files[fi].Snippets = append(out.Files[fi].Snippets, snips...)
+		for _, snippet := range snips {
+			out.Budget.UsedChars += len(snippet.Text)
+		}
+		if !knownSymbols[node.hit.Path+"#"+node.hit.Kind+"#"+node.hit.Name+"#"+strconv.Itoa(node.hit.Line)] {
+			verdict := statusOfBasis(node.basis)
+			confidence := 0.6
+			if verdict == Verified {
+				confidence = 0.9
+			}
+			out.Files[fi].Symbols = append(out.Files[fi].Symbols, Symbol{Name: node.hit.Name, Kind: node.hit.Kind, Line: node.hit.Line,
+				EndLine: node.hit.EndLine, Signature: node.hit.Signature, Verdict: verdict, Source: "structural",
+				Confidence: confidence, Reason: node.reason})
+			knownSymbols[node.hit.Path+"#"+node.hit.Kind+"#"+node.hit.Name+"#"+strconv.Itoa(node.hit.Line)] = true
+		}
+		sum := sha256.Sum256(data)
+		if rec.Hash != "" && hex.EncodeToString(sum[:]) != rec.Hash {
+			out.Files[fi].Stale = true
+			out.Gaps = append(out.Gaps, node.hit.Path+": changed on disk since indexing; line numbers may be off until the next sync")
+		}
+	}
+	return nil
+}
+
+func callEdge(node expansionNode) Edge {
+	status := statusOfBasis(node.basis)
+	parent := Ref{Name: node.parent.Name, Kind: node.parent.Kind, Path: node.parent.Path, Line: node.parent.Line, Status: Verified}
+	child := Ref{Name: node.hit.Name, Kind: node.hit.Kind, Path: node.hit.Path, Line: node.hit.Line, Status: status, Basis: node.basis, Reason: node.reason}
+	if node.hasFrom {
+		return Edge{From: child, To: parent, Kind: "calls", Status: status, Basis: node.basis}
+	}
+	return Edge{From: parent, To: child, Kind: "calls", Status: status, Basis: node.basis}
+}
+
+func edgeKey(edge Edge) string {
+	return edge.Kind + "#" + edge.From.Path + "#" + edge.From.Name + "#" + strconv.Itoa(edge.From.Line) +
+		"#" + edge.To.Path + "#" + edge.To.Name + "#" + strconv.Itoa(edge.To.Line)
+}
+
+func symbolKey(hit store.SymbolHit) string {
+	return hit.Path + "#" + hit.Kind + "#" + hit.Name + "#" + strconv.Itoa(hit.Line)
+}
+
+func queryTermScore(text string, terms []string) int {
+	text = strings.ToLower(text)
+	seen := map[string]bool{}
+	score := 0
+	for _, term := range terms {
+		if term != "" && !seen[term] && strings.Contains(text, term) {
+			seen[term] = true
+			score++
+		}
+	}
+	return score
 }
 
 // memberKeys returns the member names of dotted code references in the query (`res.send` -> `send`,
