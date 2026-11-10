@@ -11,13 +11,19 @@ import (
 // splits lists the case splits in report order. The evaluation split is never used for tuning.
 var splits = []string{"tune", "eval", "holdout"}
 
-// splitsOf lists the fixed splits first, always (the report shape is documented), then any other
-// split in order of appearance. Scenario suites and external manifests bring their own names.
+// splitsOf lists the fixed non-holdout splits first. Holdout is listed only when present in the
+// outcomes, then any other split in order of appearance. Scenario suites and external manifests
+// bring their own names.
 func splitsOf(outs []caseOutcome) []string {
-	out := append([]string{}, splits...)
-	seen := map[string]bool{}
-	for _, s := range splits {
-		seen[s] = true
+	present := map[string]bool{}
+	for _, o := range outs {
+		present[o.Split] = true
+	}
+	out := append([]string{}, splits[:2]...)
+	seen := map[string]bool{"tune": true, "eval": true}
+	if present["holdout"] {
+		out = append(out, "holdout")
+		seen["holdout"] = true
 	}
 	for _, o := range outs {
 		if !seen[o.Split] {
@@ -94,6 +100,10 @@ func compareRuns(base baseline, cur []caseOutcome, methods []string) comparison 
 	allOutcomes := make([]caseOutcome, 0, len(base.Outcomes)+len(cur))
 	allOutcomes = append(allOutcomes, base.Outcomes...)
 	allOutcomes = append(allOutcomes, cur...)
+	currentSplits := make(map[string]bool)
+	for _, o := range cur {
+		currentSplits[o.Split] = true
+	}
 	validGroups := make(map[string]map[string]bool)
 	for _, m := range methods {
 		if !inBase[m] {
@@ -101,6 +111,9 @@ func compareRuns(base baseline, cur []caseOutcome, methods []string) comparison 
 			continue
 		}
 		for _, split := range splitsOf(allOutcomes) {
+			if split == "holdout" && !currentSplits[split] {
+				continue
+			}
 			ok, nonempty := comparableCases(m, split, base.Outcomes, cur)
 			if !nonempty {
 				continue

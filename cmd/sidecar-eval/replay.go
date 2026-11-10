@@ -175,18 +175,10 @@ func gitHead() string {
 func runReplay(path string, cf casesFile, indexes map[string]*index.Index, outPath string, includeHoldout bool) error {
 	// The holdout is never used to choose among variants: replay is a tuning tool. --include-holdout exists for a
 	// final, single report and must be asked for.
-	var kept []caseSpec
-	skipped := 0
-	for _, c := range cf.Cases {
-		if c.Split == "holdout" && !includeHoldout {
-			skipped++
-			continue
-		}
-		kept = append(kept, c)
-	}
+	kept, skipped := filterHoldoutCases(cf.Cases, includeHoldout)
 	cf.Cases = kept
 	if skipped > 0 {
-		fmt.Fprintf(os.Stderr, "replay: %d holdout cases excluded (use --include-holdout for a final report)\n", skipped)
+		fmt.Fprintf(os.Stderr, "sidecar-eval: %d casos holdout omitidos; use --include-holdout só para relatório final\n", skipped)
 	}
 	cfg, raw, err := loadReplayConfig(path)
 	if err != nil {

@@ -65,6 +65,8 @@ go run ./cmd/sidecar explain --root . --json  # lê prompt de stdin
 go run ./cmd/sidecar doctor
 ```
 
+`sidecar-eval` omite casos `holdout` por padrão e informa a contagem omitida em stderr; use `--include-holdout` somente para um relatório final após o freeze explícito.
+
 `go test -race` depende do ambiente e não é gate Windows/macOS neste CI. `/tmp` é exemplo POSIX; escolher diretório temporário adequado em outros SOs. `sidecar explain` pode escrever índice no cache do usuário; usar ambiente isolado para experiências. Não rodar tarefas de benchmark agentic pagas em CI por padrão.
 
 ## Política de avaliação

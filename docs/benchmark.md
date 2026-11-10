@@ -138,9 +138,11 @@ e o restante vai para o indexador em segundo plano.
 ## Reproduzir
 
 ```sh
-go run ./cmd/sidecar-eval --cases bench/cases.json --out bench/results/run.json
-go run ./cmd/sidecar-eval --cases bench/cases.json --compare bench/results/final-state.json --report-md <fora-do-repo>/relatorio.md
+go run ./cmd/sidecar-eval --cases bench/cases.json --include-holdout --out bench/results/run.json
+go run ./cmd/sidecar-eval --cases bench/cases.json --include-holdout --compare bench/results/final-state.json --report-md <fora-do-repo>/relatorio.md
 ```
+
+Esses comandos reproduzem o relatório histórico dos três splits; o `holdout` dessa fixture já foi inspecionado e não é cego.
 
 O harness constrói os repositórios de fixture em um diretório temporário, indexa, roda os métodos e imprime as tabelas.
 
@@ -150,7 +152,7 @@ Com `--compare`, o avaliador imprime o delta de Hit@5, Recall@10, MRR, precisão
 
 Mudança: `.rs`, `.php`, `.rb` e `.kt` passam a ser indexados com as gramáticas embutidas, e `extractVersion` sobe para 2. O corpus `bench/testdata` não tem arquivos dessas extensões, então a comparação mede só a ausência de regressão, não ganho.
 
-- Comando: `go run ./cmd/sidecar-eval --cases bench/cases.json --out <tmp>`, antes e depois da mudança.
+- Comando: `go run ./cmd/sidecar-eval --cases bench/cases.json --include-holdout --out <tmp>`, antes e depois da mudança.
 - Hit@5, Recall@10, precisão e falso positivo ficaram **idênticos** em todos os métodos, em ambos os splits.
 - BM25, léxico e grafo: MRR idêntico.
 - `textual (substring)`: MRR variou entre execuções **do mesmo binário** (0,075, 0,100 e 0,117 no split tune). A variação vem do desempate do `sort.SliceStable` sobre a ordem de `AllSymbols()`, que não é determinística. Isso já existia antes da mudança e não foi corrigido nesta rodada. Até corrigir, não compare MRR do baseline textual entre execuções. Na verificação de 2026-11-06 o problema apareceu em todas as linhas: duas execuções do `HEAD`, sem nenhuma mudança, diferiram em 56 caminhos JSON não temporais de `sidecar-eval` (ex.: `hit_at_1` de casos individuais). Um antes/depois sem esse controle não prova ausência de regressão.
@@ -233,7 +235,7 @@ Conclusão: o descarte de vizinhos com "correspondência parcial" protege o rank
 ### 5. Reprodução
 
 ```sh
-go run ./cmd/sidecar-eval --cases bench/cases.json --compare bench/results/final-state.json --out /tmp/sidecar-eval-v2-final.json --report-md bench/results/v2-final.md
+go run ./cmd/sidecar-eval --cases bench/cases.json --include-holdout --compare bench/results/final-state.json --out /tmp/sidecar-eval-v2-final.json --report-md bench/results/v2-final.md
 go run ./cmd/sidecar-eval --cases bench/v2_scenarios.json --out /tmp/sidecar-eval-v2-scenarios.json --report-md bench/results/v2-scenarios.md
 go run ./cmd/sidecar-eval --external-cases <manifesto-pinado.json> --out <fora-do-repo>/externo.json
 python3 -I bench/agentic/instrumented_sim.py --sidecar <binario> --home <dir-novo> --dict internal/lexical/dictionary.go --manifest bench/agentic/manifest.jsonl --repo spring-petclinic=<clone> --repo chi=<clone> --reps 5 --out-dir bench/agentic --scores-out bench/results/real-repos-scores.json

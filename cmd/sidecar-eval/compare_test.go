@@ -168,7 +168,10 @@ func TestLoadBaselineRejectsFilesWithoutOutcomes(t *testing.T) {
 func TestMarkdownReportHasSplitsAndComparison(t *testing.T) {
 	methods := []method{{name: "m"}}
 	cur := []caseOutcome{{Method: "m", Split: "tune", Case: "T1", Hit5: false}}
-	base := baseline{Outcomes: []caseOutcome{{Method: "m", Split: "tune", Case: "T1", Hit5: true}}}
+	base := baseline{Outcomes: []caseOutcome{
+		{Method: "m", Split: "tune", Case: "T1", Hit5: true},
+		{Method: "m", Split: "holdout", Case: "H1", Hit5: true},
+	}}
 	c := compareRuns(base, cur, methodNames(methods))
 
 	path := filepath.Join(t.TempDir(), "report.md")
@@ -179,13 +182,16 @@ func TestMarkdownReportHasSplitsAndComparison(t *testing.T) {
 	}
 	out := string(data)
 	for _, want := range []string{
-		"# Relatório sidecar-eval", "### Split: tune", "### Split: holdout",
+		"# Relatório sidecar-eval", "### Split: tune",
 		"### Comparação com baseline", "#### Regressões (1)", "caso T1 (tune): Hit@5 verdadeiro → falso",
 		"#### Melhorias (0)", "Nenhuma melhoria.",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("report missing %q", want)
 		}
+	}
+	if strings.Contains(out, "holdout") {
+		t.Error("report without holdout outcomes must not expose baseline holdout")
 	}
 	var plain bytes.Buffer
 	printTables(&plain, methods, cur)
