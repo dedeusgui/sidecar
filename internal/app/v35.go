@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
@@ -637,10 +638,17 @@ func uniqueStrings(values []string) []string {
 // in the prompt (e.g. "observer" -> observer.go) ahead of the others, so the few anchors kept
 // under a tight budget are the files the user literally named.
 func preferNamedFiles(choices []engine.Choice, prompt string) []engine.Choice {
-	lower := strings.ToLower(prompt)
+	// Whole words only: a stem hidden inside a longer word, or a short common word such as
+	// "main", "test", "app" or "base", must not promote a file.
+	words := map[string]bool{}
+	for _, w := range strings.FieldsFunc(strings.ToLower(prompt), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		words[w] = true
+	}
 	named := func(c engine.Choice) bool {
 		stem := strings.ToLower(strings.TrimSuffix(filepath.Base(c.Path), filepath.Ext(c.Path)))
-		return c.Source != "contract" && len(stem) >= 5 && strings.Contains(lower, stem)
+		return c.Source != "contract" && len(stem) >= 6 && words[stem]
 	}
 	out := make([]engine.Choice, 0, len(choices))
 	seen := map[string]bool{}
@@ -661,4 +669,3 @@ func preferNamedFiles(choices []engine.Choice, prompt string) []engine.Choice {
 	}
 	return out
 }
-

@@ -414,3 +414,24 @@ func TestHookLegacyOutputsRemainByteForByteCompatible(t *testing.T) {
 		}
 	}
 }
+
+func TestPreferNamedFilesIgnoresCommonWordsAndSubstrings(t *testing.T) {
+	choices := []engine.Choice{
+		{ID: "1", Path: "cmd/main.go"}, {ID: "2", Path: "internal/app/app.go"},
+		{ID: "3", Path: "internal/base/base.go"}, {ID: "4", Path: "internal/agentes/agentes_test.go"},
+		{ID: "5", Path: "internal/app/observer.go"}, {ID: "6", Path: "internal/app/agent.go"},
+	}
+	ids := func(in []engine.Choice) string {
+		var out []string
+		for _, c := range in {
+			out = append(out, c.ID)
+		}
+		return strings.Join(out, ",")
+	}
+	if got := ids(preferNamedFiles(choices, "main test app base agentes")); got != "1,2,3,4,5,6" {
+		t.Fatalf("common words promoted files: %s", got)
+	}
+	if got := ids(preferNamedFiles(choices, "os agentes e o observer")); got != "5,1,2,3,4,6" {
+		t.Fatalf("literal whole-word file name was not promoted alone: %s", got)
+	}
+}
