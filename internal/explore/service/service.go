@@ -243,6 +243,17 @@ func verifiedAnchors(ctx context.Context, st *store.Store, registry *contract.Ev
 	anchors := make([]retrieve.Evidence, 0, min(limit, len(refs)))
 	rejectedStale := false
 	seen := map[string]bool{}
+	type fileLookup struct {
+		record store.FileRecord
+		exists bool
+		err    error
+	}
+	type symbolLookup struct {
+		symbols []store.SymbolHit
+		err     error
+	}
+	filesByPath := map[string]fileLookup{}
+	symbolsByPath := map[string]symbolLookup{}
 	for _, ref := range refs {
 		if ctx.Err() != nil {
 			return anchors, rejectedStale, true
@@ -269,18 +280,28 @@ func verifiedAnchors(ctx context.Context, st *store.Store, registry *contract.Ev
 		if hit.Path == "" || hit.ID == 0 || hit.Line <= 0 || hit.FileHash == "" {
 			continue
 		}
-		record, exists, err := st.FileRecordOf(hit.Path)
-		if err != nil || !exists || record.Hash != hit.FileHash || ref.Freshness == contract.FreshnessStale {
+		file, loaded := filesByPath[hit.Path]
+		if !loaded {
+			file.record, file.exists, file.err = st.FileRecordOf(hit.Path)
+			filesByPath[hit.Path] = file
+		}
+		file = filesByPath[hit.Path]
+		if file.err != nil || !file.exists || file.record.Hash != hit.FileHash || ref.Freshness == contract.FreshnessStale {
 			rejectedStale = true
 			continue
 		}
 		indexed := false
-		symbols, err := st.SymbolsInFile(hit.Path, 1000)
-		if err != nil {
+		symbols, loaded := symbolsByPath[hit.Path]
+		if !loaded {
+			symbols.symbols, symbols.err = st.SymbolsInFile(hit.Path, 1000)
+			symbolsByPath[hit.Path] = symbols
+		}
+		symbols = symbolsByPath[hit.Path]
+		if symbols.err != nil {
 			rejectedStale = true
 			continue
 		}
-		for _, symbol := range symbols {
+		for _, symbol := range symbols.symbols {
 			if symbol.ID == hit.ID && symbol.Name == hit.Name && symbol.Line == hit.Line && symbol.FileHash == hit.FileHash {
 				indexed = true
 				break

@@ -94,15 +94,19 @@ func TestFormatCodexUsesSameSchemaAsClaude(t *testing.T) {
 
 func TestCapabilitiesForClientEventContracts(t *testing.T) {
 	tests := []struct {
-		agent            Agent
-		promptEvent      string
-		toolEvents       contract.ObservationState
-		preCompact       contract.ObservationState
-		observationHooks []ObservationHook
+		agent             Agent
+		promptEvent       string
+		promptCapability  contract.CapabilityStatus
+		toolEvents        contract.ObservationState
+		preCompact        contract.ObservationState
+		toolCapability    contract.CapabilityStatus
+		compactCapability contract.CapabilityStatus
+		observationHooks  []ObservationHook
 	}{
 		{
-			agent: Claude, promptEvent: "UserPromptSubmit",
+			agent: Claude, promptEvent: "UserPromptSubmit", promptCapability: contract.CapabilityAvailable,
 			toolEvents: contract.ObservationSeen, preCompact: contract.ObservationSeen,
+			toolCapability: contract.CapabilityAvailable, compactCapability: contract.CapabilityAvailable,
 			observationHooks: []ObservationHook{
 				{Name: "PreToolUse", ObserveEvent: "PreToolUse"},
 				{Name: "PostToolUse", ObserveEvent: "PostToolUse"},
@@ -110,12 +114,14 @@ func TestCapabilitiesForClientEventContracts(t *testing.T) {
 			},
 		},
 		{
-			agent: Codex, promptEvent: "UserPromptSubmit",
+			agent: Codex, promptEvent: "UserPromptSubmit", promptCapability: contract.CapabilityAvailable,
 			toolEvents: contract.ObservationUnsupported, preCompact: contract.ObservationUnsupported,
+			toolCapability: contract.CapabilityUnsupported, compactCapability: contract.CapabilityUnsupported,
 		},
 		{
-			agent: Antigravity, promptEvent: "PreInvocation",
-			toolEvents: contract.ObservationSeen, preCompact: contract.ObservationUnsupported,
+			agent: Antigravity, promptEvent: "PreInvocation", promptCapability: contract.CapabilityUnverified,
+			toolEvents: contract.ObservationUnsupported, preCompact: contract.ObservationUnsupported,
+			toolCapability: contract.CapabilityUnverified, compactCapability: contract.CapabilityUnsupported,
 			observationHooks: []ObservationHook{
 				{Name: "PreTool", ObserveEvent: "PreToolUse"},
 				{Name: "PostTool", ObserveEvent: "PostToolUse"},
@@ -128,8 +134,14 @@ func TestCapabilitiesForClientEventContracts(t *testing.T) {
 			if got.PromptEvent != test.promptEvent {
 				t.Errorf("prompt event = %q, want %q", got.PromptEvent, test.promptEvent)
 			}
+			if got.PromptCapability != test.promptCapability {
+				t.Errorf("prompt capability = %q, want %q", got.PromptCapability, test.promptCapability)
+			}
 			if got.Observability.ToolEvents != test.toolEvents || got.Observability.PreCompact != test.preCompact {
 				t.Errorf("observability = %+v, want tool=%q compact=%q", got.Observability, test.toolEvents, test.preCompact)
+			}
+			if got.ToolEventsCapability != test.toolCapability || got.PreCompactCapability != test.compactCapability {
+				t.Errorf("observation capabilities = tool %q, compact %q; want %q, %q", got.ToolEventsCapability, got.PreCompactCapability, test.toolCapability, test.compactCapability)
 			}
 			if len(got.ObservationHooks) != len(test.observationHooks) {
 				t.Fatalf("observation hooks = %+v, want %+v", got.ObservationHooks, test.observationHooks)
@@ -149,5 +161,9 @@ func TestCapabilitiesForClientEventContracts(t *testing.T) {
 		unknown.Observability.ToolEvents != contract.ObservationUnsupported ||
 		unknown.Observability.PreCompact != contract.ObservationUnsupported {
 		t.Fatalf("unknown client must have no claimed hooks: %+v", unknown)
+	}
+	if unknown.PromptCapability != contract.CapabilityUnverified || unknown.ToolEventsCapability != contract.CapabilityUnverified ||
+		unknown.PreCompactCapability != contract.CapabilityUnverified {
+		t.Fatalf("unknown client capabilities must remain unverified: %+v", unknown)
 	}
 }

@@ -17,6 +17,7 @@ import (
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
+	"github.com/dedeusgui/sidecar/internal/ctxbuild"
 	"github.com/dedeusgui/sidecar/internal/engine"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/lsp"
@@ -170,6 +171,10 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 		statePath = opts.StatePath(string(opts.Agent), in.SessionID)
 	}
 	ropts := hookRetrieveOptions(root, statePath)
+	if ropts.EngineVersion == engine.Version35 && statePath != "" {
+		statePath = v35SessionStatePath(root, statePath)
+		ropts.Seen = brief.SeenFor(statePath)
+	}
 	rec["engine"] = engineOf(ropts)
 	if ropts.EngineVersion == engine.Version35 {
 		t = time.Now()
@@ -184,7 +189,9 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 		rec["exact"] = unified.Result.Trace.Exact
 		used := packedSourceEvidenceKeys(unified.Packed.Items)
 		if in.SessionID != "" {
-			brief.Remember(statePath, unified.Packed.Items)
+			remembered := append([]ctxbuild.Item(nil), unified.Packed.Items...)
+			remembered = append(remembered, v35RememberAliases(root, unified.Packed.Items)...)
+			brief.Remember(statePath, remembered)
 			recordEvidence(root, opts.Agent, in.SessionID, used)
 		}
 		rec["render_ms"] = ms(time.Since(t))

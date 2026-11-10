@@ -29,15 +29,17 @@ type ObservationHook struct {
 	ObserveEvent string
 }
 
-// Capabilities describes the hook contracts Sidecar can rely on for one client.
-// ObservationHooks contains only tool/compaction events supported by the client;
-// unverified events are omitted. ExploreCapability remains unverified until a
-// client-native path to invoke Sidecar exploration has been tested.
+// Capabilities describes prompt/observation contracts and their verification status for a client.
+// ObservationHooks also retains historical opt-in registrations whose client contract is unverified.
+// ExploreCapability remains unverified until a client-native path has been tested.
 type Capabilities struct {
-	PromptEvent       string
-	ObservationHooks  []ObservationHook
-	Observability     contract.Observability
-	ExploreCapability contract.CapabilityStatus
+	PromptEvent          string
+	PromptCapability     contract.CapabilityStatus
+	ObservationHooks     []ObservationHook
+	Observability        contract.Observability
+	ToolEventsCapability contract.CapabilityStatus
+	PreCompactCapability contract.CapabilityStatus
+	ExploreCapability    contract.CapabilityStatus
 }
 
 // CapabilitiesFor returns hook capabilities established by adapter and install
@@ -48,11 +50,15 @@ func CapabilitiesFor(agent Agent) Capabilities {
 			ToolEvents: contract.ObservationUnsupported,
 			PreCompact: contract.ObservationUnsupported,
 		},
-		ExploreCapability: contract.CapabilityUnverified,
+		PromptCapability:     contract.CapabilityUnverified,
+		ToolEventsCapability: contract.CapabilityUnverified,
+		PreCompactCapability: contract.CapabilityUnverified,
+		ExploreCapability:    contract.CapabilityUnverified,
 	}
 	switch agent {
 	case Claude:
 		capabilities.PromptEvent = "UserPromptSubmit"
+		capabilities.PromptCapability = contract.CapabilityAvailable
 		capabilities.ObservationHooks = []ObservationHook{
 			{Name: "PreToolUse", ObserveEvent: "PreToolUse"},
 			{Name: "PostToolUse", ObserveEvent: "PostToolUse"},
@@ -60,15 +66,23 @@ func CapabilitiesFor(agent Agent) Capabilities {
 		}
 		capabilities.Observability.ToolEvents = contract.ObservationSeen
 		capabilities.Observability.PreCompact = contract.ObservationSeen
+		capabilities.ToolEventsCapability = contract.CapabilityAvailable
+		capabilities.PreCompactCapability = contract.CapabilityAvailable
 	case Codex:
 		capabilities.PromptEvent = "UserPromptSubmit"
+		capabilities.PromptCapability = contract.CapabilityAvailable
+		capabilities.ToolEventsCapability = contract.CapabilityUnsupported
+		capabilities.PreCompactCapability = contract.CapabilityUnsupported
 	case Antigravity:
 		capabilities.PromptEvent = "PreInvocation"
 		capabilities.ObservationHooks = []ObservationHook{
 			{Name: "PreTool", ObserveEvent: "PreToolUse"},
 			{Name: "PostTool", ObserveEvent: "PostToolUse"},
 		}
-		capabilities.Observability.ToolEvents = contract.ObservationSeen
+		// Adapter parsing and generated configuration do not prove that the client consumes
+		// these events. Keep the historical opt-in wiring, but do not use it as V3.5 evidence.
+		capabilities.ToolEventsCapability = contract.CapabilityUnverified
+		capabilities.PreCompactCapability = contract.CapabilityUnsupported
 	}
 	return capabilities
 }

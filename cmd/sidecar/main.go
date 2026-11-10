@@ -244,9 +244,26 @@ func cmdStatus(args []string, out, errOut io.Writer) int {
 	if *asJSON {
 		return writeJSON(out, errOut, info)
 	}
-	for _, k := range []string{"root", "database", "files", "symbols", "commits", "dirty_files", "indexed_head", "last_sync", "index"} {
+	for _, k := range []string{"engine", "v35_active", "engine_detail", "root", "database", "files", "symbols", "commits", "dirty_files", "indexed_head", "last_sync", "index"} {
 		if v, ok := info[k]; ok {
 			_, _ = fmt.Fprintf(out, "%-14s %v\n", k+":", v)
+		}
+	}
+	if clients, ok := info["client_capabilities"].([]app.ClientCapabilities); ok {
+		_, _ = fmt.Fprintln(out, "clientes:")
+		for _, client := range clients {
+			detected := "não detectado"
+			if client.Detected {
+				detected = "detectado"
+			}
+			_, _ = fmt.Fprintf(out, "  %-13s %s; prompt=%s; tools=%s; PreCompact=%s; explore=%s\n",
+				client.Client, detected, client.Prompt, client.ToolEvents, client.PreCompact, client.Explore)
+		}
+		if v, ok := info["engine_activation"]; ok {
+			_, _ = fmt.Fprintf(out, "ativar V3.5: %v\n", v)
+		}
+		if v, ok := info["engine_deactivation"]; ok {
+			_, _ = fmt.Fprintf(out, "desativar V3.5: %v\n", v)
 		}
 	}
 	return 0

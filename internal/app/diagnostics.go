@@ -268,10 +268,85 @@ type Check struct {
 	Detail string
 }
 
+type ClientCapabilities struct {
+	Client      string                    `json:"client"`
+	Detected    bool                      `json:"detected"`
+	PromptEvent string                    `json:"prompt_event,omitempty"`
+	Prompt      contract.CapabilityStatus `json:"prompt"`
+	ToolEvents  contract.CapabilityStatus `json:"tool_events"`
+	PreCompact  contract.CapabilityStatus `json:"pre_compact"`
+	Explore     contract.CapabilityStatus `json:"explore"`
+}
+
+func engineReadiness() map[string]any {
+	selected := configuredEngine()
+	active := selected == engine.Version35
+	activation := "export SIDECAR_ENGINE=v3.5"
+	deactivation := "unset SIDECAR_ENGINE (default: v1; applies on the next hook)"
+	detail := "motor atual: " + selected + "; V3.5 inativa (opt-in); ativar: " + activation + "; desativar: " + deactivation
+	if active {
+		detail = "motor atual: v3.5; rollback imediato: " + deactivation
+	}
+	env, err := install.DefaultEnv()
+	var detected []string
+	if err == nil {
+		detected = install.Detect(env)
+	}
+	clients := clientCapabilityMatrix(detected)
+	return map[string]any{
+		"engine": selected, "v35_active": active, "engine_detail": detail,
+		"engine_activation": activation, "engine_deactivation": deactivation,
+		"client_capabilities": clients,
+	}
+}
+
+func configuredEngine() string {
+	switch os.Getenv("SIDECAR_ENGINE") {
+	case "v2", engine.Version, engine.Version35:
+		return os.Getenv("SIDECAR_ENGINE")
+	default:
+		return "v1"
+	}
+}
+
+func clientCapabilityMatrix(detected []string) []ClientCapabilities {
+	present := make(map[string]bool, len(detected))
+	for _, name := range detected {
+		present[name] = true
+	}
+	clients := []adapter.Agent{adapter.Claude, adapter.Codex, adapter.Antigravity}
+	result := make([]ClientCapabilities, 0, len(clients))
+	for _, client := range clients {
+		capabilities := adapter.CapabilitiesFor(client)
+		result = append(result, ClientCapabilities{
+			Client: string(client), Detected: present[string(client)], PromptEvent: capabilities.PromptEvent,
+			Prompt: capabilities.PromptCapability, ToolEvents: capabilities.ToolEventsCapability,
+			PreCompact: capabilities.PreCompactCapability, Explore: capabilities.ExploreCapability,
+		})
+	}
+	return result
+}
+
+func clientCapabilityDetail(env install.Env) string {
+	clients := clientCapabilityMatrix(install.Detect(env))
+	parts := make([]string, 0, len(clients))
+	for _, client := range clients {
+		name := client.Client
+		if !client.Detected {
+			name += " (não detectado)"
+		}
+		parts = append(parts, fmt.Sprintf("%s: prompt=%s, tools=%s, PreCompact=%s, explore=%s",
+			name, client.Prompt, client.ToolEvents, client.PreCompact, client.Explore))
+	}
+	return strings.Join(parts, "; ")
+}
+
 // Doctor inspects the installation, the environment and the index for cwd.
 func Doctor(env install.Env, cwd string) []Check {
 	var checks []Check
 	add := func(name, status, detail string) { checks = append(checks, Check{name, status, detail}) }
+	add("motor", "info", engineReadiness()["engine_detail"].(string))
+	add("matriz de clientes", "info", clientCapabilityDetail(env))
 
 	if exe, err := os.Executable(); err == nil {
 		add("binário", "ok", exe)
@@ -456,9 +531,12 @@ func hookLogSummary(path string) (errs int, p50, p95 float64, n int) {
 
 // Status summarizes the index for cwd.
 func Status(root string) (map[string]any, error) {
+	info := engineReadiness()
+	info["root"] = root
 	db := paths.IndexDB(root)
 	if _, err := os.Stat(db); err != nil {
-		return map[string]any{"root": root, "index": "not created yet"}, nil
+		info["index"] = "not created yet"
+		return info, nil
 	}
 	st, err := store.Open(db)
 	if err != nil {
@@ -471,10 +549,13 @@ func Status(root string) (map[string]any, error) {
 	dirty, _ := st.DirtyPaths()
 	lastSync, _ := st.GetMeta("last_sync")
 	head, _ := st.GetMeta("indexed_head")
-	return map[string]any{
+	for key, value := range map[string]any{
 		"root": root, "files": len(files), "symbols": symbols, "commits": commits,
 		"dirty_files": len(dirty), "indexed_head": head, "last_sync": lastSync, "database": db,
-	}, nil
+	} {
+		info[key] = value
+	}
+	return info, nil
 }
 
 // SupportedAgents lists agent names for help text.

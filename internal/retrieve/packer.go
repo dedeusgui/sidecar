@@ -26,9 +26,10 @@ func ProfileBudget(name string) (int, bool) {
 
 // PackOptions configures Pack.
 type PackOptions struct {
-	Budget int           // tokens available to the context block
-	Seen   ctxbuild.Seen // evidence already delivered in this session; nil when none
-	Tuning *Tuning       // nil = DefaultTuning
+	Budget               int           // tokens available to the context block
+	Seen                 ctxbuild.Seen // evidence already delivered in this session; nil when none
+	Tuning               *Tuning       // nil = DefaultTuning
+	PreferImplementation bool          // prefer production source to docs and test helpers
 }
 
 // PackTrace explains the packing decision for `sidecar explain`.
@@ -89,7 +90,7 @@ func Pack(cands []Evidence, o PackOptions) ([]Evidence, map[string]string, PackT
 		return nil, excluded, pt
 	}
 
-	st := &packState{covered: map[string]bool{}, perFile: map[string]int{}}
+	st := &packState{covered: map[string]bool{}, perFile: map[string]int{}, preferImplementation: o.PreferImplementation}
 	for _, e := range cands {
 		st.top = max(st.top, e.Score)
 	}
@@ -131,16 +132,35 @@ func isRanked(e Evidence) bool { return e.Section != ctxbuild.Concerns }
 
 // packState is what the selection has covered so far.
 type packState struct {
-	top     float64         // best fused score among the candidates
-	covered map[string]bool // query concepts matched by a selected item
-	perFile map[string]int  // selected items per file
-	chosen  []Evidence
+	top                  float64         // best fused score among the candidates
+	covered              map[string]bool // query concepts matched by a selected item
+	perFile              map[string]int  // selected items per file
+	chosen               []Evidence
+	preferImplementation bool
 }
 
 // value is the item's marginal utility: confidence × expected usefulness × trust × novelty ×
 // diversity × complement. Each factor is a heuristic named where it is defined.
 func (s *packState) value(e Evidence) float64 {
-	return e.Confidence * s.expected(e) * trustOf(e) * s.novelty(e) * s.diversity(e) * s.complement(e)
+	v := e.Confidence * s.expected(e) * trustOf(e) * s.novelty(e) * s.diversity(e) * s.complement(e)
+	if s.preferImplementation && implementationSource(e.Hit.Path) {
+		v *= 2
+	}
+	return v
+}
+
+func implementationSource(path string) bool {
+	path = strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
+	if strings.Contains(path, "/bench/") || strings.Contains(path, "/test/") || strings.Contains(path, "/tests/") ||
+		strings.Contains(path, "_test.") || strings.Contains(path, ".test.") || strings.Contains(path, ".spec.") {
+		return false
+	}
+	i := strings.LastIndexByte(path, '.')
+	if i < 0 {
+		return false
+	}
+	ext := path[i:]
+	return strings.Contains(" .go .py .js .jsx .ts .tsx .rs .java .kt .cs .php .rb .swift .c .cc .cpp .h .hpp .ex .exs .scala ", " "+ext+" ")
 }
 
 // expected is the item's place in the fused ranking, as a share of the best score: the ranking

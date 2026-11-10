@@ -112,6 +112,8 @@ var (
 	frameRe      = regexp.MustCompile(`(?:\.(?:go|py|ts|tsx|js|java|cs|rs|php|rb|kt|swift|c|cpp|h):\d+)|(?:File "[^"]+", line \d+)|(?:at [\w.$<>]+\()`)
 	backtickRe   = regexp.MustCompile("`([^`\n]{2,80})`")
 	identTokenRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*(?:[.:#][A-Za-z_][A-Za-z0-9_]*)*[?!]?`)
+	camelAcronym = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`)
+	camelWord    = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 )
 
 // readSignals derives the prompt-only signals. It runs before retrieval and costs microseconds.
@@ -200,6 +202,56 @@ func codeIdentifier(tok string) bool {
 		}
 	}
 	return strings.ContainsAny(core, "0123456789") && unicode.IsLetter(rune(core[0])) && strings.IndexFunc(core, unicode.IsLetter) >= 0 && len(core) >= 4 && strings.IndexFunc(core, unicode.IsLower) >= 0
+}
+
+// hasCodeAnchor is the stricter V3.5 delivery gate. A documentation heading or a generic
+// lexical coincidence is not enough: there must be a retrieved code symbol plus a repository
+// cue, verified locator, or a prompt term that names that symbol.
+func hasCodeAnchor(s TaskSignals, res retrieve.Result) bool {
+	var symbols []string
+	for _, evidence := range res.Evidence {
+		if evidence.Hit.Name == "" || evidence.Hit.Kind == "file" || evidence.Hit.Kind == "section" {
+			continue
+		}
+		symbols = append(symbols, evidence.Hit.Name)
+	}
+	if len(symbols) == 0 {
+		return false
+	}
+	for _, locator := range s.Locators {
+		if locator.Verified {
+			return true
+		}
+	}
+	if s.RepoCue {
+		return true
+	}
+	terms := make(map[string]bool, len(res.Trace.Terms))
+	for _, term := range res.Trace.Terms {
+		if len(term) >= 3 && !genericAnchorTerms[term] {
+			terms[term] = true
+		}
+	}
+	for _, name := range symbols {
+		for _, term := range symbolWords(name) {
+			if terms[term] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+var genericAnchorTerms = buildLexicon(`
+a an and are as at be by can could do does for from had has have he her here hers him his how i if in into is it its may me might my of on or our ours she should so than that the their them then there these they this those through to too up us was we were what when where which who why will with would you your
+ainda algum alguma alguns algumas assim bem cada coisa como da das de dela delas dele deles depois do dos e ela elas ele eles em enquanto entre era essa esse essas esses esta este estas estes eu faz fazer fez fica ficar foi foram fosse garantia hoje isso isto já la mais mas me meu minha meus minhas muito nada nele nela nem no nos nossa nossas nosso nossos novo o os outra outras outro outros para pela pelas pelo pelos pequeno pode por porque qual quando que quem será seu seus sem sempre sua suas também tanto toda todas todo todos tu um uma umas uns vai vais vão voce voces você vocês
+`)
+
+func symbolWords(name string) []string {
+	name = camelAcronym.ReplaceAllString(name, "$1 $2")
+	name = camelWord.ReplaceAllString(name, "$1 $2")
+	folded := lexical.Fold(name)
+	return strings.FieldsFunc(folded, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
 }
 
 func contains(xs []string, s string) bool {

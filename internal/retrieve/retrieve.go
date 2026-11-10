@@ -56,6 +56,9 @@ type Options struct {
 	// NoExactDominance keeps partial word matches next to an exact identifier instead of dropping them.
 	// On-demand exploration wants the neighbourhood; the hook keeps the default (false).
 	NoExactDominance bool
+	// PreferImplementation gives production source a stronger packing preference. V3.5 uses it
+	// when a code anchor is required so nearby docs and tests do not crowd out the implementation.
+	PreferImplementation bool
 	// feedbackMults holds the post-task feedback multipliers of Root, keyed "path#symbol" or "path".
 	feedbackMults   map[string]float64
 	hasAbsentAnchor bool
@@ -438,7 +441,9 @@ func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evid
 		}
 		return append(out, concerns...), nil, nil
 	}
-	selected, excluded, pt := Pack(append(pool, concerns...), PackOptions{Budget: budget, Seen: opts.Seen, Tuning: opts.Tuning})
+	selected, excluded, pt := Pack(append(pool, concerns...), PackOptions{
+		Budget: budget, Seen: opts.Seen, Tuning: opts.Tuning, PreferImplementation: opts.PreferImplementation,
+	})
 	tr.Packing = &pt
 	return selected, excluded, nil
 }

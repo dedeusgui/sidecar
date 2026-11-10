@@ -3,7 +3,10 @@ package app
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -44,7 +47,7 @@ func runV35Safe(ctx context.Context, st *store.Store, root, prompt string, opts 
 
 func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retrieve.Options,
 	agent adapter.Agent, sessionID, statePath string, now time.Time, deep bool) (v35Output, error) {
-	result, decision, err := engine.Run(ctx, st, prompt, engine.Options{Retrieve: opts})
+	result, decision, err := engine.Run(ctx, st, prompt, engine.Options{Retrieve: opts, RequireCodeAnchor: true})
 	if err != nil {
 		return v35Output{}, err
 	}
@@ -53,12 +56,16 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 		return v35Output{Result: result, Decision: decision}, nil
 	}
 
-	revision, err := gitx.Head(ctx, root)
-	if err != nil {
-		if ctx.Err() != nil {
-			return v35Output{}, ctx.Err()
+	revision := "no-head"
+	if _, statErr := os.Stat(filepath.Join(root, ".git")); statErr == nil {
+		var err error
+		revision, err = gitx.Head(ctx, root)
+		if err != nil {
+			if ctx.Err() != nil {
+				return v35Output{}, ctx.Err()
+			}
+			revision = "no-head"
 		}
-		revision = "no-head"
 	}
 	scope := contract.NormalizeScope(contract.Scope{
 		RepoRoot: root, WorktreeID: root, SessionID: sessionID, WorktreeRevision: revision,
@@ -82,7 +89,7 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 
 	// The decision action is the planner's request for bounded structural evidence. Hooks use
 	// QuickExpand; explain is an explicit diagnostic surface and can use the wider shared traversal.
-	if decision.Action == engine.ActionExploreAvailable || decision.Action == engine.ActionVerify {
+	if !deep && (decision.Action == engine.ActionExploreAvailable || decision.Action == engine.ActionVerify) {
 		var expansion service.ExpansionResult
 		if deep {
 			expansion = service.DeepExplore(ctx, st, service.DeepRequest{
@@ -92,9 +99,9 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 			}, registry)
 		} else {
 			expansion = service.QuickExpand(ctx, st, service.QuickRequest{
-				Enabled: true, Root: root, Query: prompt, Anchors: baseRefs,
+				Enabled: true, Root: root, Query: prompt, Anchors: v35QuickAnchors(baseRefs, registry),
 				Limits: service.Limits{Timeout: service.QuickMaxDuration, MaxFiles: service.QuickMaxFiles,
-					MaxTokens: min(service.QuickMaxTokens, max(1, decision.Budget/3))},
+					MaxTokens: min(service.QuickMaxTokens, max(1, decision.Budget*2/3))},
 			}, registry)
 		}
 		task.Uncertainties = append(task.Uncertainties, expansion.Gaps...)
@@ -194,12 +201,30 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 	}
 	task.Evidence = registryRefs(registry)
 	planDecision := decision
-	if len(planDecision.Included) > 1 {
-		// Reserve room for the hybrid brief and a source window while preserving V3's top-ranked anchor.
-		planDecision.Included = planDecision.Included[:1]
+	baseEvidence := 1
+	if decision.Action == engine.ActionExploreAvailable || decision.Action == engine.ActionVerify {
+		baseEvidence = 3
+	}
+	if len(planDecision.Included) > baseEvidence {
+		planDecision.Included = preferNamedFiles(planDecision.Included, prompt)
+		// Keep a few independent navigation anchors when expansion is requested, while reserving
+		// the rest of the single global budget for the hybrid brief and source snippets.
+		planDecision.Included = planDecision.Included[:baseEvidence]
 	}
 	plan := (engine.Planner{}).Plan(engine.PlanInput{Task: task, Decision: planDecision,
 		Evidence: registry, BudgetTokens: decision.Budget})
+	// The packer counts section headers and bullets against the section budget, but the planner
+	// allocates only the raw evidence estimates; give selected evidence room inside the global cap.
+	spare := plan.BudgetTokens
+	for _, section := range plan.Sections {
+		spare -= section.BudgetTokens
+	}
+	for i := range plan.Sections {
+		if plan.Sections[i].Section == ctxbuild.Code && spare > 0 {
+			extra := min(spare, v35SectionFrameTokens*(1+plan.Sections[i].MaxItems))
+			plan.Sections[i].BudgetTokens += extra
+		}
+	}
 	snippetKeys := snippetKeysAndFingerprints(proposals)
 	for i := range proposals {
 		if proposals[i].Proposal.Kind != ctxbuild.TaskBrief {
@@ -211,6 +236,7 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 			}
 		}
 	}
+	seen := v35Seen(opts.Seen, root, registry, proposals)
 	packed := ctxbuild.Pack(plan, registry, func(entry contract.EvidenceEntry[retrieve.Evidence]) []ctxbuild.Item {
 		value := entry.Value
 		if _, hasSnippet := snippetKeys[value.Key()]; hasSnippet {
@@ -219,7 +245,7 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 		return []ctxbuild.Item{{Section: value.Section, Key: value.Key(), Fingerprint: value.Fingerprint(),
 			Text: retrieve.Describe(value), Source: value.Source, Role: value.Hit.Kind,
 			Qualifier: evidenceQualifier(entry.Ref), Provenance: evidenceProvenance(entry.Ref)}}
-	}, proposals, opts.Seen)
+	}, proposals, seen)
 	if groomState != nil && containsSource(packed.Items, "groom") {
 		if err := SaveGroomProposalState(scope, groomState.State); err != nil {
 			return v35Output{}, err
@@ -228,8 +254,100 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 	return v35Output{Result: result, Decision: decision, Plan: plan, Packed: packed}, nil
 }
 
+func v35QuickAnchors(refs []contract.EvidenceRef, registry *contract.EvidenceRegistry[retrieve.Evidence]) []contract.EvidenceRef {
+	anchors := make([]contract.EvidenceRef, 0, len(refs))
+	for _, ref := range refs {
+		entry, ok := registry.Lookup(ref.Key)
+		if !ok || entry.Value.Hit.Kind == "file" || entry.Value.Hit.Kind == "section" {
+			continue
+		}
+		anchors = append(anchors, ref)
+	}
+	return anchors
+}
+
+func v35Seen(base ctxbuild.Seen, root string, registry *contract.EvidenceRegistry[retrieve.Evidence], proposals []ctxbuild.GuidanceProposal) ctxbuild.Seen {
+	pathsByKey := make(map[string]string)
+	for _, entry := range registry.Snapshot() {
+		if entry.Ref.Path != "" {
+			pathsByKey[entry.Value.Key()] = entry.Ref.Path
+		}
+	}
+	for _, proposal := range proposals {
+		for _, item := range proposal.Items {
+			if path := itemPath(item); path != "" {
+				pathsByKey[item.Key] = path
+			}
+		}
+	}
+	return func(key, fingerprint string) bool {
+		if base != nil && base(key, fingerprint) {
+			return true
+		}
+		path := pathsByKey[key]
+		if path == "" || base == nil {
+			return false
+		}
+		fileFingerprint, exists := diskHash(root, path)
+		return exists && base(v35FileAliasKey(path), fileFingerprint)
+	}
+}
+
+func v35RememberAliases(root string, items []ctxbuild.Item) []ctxbuild.Item {
+	aliases := make([]ctxbuild.Item, 0, len(items))
+	seen := make(map[string]bool)
+	for _, item := range items {
+		if item.Section != ctxbuild.Code {
+			continue
+		}
+		path := itemPath(item)
+		if path == "" {
+			continue
+		}
+		fingerprint, exists := diskHash(root, path)
+		if !exists {
+			continue
+		}
+		key := v35FileAliasKey(path)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		aliases = append(aliases, ctxbuild.Item{Key: key, Fingerprint: fingerprint})
+	}
+	return aliases
+}
+
+func itemPath(item ctxbuild.Item) string {
+	if item.Provenance == "" {
+		return ""
+	}
+	if colon := strings.LastIndex(item.Provenance, ":"); colon > strings.LastIndexAny(item.Provenance, `/\\`) {
+		return item.Provenance[:colon]
+	}
+	return item.Provenance
+}
+
+func v35FileAliasKey(path string) string {
+	sum := sha256.Sum256([]byte(filepath.Clean(path)))
+	return "v35-file|" + hex.EncodeToString(sum[:16])
+}
+
+func v35SessionStatePath(root, sessionStatePath string) string {
+	sum := sha256.Sum256([]byte(filepath.Clean(root) + "\x00" + sessionStatePath))
+	return filepath.Join(paths.Home(), "sessions", hex.EncodeToString(sum[:16])+".v35.json")
+}
+
 func registerV35Evidence(st *store.Store, root string, result retrieve.Result, registry *contract.EvidenceRegistry[retrieve.Evidence]) ([]contract.EvidenceRef, error) {
 	refs := make([]contract.EvidenceRef, 0, len(result.Evidence))
+	type indexedFile struct {
+		diskHash string
+		exists   bool
+		record   store.FileRecord
+		indexed  bool
+		err      error
+	}
+	files := map[string]indexedFile{}
 	for _, evidence := range result.Evidence {
 		ref := contract.EvidenceRef{Key: evidence.Key(), Fingerprint: evidence.Fingerprint(), Path: evidence.Hit.Path,
 			LineStart: evidence.Hit.Line, LineEnd: evidence.Hit.EndLine, Origin: evidence.Source,
@@ -249,12 +367,17 @@ func registerV35Evidence(st *store.Store, root string, result retrieve.Result, r
 		if evidence.Hit.Path == "" || evidence.Note != "" {
 			ref.Freshness = contract.FreshnessCurrent
 		} else {
-			hash, exists := diskHash(root, evidence.Hit.Path)
-			record, indexed, err := st.FileRecordOf(evidence.Hit.Path)
-			if err != nil {
-				return nil, err
+			file, loaded := files[evidence.Hit.Path]
+			if !loaded {
+				file.diskHash, file.exists = diskHash(root, evidence.Hit.Path)
+				file.record, file.indexed, file.err = st.FileRecordOf(evidence.Hit.Path)
+				files[evidence.Hit.Path] = file
 			}
-			if exists && indexed && hash == evidence.Hit.FileHash && record.Hash == evidence.Hit.FileHash {
+			file = files[evidence.Hit.Path]
+			if file.err != nil {
+				return nil, file.err
+			}
+			if file.exists && file.indexed && file.diskHash == evidence.Hit.FileHash && file.record.Hash == evidence.Hit.FileHash {
 				ref.Freshness = contract.FreshnessCurrent
 			} else {
 				ref.Freshness = contract.FreshnessStale
@@ -324,30 +447,34 @@ func expansionItems(expansion service.ExpansionResult, registry *contract.Eviden
 		if file.Stale || len(file.Snippets) == 0 {
 			continue
 		}
-		snippet := file.Snippets[0]
-		var match *contract.EvidenceEntry[retrieve.Evidence]
-		for i := range entries {
-			entry := &entries[i]
-			if entry.Ref.Path != file.Path || entry.Ref.Freshness != contract.FreshnessCurrent {
+		for _, snippet := range file.Snippets {
+			var match *contract.EvidenceEntry[retrieve.Evidence]
+			for i := range entries {
+				entry := &entries[i]
+				if entry.Ref.Path != file.Path || entry.Ref.Freshness != contract.FreshnessCurrent {
+					continue
+				}
+				if entry.Ref.LineStart > 0 && (entry.Ref.LineStart > snippet.End || entry.Ref.LineEnd > 0 && entry.Ref.LineEnd < snippet.Start) {
+					continue
+				}
+				match = entry
+				if entry.Ref.Confidence == contract.ConfidenceVerified {
+					break
+				}
+			}
+			if match == nil {
 				continue
 			}
-			if entry.Ref.LineStart > 0 && (entry.Ref.LineStart > snippet.End || entry.Ref.LineEnd > 0 && entry.Ref.LineEnd < snippet.Start) {
+			text := fmt.Sprintf("%s:%d-%d %s", file.Path, snippet.Start, snippet.End, snippet.Text)
+			value := match.Value
+			if keySet[match.Ref.Key] {
 				continue
 			}
-			match = entry
-			if entry.Ref.Confidence == contract.ConfidenceVerified {
-				break
-			}
+			items = append(items, ctxbuild.Item{Section: ctxbuild.Code, Key: value.Key(), Fingerprint: textFingerprint(text),
+				Text: text, Priority: 115, Source: "explore", Role: "snippet",
+				Qualifier: evidenceQualifier(match.Ref), Provenance: fmt.Sprintf("%s:%d-%d", file.Path, snippet.Start, snippet.End)})
+			keySet[match.Ref.Key] = true
 		}
-		if match == nil {
-			continue
-		}
-		text := fmt.Sprintf("%s:%d-%d %s", file.Path, snippet.Start, snippet.End, snippet.Text)
-		value := match.Value
-		items = append(items, ctxbuild.Item{Section: ctxbuild.Code, Key: value.Key(), Fingerprint: textFingerprint(text),
-			Text: text, Priority: 115, Source: "explore", Role: "snippet",
-			Qualifier: evidenceQualifier(match.Ref), Provenance: fmt.Sprintf("%s:%d-%d", file.Path, snippet.Start, snippet.End)})
-		keySet[match.Ref.Key] = true
 	}
 	keys := make([]string, 0, len(keySet))
 	for key := range keySet {
@@ -517,3 +644,34 @@ func uniqueStrings(values []string) []string {
 	}
 	return out
 }
+
+// preferNamedFiles keeps the original order but moves choices whose file name stem is spelled
+// in the prompt (e.g. "observer" -> observer.go) ahead of the others, so the few anchors kept
+// under a tight budget are the files the user literally named.
+func preferNamedFiles(choices []engine.Choice, prompt string) []engine.Choice {
+	lower := strings.ToLower(prompt)
+	named := func(c engine.Choice) bool {
+		stem := strings.ToLower(strings.TrimSuffix(filepath.Base(c.Path), filepath.Ext(c.Path)))
+		return c.Source != "contract" && len(stem) >= 5 && strings.Contains(lower, stem)
+	}
+	out := make([]engine.Choice, 0, len(choices))
+	seen := map[string]bool{}
+	for _, c := range choices { // one anchor per named file first
+		if named(c) && !seen[c.Path] {
+			seen[c.Path] = true
+			out = append(out, c)
+		}
+	}
+	used := map[string]bool{}
+	for _, c := range out {
+		used[c.ID] = true
+	}
+	for _, c := range choices {
+		if !used[c.ID] {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+const v35SectionFrameTokens = 40
