@@ -213,18 +213,6 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 	}
 	plan := (engine.Planner{}).Plan(engine.PlanInput{Task: task, Decision: planDecision,
 		Evidence: registry, BudgetTokens: decision.Budget})
-	// The packer counts section headers and bullets against the section budget, but the planner
-	// allocates only the raw evidence estimates; give selected evidence room inside the global cap.
-	spare := plan.BudgetTokens
-	for _, section := range plan.Sections {
-		spare -= section.BudgetTokens
-	}
-	for i := range plan.Sections {
-		if plan.Sections[i].Section == ctxbuild.Code && spare > 0 {
-			extra := min(spare, v35SectionFrameTokens*(1+plan.Sections[i].MaxItems))
-			plan.Sections[i].BudgetTokens += extra
-		}
-	}
 	snippetKeys := snippetKeysAndFingerprints(proposals)
 	for i := range proposals {
 		if proposals[i].Proposal.Kind != ctxbuild.TaskBrief {
@@ -674,4 +662,3 @@ func preferNamedFiles(choices []engine.Choice, prompt string) []engine.Choice {
 	return out
 }
 
-const v35SectionFrameTokens = 40

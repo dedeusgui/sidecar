@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dedeusgui/sidecar/internal/ctxbuild"
 	"github.com/dedeusgui/sidecar/internal/engine/contract"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 )
@@ -95,7 +96,9 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 		return plan
 	}
 
-	remainingTokens, remainingItems := plan.BudgetTokens, plan.MaxItems
+	// Pack charges the context markers, section headers and bullets against the same global
+	// budget as the item text, so the plan reserves them here, in the only place that allocates.
+	remainingTokens, remainingItems := max(0, plan.BudgetTokens-ctxbuild.PackFrameTokens()), plan.MaxItems
 	selected := make([]string, 0, min(len(taskEvidence), remainingItems))
 	selectedCost := 0
 	keys := make([]string, 0, len(taskEvidence))
@@ -130,7 +133,9 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 				plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "evidence_cost_unknown", Key: key})
 				continue
 			}
-			if ref.Ref.CostEstimate > remainingTokens {
+			cost := ref.Ref.CostEstimate + ctxbuild.SectionFrameTokens(contract.SectionEvidence, len(selected)+1) -
+				ctxbuild.SectionFrameTokens(contract.SectionEvidence, len(selected))
+			if cost > remainingTokens {
 				plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "evidence_over_budget", Key: key})
 				continue
 			}
@@ -139,8 +144,8 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 				continue
 			}
 			selected = append(selected, key)
-			selectedCost += ref.Ref.CostEstimate
-			remainingTokens -= ref.Ref.CostEstimate
+			selectedCost += cost
+			remainingTokens -= cost
 			remainingItems--
 		}
 	}

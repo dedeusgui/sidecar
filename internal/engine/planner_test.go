@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dedeusgui/sidecar/internal/ctxbuild"
 	"github.com/dedeusgui/sidecar/internal/engine/contract"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 )
@@ -40,11 +41,11 @@ func plannerFixture(t *testing.T) (PlanInput, string) {
 			},
 		},
 		Decision: Decision{
-			Action: ActionBrief, Budget: 60, MaxItems: 4,
+			Action: ActionBrief, Budget: 60 + ctxbuild.PackFrameTokens(), MaxItems: 4,
 			Included: []Choice{{ID: "evidence-1"}}, RetrievalRan: true,
 		},
 		Evidence:     registry,
-		BudgetTokens: 45,
+		BudgetTokens: 45 + ctxbuild.PackFrameTokens(),
 	}
 	return input, ref.Key
 }
@@ -133,12 +134,14 @@ func TestPlannerRejectsEvidenceFromAnotherScope(t *testing.T) {
 
 func TestPlannerClampsGlobalBudgetAndAbstains(t *testing.T) {
 	input, _ := plannerFixture(t)
-	input.BudgetTokens = 22 // The selected evidence costs 20; the 8-token brief no longer fits.
+	evidenceCost := 20 + ctxbuild.SectionFrameTokens(contract.SectionEvidence, 1)
+	// The selected evidence costs 20 plus its rendered header and bullet; the 8-token brief no longer fits.
+	input.BudgetTokens = ctxbuild.PackFrameTokens() + evidenceCost + 2
 	plan := (Planner{}).Plan(input)
-	if len(plan.Sections) != 1 || plan.Sections[0].BudgetTokens != 20 {
+	if len(plan.Sections) != 1 || plan.Sections[0].BudgetTokens != evidenceCost {
 		t.Fatalf("over-budget proposal was allocated: %+v", plan.Sections)
 	}
-	if plan.BudgetTokens != 22 || plan.Sections[0].BudgetTokens > plan.BudgetTokens {
+	if plan.BudgetTokens != input.BudgetTokens || plan.Sections[0].BudgetTokens > plan.BudgetTokens {
 		t.Fatalf("global budget was not respected: %+v", plan)
 	}
 	if !hasPlanReason(plan, "proposal_over_budget", "BRIEF") {
@@ -174,4 +177,45 @@ func hasPlanReason(plan contract.OutputPlan, code, kind string) bool {
 		}
 	}
 	return false
+}
+
+// The plan must reserve what ctxbuild.Pack renders around the items (markers, headers, bullets):
+// whatever budget is given, Pack stays within it and delivers every section the plan allocated.
+func TestPlanThenPackStaysWithinTightBudgetWithoutEstimateDrops(t *testing.T) {
+	input, key := plannerFixture(t)
+	input.Task.Guidance = []contract.GuidanceProposal{
+		{Kind: ctxbuild.TaskBrief, EvidenceKeys: []string{key}, Priority: 5, TokenEstimate: 8, DeliveryReason: "brief", Phase: contract.PhaseEdit},
+		{Kind: ctxbuild.Verification, EvidenceKeys: []string{key}, Priority: 4, TokenEstimate: 8, DeliveryReason: "verify", Phase: contract.PhaseEdit},
+	}
+	proposals := []ctxbuild.GuidanceProposal{
+		{Proposal: input.Task.Guidance[0], Items: []ctxbuild.Item{{Section: ctxbuild.TaskBrief, Text: "brief item"}}},
+		{Proposal: input.Task.Guidance[1], Items: []ctxbuild.Item{{Section: ctxbuild.Verification, Text: "verify item"}}},
+	}
+	mapper := func(contract.EvidenceEntry[retrieve.Evidence]) []ctxbuild.Item {
+		return []ctxbuild.Item{{Section: ctxbuild.Code, Text: strings.Repeat("c", 70)}}
+	}
+	seen := func(string, string) bool { return false }
+	delivered := 0
+	for budget := ctxbuild.PackFrameTokens(); budget <= ctxbuild.PackFrameTokens()+70; budget++ {
+		input.BudgetTokens, input.Decision.Budget = budget, budget
+		plan := (Planner{}).Plan(input)
+		packed := ctxbuild.Pack(plan, input.Evidence, mapper, proposals, seen)
+		if packed.Text == "" {
+			continue
+		}
+		if got := ctxbuild.EstimateTokens(packed.Text); got > budget {
+			t.Fatalf("budget %d: packed %d tokens\n%s", budget, got, packed.Text)
+		}
+		for _, section := range plan.Sections {
+			if !strings.Contains(packed.Text, section.Section+"\n") {
+				t.Fatalf("budget %d: allocated section %q dropped by packing\n%s", budget, section.Section, packed.Text)
+			}
+		}
+		if len(plan.Sections) == 3 {
+			delivered++
+		}
+	}
+	if delivered == 0 {
+		t.Fatal("no budget delivered evidence, brief and verification together")
+	}
 }
