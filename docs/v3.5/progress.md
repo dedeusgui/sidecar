@@ -32,7 +32,7 @@ Opt-in; o default continua V1. Mecanismo real:
 
 - Coortes E1/E2 são **author-coupled** (prompts e gold escritos pelo mesmo autor que implementou) e **ainda não executadas** contra a V3.5; revisão semântica independente pendente.
 - Capacidade de Explore nativo por cliente não verificada (`unverified`).
-- Validação E2E por cliente, latência do fluxo completo e readiness em `doctor`/`status`: **pendente de validação** (trabalho em andamento fora desta documentação).
+- Validação offline local (2026-11-09, fixture, sem agente): testes E2E do hook para Claude Code e Codex (injeção, Explore embutido, sessão em várias voltas, abstenção, saída idêntica com V3.5 desligada, readiness em `doctor`/`status`) em `internal/app/v35_test.go` e `e2e_cli_test.go`; `go test -count=1 ./...` e `-race` nos pacotes concorrentes passam. Latência do hook em `BenchmarkHookPathLatency` (p50, 20 iterações, uma máquina): quente V2 11,7 ms, V3 13,0 ms, V3.5 17,8 ms (p95 20,9); frio V2 39,3 ms, V3 40,0 ms, V3.5 45,1 ms. **Não feito:** comparação de V1/V2/V3 contra um binário da `main`, E2E com cliente real, e as referências `arquivo:linha` deste documento não foram reconferidas após os últimos commits.
 - O packer e o planner usam heurísticas determinísticas sem modelo; regressões em prompts curtos de domínio documentadas na V3 não foram reavaliadas nas coortes novas.
 
 ## Resultados offline obtidos (e ressalvas)
