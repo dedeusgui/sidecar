@@ -81,8 +81,10 @@ func CapabilitiesFor(agent Agent) Capabilities {
 		}
 		// Adapter parsing and generated configuration do not prove that the client consumes
 		// these events. Keep the historical opt-in wiring, but do not use it as V3.5 evidence.
+		// Observability stays unsupported/unobserved (no client-consumption proof), and the
+		// absence of a PreCompact event is equally unproven, so every capability is unverified.
 		capabilities.ToolEventsCapability = contract.CapabilityUnverified
-		capabilities.PreCompactCapability = contract.CapabilityUnsupported
+		capabilities.PreCompactCapability = contract.CapabilityUnverified
 	}
 	return capabilities
 }

@@ -121,7 +121,7 @@ func TestCapabilitiesForClientEventContracts(t *testing.T) {
 		{
 			agent: Antigravity, promptEvent: "PreInvocation", promptCapability: contract.CapabilityUnverified,
 			toolEvents: contract.ObservationUnsupported, preCompact: contract.ObservationUnsupported,
-			toolCapability: contract.CapabilityUnverified, compactCapability: contract.CapabilityUnsupported,
+			toolCapability: contract.CapabilityUnverified, compactCapability: contract.CapabilityUnverified,
 			observationHooks: []ObservationHook{
 				{Name: "PreTool", ObserveEvent: "PreToolUse"},
 				{Name: "PostTool", ObserveEvent: "PostToolUse"},
