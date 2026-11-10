@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/dedeusgui/sidecar/internal/engine/contract"
 )
 
 const claudeInput = `{
@@ -87,5 +89,65 @@ func TestFormatCodexUsesSameSchemaAsClaude(t *testing.T) {
 	out := Format(Codex, "ctx")
 	if !strings.Contains(string(out), `"hookEventName":"UserPromptSubmit"`) || !strings.Contains(string(out), `"additionalContext":"ctx"`) {
 		t.Fatalf("codex output %s", out)
+	}
+}
+
+func TestCapabilitiesForClientEventContracts(t *testing.T) {
+	tests := []struct {
+		agent            Agent
+		promptEvent      string
+		toolEvents       contract.ObservationState
+		preCompact       contract.ObservationState
+		observationHooks []ObservationHook
+	}{
+		{
+			agent: Claude, promptEvent: "UserPromptSubmit",
+			toolEvents: contract.ObservationSeen, preCompact: contract.ObservationSeen,
+			observationHooks: []ObservationHook{
+				{Name: "PreToolUse", ObserveEvent: "PreToolUse"},
+				{Name: "PostToolUse", ObserveEvent: "PostToolUse"},
+				{Name: "PreCompact", ObserveEvent: "PreCompact"},
+			},
+		},
+		{
+			agent: Codex, promptEvent: "UserPromptSubmit",
+			toolEvents: contract.ObservationUnsupported, preCompact: contract.ObservationUnsupported,
+		},
+		{
+			agent: Antigravity, promptEvent: "PreInvocation",
+			toolEvents: contract.ObservationSeen, preCompact: contract.ObservationUnsupported,
+			observationHooks: []ObservationHook{
+				{Name: "PreTool", ObserveEvent: "PreToolUse"},
+				{Name: "PostTool", ObserveEvent: "PostToolUse"},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(string(test.agent), func(t *testing.T) {
+			got := CapabilitiesFor(test.agent)
+			if got.PromptEvent != test.promptEvent {
+				t.Errorf("prompt event = %q, want %q", got.PromptEvent, test.promptEvent)
+			}
+			if got.Observability.ToolEvents != test.toolEvents || got.Observability.PreCompact != test.preCompact {
+				t.Errorf("observability = %+v, want tool=%q compact=%q", got.Observability, test.toolEvents, test.preCompact)
+			}
+			if len(got.ObservationHooks) != len(test.observationHooks) {
+				t.Fatalf("observation hooks = %+v, want %+v", got.ObservationHooks, test.observationHooks)
+			}
+			for i, want := range test.observationHooks {
+				if got.ObservationHooks[i] != want {
+					t.Errorf("observation hook %d = %+v, want %+v", i, got.ObservationHooks[i], want)
+				}
+			}
+			if got.ExploreCapability != contract.CapabilityUnverified {
+				t.Errorf("explore capability = %q, want unverified", got.ExploreCapability)
+			}
+		})
+	}
+	unknown := CapabilitiesFor("unknown")
+	if unknown.PromptEvent != "" || len(unknown.ObservationHooks) != 0 ||
+		unknown.Observability.ToolEvents != contract.ObservationUnsupported ||
+		unknown.Observability.PreCompact != contract.ObservationUnsupported {
+		t.Fatalf("unknown client must have no claimed hooks: %+v", unknown)
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/paths"
 )
 
@@ -274,34 +275,14 @@ func observeCommand(bin, agent, event string) string {
 
 // promptEvent is the event that runs Sidecar's prompt hook for an agent.
 func promptEvent(agent string) string {
-	if agent == "antigravity" {
-		return "PreInvocation"
-	}
-	return "UserPromptSubmit"
-}
-
-// toolEvent pairs a client's tool hook event with the --event name `sidecar observe` receives.
-// Antigravity CLI names its events PreTool and PostTool; the parser speaks the Claude Code names.
-type toolEvent struct{ event, observed string }
-
-// toolEvents lists the tool-event hooks --observe-tools installs for an agent. Codex is not
-// listed: its tool hooks are not verified against a live client yet. Claude Code also gets PreCompact: the observer
-// resets the evidence it believes the agent has seen, because compaction made the agent forget it.
-func toolEvents(agent string) []toolEvent {
-	switch agent {
-	case "claude":
-		return []toolEvent{{"PreToolUse", "PreToolUse"}, {"PostToolUse", "PostToolUse"}, {"PreCompact", "PreCompact"}} // PreCompact verified against Claude Code 2.1.319 (2026-11-08)
-	case "antigravity":
-		return []toolEvent{{"PreTool", "PreToolUse"}, {"PostTool", "PostToolUse"}}
-	}
-	return nil
+	return adapter.CapabilitiesFor(adapter.Agent(agent)).PromptEvent
 }
 
 // toolEventNames lists the client event names of an agent's tool hooks, for messages.
 func toolEventNames(agent string) []string {
 	var names []string
-	for _, t := range toolEvents(agent) {
-		names = append(names, t.event)
+	for _, hook := range adapter.CapabilitiesFor(adapter.Agent(agent)).ObservationHooks {
+		names = append(names, hook.Name)
 	}
 	return names
 }
@@ -312,10 +293,14 @@ type hookFor struct{ event, command string }
 // hooksFor lists the handlers an install adds for one agent: the prompt hook, and the tool
 // observers when observeTools is set.
 func hooksFor(bin, agent string, observeTools bool) []hookFor {
-	out := []hookFor{{promptEvent(agent), HookCommand(bin, agent)}}
+	capabilities := adapter.CapabilitiesFor(adapter.Agent(agent))
+	if capabilities.PromptEvent == "" {
+		return nil
+	}
+	out := []hookFor{{capabilities.PromptEvent, HookCommand(bin, agent)}}
 	if observeTools {
-		for _, t := range toolEvents(agent) {
-			out = append(out, hookFor{t.event, observeCommand(bin, agent, t.observed)})
+		for _, hook := range capabilities.ObservationHooks {
+			out = append(out, hookFor{hook.Name, observeCommand(bin, agent, hook.ObserveEvent)})
 		}
 	}
 	return out

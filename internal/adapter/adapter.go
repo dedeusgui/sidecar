@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/dedeusgui/sidecar/internal/engine/contract"
 )
 
 // Agent names a supported coding agent.
@@ -18,6 +20,58 @@ const (
 	Codex       Agent = "codex"
 	Antigravity Agent = "antigravity"
 )
+
+// ObservationHook is a client event whose payload has a tested adapter contract.
+// Name is the event registered with the client; ObserveEvent is passed to
+// `sidecar observe` and may differ for clients with different event names.
+type ObservationHook struct {
+	Name         string
+	ObserveEvent string
+}
+
+// Capabilities describes the hook contracts Sidecar can rely on for one client.
+// ObservationHooks contains only tool/compaction events supported by the client;
+// unverified events are omitted. ExploreCapability remains unverified until a
+// client-native path to invoke Sidecar exploration has been tested.
+type Capabilities struct {
+	PromptEvent       string
+	ObservationHooks  []ObservationHook
+	Observability     contract.Observability
+	ExploreCapability contract.CapabilityStatus
+}
+
+// CapabilitiesFor returns hook capabilities established by adapter and install
+// contract tests. Unknown agents have no registered events and remain unverified.
+func CapabilitiesFor(agent Agent) Capabilities {
+	capabilities := Capabilities{
+		Observability: contract.Observability{
+			ToolEvents: contract.ObservationUnsupported,
+			PreCompact: contract.ObservationUnsupported,
+		},
+		ExploreCapability: contract.CapabilityUnverified,
+	}
+	switch agent {
+	case Claude:
+		capabilities.PromptEvent = "UserPromptSubmit"
+		capabilities.ObservationHooks = []ObservationHook{
+			{Name: "PreToolUse", ObserveEvent: "PreToolUse"},
+			{Name: "PostToolUse", ObserveEvent: "PostToolUse"},
+			{Name: "PreCompact", ObserveEvent: "PreCompact"},
+		}
+		capabilities.Observability.ToolEvents = contract.ObservationSeen
+		capabilities.Observability.PreCompact = contract.ObservationSeen
+	case Codex:
+		capabilities.PromptEvent = "UserPromptSubmit"
+	case Antigravity:
+		capabilities.PromptEvent = "PreInvocation"
+		capabilities.ObservationHooks = []ObservationHook{
+			{Name: "PreTool", ObserveEvent: "PreToolUse"},
+			{Name: "PostTool", ObserveEvent: "PostToolUse"},
+		}
+		capabilities.Observability.ToolEvents = contract.ObservationSeen
+	}
+	return capabilities
+}
 
 // MaxInputBytes bounds the hook payload read from stdin.
 const MaxInputBytes = 1 << 20
