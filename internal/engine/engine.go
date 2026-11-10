@@ -13,6 +13,9 @@ import (
 // Version is the engine name written to logs and explain output.
 const Version = "v3"
 
+// Version35 selects the opt-in unified context transaction built on the V3 decision layer.
+const Version35 = "v3.5"
+
 // Action is what the engine decided to deliver. They are distinct actions, not a bundle that is
 // always on: ABSTAIN emits zero bytes, EXPLORE_AVAILABLE only offers the on-demand tool.
 type Action string

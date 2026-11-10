@@ -16,6 +16,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
 	"github.com/dedeusgui/sidecar/internal/engine"
+	"github.com/dedeusgui/sidecar/internal/engine/contract"
 	"github.com/dedeusgui/sidecar/internal/explore"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/install"
@@ -49,12 +50,14 @@ type ExplainReport struct {
 	Packing       *retrieve.PackTrace       `json:"packing,omitempty"`
 	Context       string                    `json:"context"`
 	Decision      *engine.Decision          `json:"v3_decision,omitempty"` // v3 only
+	V35Plan       *contract.OutputPlan      `json:"v35_plan,omitempty"`
+	V35Tokens     int                       `json:"v35_tokens,omitempty"`
 }
 
-// engineOf names the pipeline that produced a result. Only the exact values "v2" and "v3" select them.
+// engineOf names the pipeline that produced a result. Unknown values keep the v1 compatibility default.
 func engineOf(opts retrieve.Options) string {
 	switch opts.EngineVersion {
-	case "v2", engine.Version:
+	case "v2", engine.Version, engine.Version35:
 		return opts.EngineVersion
 	}
 	return "v1"
@@ -109,7 +112,14 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 	}
 	var res retrieve.Result
 	var decision *engine.Decision
-	if engineOf(opts) == engine.Version {
+	var unified *v35Output
+	if engineOf(opts) == engine.Version35 {
+		r, err := runV35Safe(ctx, ix.Store(), root, prompt, opts, adapter.Agent(""), "", "", time.Now(), true)
+		if err == nil {
+			res, unified = r.Result, &r
+			decision = &r.Decision
+		}
+	} else if engineOf(opts) == engine.Version {
 		r, d, err := engine.Run(ctx, ix.Store(), prompt, engine.Options{Retrieve: opts})
 		if err != nil {
 			return ExplainReport{}, err
@@ -122,7 +132,7 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 		}
 		res = r
 	}
-	if engineOf(opts) == "v2" || decision != nil && decision.Action != engine.ActionAbstain {
+	if engineOf(opts) != engine.Version35 && (engineOf(opts) == "v2" || decision != nil && decision.Action != engine.ActionAbstain) {
 		if _, err := attachDecisions(ix.Store(), root, prompt, &res, time.Now()); err != nil {
 			return ExplainReport{}, err
 		}
@@ -152,7 +162,11 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 		Context:       renderContext(res, opts),
 		Decision:      decision,
 	}
-	if decision != nil {
+	if unified != nil {
+		rep.Context = unified.Packed.Text
+		rep.V35Plan = &unified.Plan
+		rep.V35Tokens = unified.Packed.EstimatedTokens
+	} else if decision != nil {
 		rep.Context = engine.Render(res, *decision, nil)
 	}
 	for k, d := range res.Trace.Timings {
@@ -193,10 +207,17 @@ func WriteExplain(w io.Writer, rep ExplainReport, asJSON bool) error {
 	_, _ = fmt.Fprintf(w, "Intenção: %s (confiança %.2f)\n", strings.Join(rep.Intent.Kinds, ", "), rep.Intent.Confidence)
 	_, _ = fmt.Fprintf(w, "Motor: %s\n", rep.Engine)
 	if d := rep.Decision; d != nil {
-		_, _ = fmt.Fprintf(w, "Decisão V3: %s · classe %s · relevância %s · orçamento %d tokens · %d itens\n", d.Action, d.Class, d.Relevance, d.Budget, len(d.Included))
+		version := "V3"
+		if rep.Engine == engine.Version35 {
+			version = "V3.5"
+		}
+		_, _ = fmt.Fprintf(w, "Decisão %s: %s · classe %s · relevância %s · orçamento %d tokens · %d itens\n", version, d.Action, d.Class, d.Relevance, d.Budget, len(d.Included))
 		for _, r := range append(append([]string{}, d.AbstainReasons...), d.LowConfidence...) {
 			_, _ = fmt.Fprintf(w, "  motivo: %s\n", r)
 		}
+	}
+	if rep.V35Plan != nil {
+		_, _ = fmt.Fprintf(w, "Plano V3.5: %d tokens alocados · %d tokens empacotados · %d seções\n", rep.V35Plan.BudgetTokens, rep.V35Tokens, len(rep.V35Plan.Sections))
 	}
 	if pk := rep.Packing; pk != nil {
 		_, _ = fmt.Fprintf(w, "Pacote: %d itens · %d/%d tokens · abstenção=%v %s\n", pk.Selected, pk.Used, pk.Budget, pk.Abstained, pk.Reason)

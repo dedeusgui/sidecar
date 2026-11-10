@@ -24,7 +24,7 @@ const (
 	// QuickMaxTokens caps estimated evidence tokens added by QuickExpand.
 	QuickMaxTokens = 512
 	// QuickMaxDuration caps QuickExpand's cooperative wall-time budget.
-	QuickMaxDuration = 150 * time.Millisecond
+	QuickMaxDuration = 500 * time.Millisecond
 	// DeepMaxFiles is the hard ceiling on source files shown by DeepExplore.
 	DeepMaxFiles = 6
 	// DeepMaxTokens caps estimated evidence tokens added by DeepExplore.
