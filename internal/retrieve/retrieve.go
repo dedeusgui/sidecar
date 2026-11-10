@@ -295,8 +295,9 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 
 	t = time.Now()
 	seeds := pickSeeds(cands, opts.Seeds)
+	lexicalTopKLocked := lexicalCandidatesFillTopK(cands, lexOrder, opts)
 	added := 0
-	if !opts.Ablate.NoStructure {
+	if !opts.Ablate.NoStructure && !lexicalTopKLocked {
 		added, err = expand(st, seeds, cands, !opts.Ablate.NoGit, families)
 		if err != nil {
 			return res, err
@@ -307,7 +308,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 
 	t = time.Now()
 	var dirty []string
-	if !opts.Ablate.NoGit {
+	if !opts.Ablate.NoGit && !lexicalTopKLocked {
 		dirty, err = st.DirtyPaths()
 		if err != nil {
 			return res, err
@@ -359,6 +360,37 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	markExcluded(res.Trace.Candidates, excluded)
 	res.Trace.Timings["total"] = time.Since(start)
 	return res, nil
+}
+
+// lexicalCandidatesFillTopK reports whether enough eligible, non-file lexical results already fill
+// the output limit. In that case structural expansion and Git state cannot change the selected set.
+// Excluding file rows is conservative: fuse may suppress them when a more specific symbol exists.
+func lexicalCandidatesFillTopK(cands map[int64]*candidate, lexOrder []int64, opts Options) bool {
+	hasExact := false
+	for _, c := range cands {
+		if c.exact {
+			hasExact = true
+			break
+		}
+	}
+	count := 0
+	for _, id := range lexOrder {
+		c := cands[id]
+		if c == nil || c.hit.Kind == "file" || repo.IsGenerated(c.hit.Path, nil) || gate(c) == "no evidence" {
+			continue
+		}
+		if hasExact && !opts.NoExactDominance && !c.exact && !c.neighbor && len(c.rels) == 0 && c.coverage < 1 {
+			continue
+		}
+		if opts.hasAbsentAnchor && !hasExact && !c.exact && len(c.matched) <= 1 {
+			continue
+		}
+		count++
+		if count >= opts.MaxItems {
+			return true
+		}
+	}
+	return false
 }
 
 // v2Pipeline adds contract evidence to the ranked pool, then (unless ablated) packs the set
@@ -1086,7 +1118,7 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 		}
 	}
 	for _, c := range pool {
-		if c.neighbor {
+		if c.neighbor && c.lexRank == 0 {
 			structList = append(structList, idx(c))
 		}
 	}
@@ -1117,13 +1149,65 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 		c := byKey[key]
 		scored = append(scored, fusion.Scored{Key: key, File: c.hit.Path, Score: c.score})
 	}
-	// Direct matches claim the per-file budget before structural neighbours do: a neighbour
-	// that matches nothing in the prompt is supporting context, not the answer.
+	// Keep BM25's eligible order as the base ranking. Relations may add candidates after it, but
+	// cannot push a lexical result out of the top-K or displace one lexical result with another.
 	sort.SliceStable(scored, func(i, j int) bool {
 		di, dj := byKey[scored[i].Key].direct(), byKey[scored[j].Key].direct()
 		return di && !dj
 	})
-	kept := fusion.Diversify(scored, opts.MaxPerFile, opts.MaxItems)
+	ordered := make([]fusion.Scored, 0, len(pool))
+	seen := map[string]bool{}
+	lexicalIDs := append([]int64(nil), lexOrder...)
+	// Explicit post-task feedback is a user signal and may change lexical ordering; graph
+	// evidence never does. Structural scores are excluded from lexical candidates above.
+	feedbackChangedLexicalRank := false
+	for _, id := range lexicalIDs {
+		if c := cands[id]; c != nil && c.feedback != "" {
+			feedbackChangedLexicalRank = true
+			break
+		}
+	}
+	if feedbackChangedLexicalRank {
+		sort.SliceStable(lexicalIDs, func(i, j int) bool {
+			a, b := cands[lexicalIDs[i]], cands[lexicalIDs[j]]
+			if a.score != b.score {
+				return a.score > b.score
+			}
+			return a.lexRank < b.lexRank
+		})
+	}
+	for _, id := range lexicalIDs {
+		c, ok := cands[id]
+		if !ok || !gated(c) {
+			continue
+		}
+		key := idx(c)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		ordered = append(ordered, fusion.Scored{Key: key, File: c.hit.Path, Score: c.score})
+	}
+	for _, it := range scored {
+		if seen[it.Key] {
+			continue
+		}
+		ordered = append(ordered, it)
+	}
+	// Lexical matches keep their BM25 order and are not subject to graph diversification. The
+	// per-file cap applies to expansion candidates, using lexical items as already-consumed slots.
+	perFile := map[string]int{}
+	var kept []fusion.Scored
+	for _, it := range ordered {
+		if len(kept) >= opts.MaxItems {
+			break
+		}
+		if byKey[it.Key].lexRank == 0 && perFile[it.File] >= opts.MaxPerFile {
+			continue
+		}
+		perFile[it.File]++
+		kept = append(kept, it)
+	}
 	keptSet := map[string]bool{}
 	for _, k := range kept {
 		keptSet[k.Key] = true

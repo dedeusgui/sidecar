@@ -187,6 +187,73 @@ func TestStructuralRelationsAddSameFileCallees(t *testing.T) {
 	}
 }
 
+func TestGraphExpansionDoesNotDisplaceTopLexicalHits(t *testing.T) {
+	tests := []struct {
+		split, prompt, path, name string
+	}{
+		{"tune", "dar baixa na nota fiscal do fornecedor depois do pagamento", "billing/supplier_invoice.ts", "settleInvoice"},
+		{"eval", "marcar a entrega como concluída", "shipping/delivery_tracker.py", "mark_delivered"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			root := filepath.Join("..", "..", "bench", "testdata", "fixtures", tc.split)
+			ix, _, err := index.Open(root, filepath.Join(t.TempDir(), "index.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = ix.Close() })
+			if _, err := ix.Sync(context.Background(), index.Options{}); err != nil {
+				t.Fatal(err)
+			}
+			lexical, err := Search(context.Background(), ix.Store(), tc.prompt, Options{Ablate: Ablation{LexicalOnly: true}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !hasHit(lexical.Evidence[:min(len(lexical.Evidence), 5)], tc.path, tc.name) {
+				t.Fatalf("fixture no longer has the expected lexical top-5 hit: %+v", lexical.Evidence)
+			}
+			withGraph, err := Search(context.Background(), ix.Store(), tc.prompt, Options{Ablate: Ablation{NoGit: true}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !hasHit(withGraph.Evidence[:min(len(withGraph.Evidence), 5)], tc.path, tc.name) {
+				t.Fatalf("graph displaced lexical top-5 hit %s:%s: %+v", tc.path, tc.name, withGraph.Evidence)
+			}
+		})
+	}
+}
+
+func TestGraphExpansionSkippedWhenLexicalResultsFillLimit(t *testing.T) {
+	root := filepath.Join("..", "..", "bench", "testdata", "fixtures", "tune")
+	ix, _, err := index.Open(root, filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ix.Close() })
+	if _, err := ix.Sync(context.Background(), index.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Search(context.Background(), ix.Store(), "dar baixa na nota fiscal do fornecedor depois do pagamento", Options{
+		MaxItems: 3,
+		Ablate:   Ablation{NoGit: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Trace.Structural != 0 {
+		t.Fatalf("structural expansion ran although lexical results filled the output limit: %+v", res.Trace)
+	}
+}
+
+func hasHit(evidence []Evidence, path, name string) bool {
+	for _, e := range evidence {
+		if e.Hit.Path == path && e.Hit.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 func TestTestFilesAreReportedAsContracts(t *testing.T) {
 	ix := buildIndex(t)
 	res, err := Search(context.Background(), ix.Store(), "fila de tickets enqueue", Options{})
@@ -207,19 +274,21 @@ func TestTestFilesAreReportedAsContracts(t *testing.T) {
 	}
 }
 
-func TestDiversificationLimitsItemsPerFile(t *testing.T) {
+func TestExpansionCandidatesRespectPerFileLimit(t *testing.T) {
 	ix := buildIndex(t)
 	res, err := Search(context.Background(), ix.Store(), "queue ticket service enqueue constant", Options{MaxItems: 10, MaxPerFile: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
 	perFile := map[string]int{}
-	for _, e := range res.Evidence {
-		perFile[e.Hit.Path]++
+	for _, c := range res.Trace.Candidates {
+		if c.Kept && c.Lexical == 0 {
+			perFile[c.Path]++
+		}
 	}
 	for p, n := range perFile {
 		if n > 2 {
-			t.Fatalf("file %s contributed %d items, limit 2", p, n)
+			t.Fatalf("file %s contributed %d expansion candidates, limit 2", p, n)
 		}
 	}
 }
