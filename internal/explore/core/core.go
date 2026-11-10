@@ -602,9 +602,7 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 		}
 		rec := records[node.hit.Path]
 		tokenTerms := append(append([]string{}, terms...), strings.ToLower(node.hit.Name))
-		for _, term := range lexical.Analyze(node.hit.Name) {
-			tokenTerms = append(tokenTerms, term)
-		}
+		tokenTerms = append(tokenTerms, lexical.Analyze(node.hit.Name)...)
 		evidence := retrieve.Evidence{Hit: node.hit, Verdict: statusOfBasis(node.basis), Source: "structural", Confidence: 0.9}
 		snips := snippets(string(data), []retrieve.Evidence{evidence}, maxChars-out.Budget.UsedChars, tokenTerms)
 		if len(snips) == 0 {
