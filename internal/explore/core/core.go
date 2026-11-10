@@ -308,10 +308,11 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 	for _, f := range out.Files {
 		shown[f.Path] = true
 	}
-	if err := relate(ctx, st, seeds, shown, &out); err != nil {
+	rel := newRelationCache(st)
+	if err := relate(ctx, st, rel, seeds, shown, &out); err != nil {
 		return out, err
 	}
-	if err := expandCallChain(ctx, st, opts.Root, terms, plan, recs, maxFiles, maxChars, &out); err != nil {
+	if err := expandCallChain(ctx, st, rel, opts.Root, terms, plan, recs, maxFiles, maxChars, &out); err != nil {
 		return out, err
 	}
 	for _, f := range res.Trace.Contracts {
@@ -455,7 +456,7 @@ func planExpansion(st *store.Store, seeds []store.SymbolHit, evidence []retrieve
 	return plan, nil
 }
 
-func expandCallChain(ctx context.Context, st *store.Store, root string, terms []string, plan expansionPlan,
+func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, root string, terms []string, plan expansionPlan,
 	records map[string]store.FileRecord, maxFiles, maxChars int, out *Result) error {
 	if len(plan.roots) == 0 {
 		return nil
@@ -493,11 +494,11 @@ func expandCallChain(ctx context.Context, st *store.Store, root string, terms []
 		if current.depth >= maxExpansionDepth {
 			continue
 		}
-		callers, err := st.CallersOf(current.hit.ID, maxRelationsPerSymbol)
+		callers, err := rel.callers(current.hit.ID, maxRelationsPerSymbol)
 		if err != nil {
 			return err
 		}
-		callees, err := st.CalleesOf(current.hit.ID, maxRelationsPerSymbol)
+		callees, err := rel.callees(current.hit.ID, maxRelationsPerSymbol)
 		if err != nil {
 			return err
 		}
@@ -696,7 +697,7 @@ func IsIdent(s string) bool {
 }
 
 // relate fills relations, consumers, dependencies, tests and candidate entry points from the index.
-func relate(ctx context.Context, st *store.Store, seeds []store.SymbolHit, shown map[string]bool, out *Result) error {
+func relate(ctx context.Context, st *store.Store, rel *relationCache, seeds []store.SymbolHit, shown map[string]bool, out *Result) error {
 	addRef := func(list *[]Ref, r Ref) {
 		if len(*list) >= maxRefs {
 			return
@@ -713,11 +714,11 @@ func relate(ctx context.Context, st *store.Store, seeds []store.SymbolHit, shown
 			return err
 		}
 		from := Ref{Name: s.Name, Kind: s.Kind, Path: s.Path, Line: s.Line, Status: Verified}
-		callers, err := st.CallersOf(s.ID, maxRelationsPerSymbol)
+		callers, err := rel.callers(s.ID, maxRelationsPerSymbol)
 		if err != nil {
 			return err
 		}
-		callees, err := st.CalleesOf(s.ID, maxRelationsPerSymbol)
+		callees, err := rel.callees(s.ID, maxRelationsPerSymbol)
 		if err != nil {
 			return err
 		}
@@ -740,7 +741,7 @@ func relate(ctx context.Context, st *store.Store, seeds []store.SymbolHit, shown
 				Reason: "no indexed caller"})
 		}
 		for _, c := range callers {
-			if more, err := st.CallersOf(c.ID, 1); err == nil && len(more) == 0 && c.Kind != "test" && !strings.HasPrefix(c.Name, "Test") {
+			if more, err := rel.callers(c.ID, 1); err == nil && len(more) == 0 && c.Kind != "test" && !strings.HasPrefix(c.Name, "Test") {
 				addRef(&out.EntryPoints, Ref{Name: c.Name, Kind: c.Kind, Path: c.Path, Line: c.Line, Status: Candidate,
 					Reason: "top of the indexed call chain into " + s.Name})
 			}
@@ -975,3 +976,40 @@ func statusOfVerdict(v string) string {
 }
 
 func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }
+
+// relationCache memoizes caller/callee lookups within one Build: relate and expandCallChain
+// ask for the same symbols, and each store query pays a full SQL prepare.
+type relationCache struct {
+	st      *store.Store
+	callerM map[[2]int64]cachedRelations
+	calleeM map[[2]int64]cachedRelations
+}
+
+type cachedRelations struct {
+	rows []store.Related
+	err  error
+}
+
+func newRelationCache(st *store.Store) *relationCache {
+	return &relationCache{st: st, callerM: map[[2]int64]cachedRelations{}, calleeM: map[[2]int64]cachedRelations{}}
+}
+
+func (c *relationCache) callers(id int64, limit int) ([]store.Related, error) {
+	key := [2]int64{id, int64(limit)}
+	if v, ok := c.callerM[key]; ok {
+		return v.rows, v.err
+	}
+	rows, err := c.st.CallersOf(id, limit)
+	c.callerM[key] = cachedRelations{rows, err}
+	return rows, err
+}
+
+func (c *relationCache) callees(id int64, limit int) ([]store.Related, error) {
+	key := [2]int64{id, int64(limit)}
+	if v, ok := c.calleeM[key]; ok {
+		return v.rows, v.err
+	}
+	rows, err := c.st.CalleesOf(id, limit)
+	c.calleeM[key] = cachedRelations{rows, err}
+	return rows, err
+}

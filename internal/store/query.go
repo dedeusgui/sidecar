@@ -100,7 +100,7 @@ func (s *Store) ParentOf(id int64) (SymbolHit, bool, error) {
 // file or in a file the caller imports is linked; a name defined only once in the whole
 // repository is linked with the weaker unique_name basis. Other names are not linked.
 func (s *Store) CalleesOf(id int64, limit int) ([]Related, error) {
-	rows, err := s.db.Query(`SELECT `+symbolColumns("t")+`, CASE
+	rows, err := s.queryCached(`SELECT `+symbolColumns("t")+`, CASE
 			WHEN t.file_id = src.file_id THEN 'same_file'
 			WHEN EXISTS (SELECT 1 FROM imports i WHERE i.file_id = src.file_id AND i.resolved_file_id = t.file_id) THEN 'import'
 			ELSE 'unique_name' END AS basis
@@ -135,7 +135,7 @@ func (s *Store) CalleesOf(id int64, limit int) ([]Related, error) {
 
 // CallersOf returns symbols that call the given symbol's name, under the same linking rules.
 func (s *Store) CallersOf(id int64, limit int) ([]Related, error) {
-	rows, err := s.db.Query(`SELECT `+symbolColumns("src")+`, CASE
+	rows, err := s.queryCached(`SELECT `+symbolColumns("src")+`, CASE
 			WHEN src.file_id = t.file_id THEN 'same_file'
 			WHEN EXISTS (SELECT 1 FROM imports i WHERE i.file_id = src.file_id AND i.resolved_file_id = t.file_id) THEN 'import'
 			ELSE 'unique_name' END AS basis
@@ -170,7 +170,7 @@ func (s *Store) CallersOf(id int64, limit int) ([]Related, error) {
 
 // TestFilesReferencing returns the file rows of test files that mention a name.
 func (s *Store) TestFilesReferencing(name string, limit int) ([]SymbolHit, error) {
-	rows, err := s.db.Query(`SELECT DISTINCT `+symbolColumns("s")+`
+	rows, err := s.queryCached(`SELECT DISTINCT `+symbolColumns("s")+`
 		FROM refs r
 		JOIN files f ON f.id = r.file_id AND f.kind = 'test'
 		JOIN symbols s ON s.file_id = f.id AND s.kind = 'file'
@@ -270,7 +270,7 @@ func (s *Store) TestPaths(limit int) ([]string, error) {
 
 // DocstringOwners returns definitions whose extracted doc comment contains name verbatim.
 func (s *Store) DocstringOwners(name string, limit int) ([]SymbolHit, error) {
-	rows, err := s.db.Query(`SELECT `+symbolColumns("s")+`
+	rows, err := s.queryCached(`SELECT `+symbolColumns("s")+`
 		FROM symbols s JOIN files f ON f.id = s.file_id
 		WHERE s.doc <> '' AND instr(s.doc, ?) > 0 ORDER BY s.id LIMIT ?`, name, limit)
 	if err != nil {
@@ -302,7 +302,7 @@ func (s *Store) SymbolsInFile(path string, limit int) ([]SymbolHit, error) {
 // ImportersOf returns the paths of files whose imports resolve to path. An import that did not resolve
 // to a file in the repository is not listed: absence here is not proof that nobody imports the file.
 func (s *Store) ImportersOf(path string, limit int) ([]string, error) {
-	rows, err := s.db.Query(`SELECT DISTINCT f.path FROM imports i
+	rows, err := s.queryCached(`SELECT DISTINCT f.path FROM imports i
 		JOIN files f ON f.id = i.file_id JOIN files t ON t.id = i.resolved_file_id
 		WHERE t.path = ? AND f.id <> t.id ORDER BY f.path LIMIT ?`, path, limit)
 	if err != nil {

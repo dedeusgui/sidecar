@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver with FTS5; keeps the binary CGo-free
@@ -26,6 +27,9 @@ var ErrSchemaTooNew = errors.New("index schema is newer than this sidecar build"
 type Store struct {
 	db   *sql.DB
 	path string
+
+	stmtMu sync.Mutex
+	stmts  map[string]*sql.Stmt
 }
 
 // FileRecord describes an indexed (or deliberately skipped) file.
@@ -190,7 +194,35 @@ func IsCorrupt(err error) bool {
 }
 
 // Close releases the database handle.
-func (s *Store) Close() error { return s.db.Close() }
+func (s *Store) Close() error {
+	s.stmtMu.Lock()
+	for _, stmt := range s.stmts {
+		_ = stmt.Close()
+	}
+	s.stmts = nil
+	s.stmtMu.Unlock()
+	return s.db.Close()
+}
+
+// queryCached runs a read query through a per-store prepared statement. The hot hook path asks
+// the same relation queries repeatedly and each SQL parse costs more than executing the query.
+func (s *Store) queryCached(query string, args ...any) (*sql.Rows, error) {
+	s.stmtMu.Lock()
+	stmt, ok := s.stmts[query]
+	if !ok {
+		var err error
+		if stmt, err = s.db.Prepare(query); err != nil {
+			s.stmtMu.Unlock()
+			return nil, err
+		}
+		if s.stmts == nil {
+			s.stmts = map[string]*sql.Stmt{}
+		}
+		s.stmts[query] = stmt
+	}
+	s.stmtMu.Unlock()
+	return stmt.Query(args...)
+}
 
 // SchemaVersion returns the version recorded in the database.
 func (s *Store) SchemaVersion() (int, error) {
@@ -353,12 +385,18 @@ func (s *Store) FileRecords() (map[string]FileRecord, error) {
 // FileRecordOf returns one indexed file, or ok=false when the path is not indexed.
 func (s *Store) FileRecordOf(path string) (FileRecord, bool, error) {
 	var f FileRecord
-	err := s.db.QueryRow(`SELECT path, lang, kind, size, mtime_ns, hash, skipped, extract_ver FROM files WHERE path = ?`, path).
-		Scan(&f.Path, &f.Lang, &f.Kind, &f.Size, &f.MtimeNS, &f.Hash, &f.Skipped, &f.ExtractVer)
-	if errors.Is(err, sql.ErrNoRows) {
-		return FileRecord{}, false, nil
+	rows, err := s.queryCached(`SELECT path, lang, kind, size, mtime_ns, hash, skipped, extract_ver FROM files WHERE path = ?`, path)
+	if err != nil {
+		return f, false, err
 	}
-	return f, err == nil, err
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		return FileRecord{}, false, rows.Err()
+	}
+	if err := rows.Scan(&f.Path, &f.Lang, &f.Kind, &f.Size, &f.MtimeNS, &f.Hash, &f.Skipped, &f.ExtractVer); err != nil {
+		return f, false, err
+	}
+	return f, true, nil
 }
 
 // SearchSymbols runs an FTS5 MATCH over symbol text. match must already be a valid FTS5
@@ -510,7 +548,7 @@ func (s *Store) PendingImports() ([]PendingImport, error) {
 
 // ResolvedImportPaths lists the repository files a file imports, once resolved.
 func (s *Store) ResolvedImportPaths(fromPath string) ([]string, error) {
-	rows, err := s.db.Query(`SELECT t.path FROM imports i
+	rows, err := s.queryCached(`SELECT t.path FROM imports i
 		JOIN files f ON f.id = i.file_id
 		JOIN files t ON t.id = i.resolved_file_id
 		WHERE f.path = ? ORDER BY t.path`, fromPath)
