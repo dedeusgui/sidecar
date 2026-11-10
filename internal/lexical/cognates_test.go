@@ -59,3 +59,48 @@ func TestCognateTransducerDerivesUnlistedDomainTerms(t *testing.T) {
 		}
 	}
 }
+
+func TestVoiceTranscriptionTermsNormalizeWithoutNoise(t *testing.T) {
+	translations := map[string]string{
+		"giin": "engine",
+		"ader": "aider",
+	}
+	for input, want := range translations {
+		if got := Translations(input); !slices.Contains(got, want) {
+			t.Errorf("Translations(%q) = %v, want %q", input, got, want)
+		}
+	}
+	cases := map[string][]string{
+		"byte en giin": {"engine"},
+		"cold graph":   {"code", "graph"},
+		"Ader Ripple":  {"aider"},
+	}
+	for input, want := range cases {
+		if got := Analyze(input); !slices.Equal(got, want) {
+			t.Errorf("Analyze(%q) = %v, want %v", input, got, want)
+		}
+	}
+	if slices.Contains(Translations("cold"), "code") || slices.Contains(Translations("ripple"), "repo") {
+		t.Fatal("common words must not gain standalone technical translations")
+	}
+}
+
+func TestShortDomainPromptTermsTranslate(t *testing.T) {
+	cases := map[string][]string{
+		"pesados":   {"weighing"},
+		"esperando": {"waiting"},
+		"espera":    {"waiting"},
+		"próximo":   {"next"},
+		"carência":  {"grace"},
+		"cadastrar": {"register"},
+		"cancela":   {"barrier"},
+	}
+	for input, want := range cases {
+		got := Translations(input)
+		for _, w := range want {
+			if !slices.Contains(got, w) {
+				t.Errorf("Translations(%q) = %v, want %q", input, got, w)
+			}
+		}
+	}
+}

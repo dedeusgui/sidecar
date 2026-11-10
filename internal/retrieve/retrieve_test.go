@@ -72,10 +72,14 @@ func TestEnqueueKeepsOrder(t *testing.T) {
 `,
 }
 
-func buildIndex(t *testing.T) *index.Index {
+func buildIndex(t testing.TB) *index.Index {
+	return buildIndexFromFiles(t, project)
+}
+
+func buildIndexFromFiles(t testing.TB, files map[string]string) *index.Index {
 	t.Helper()
 	root := t.TempDir()
-	for rel, body := range project {
+	for rel, body := range files {
 		p := filepath.Join(root, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -242,6 +246,44 @@ func TestGraphExpansionSkippedWhenLexicalResultsFillLimit(t *testing.T) {
 	}
 	if res.Trace.Structural != 0 {
 		t.Fatalf("structural expansion ran although lexical results filled the output limit: %+v", res.Trace)
+	}
+}
+
+func TestDomainAcronymDoesNotSuppressTranslatedAnchor(t *testing.T) {
+	root := filepath.Join("..", "..", "bench", "testdata", "fixtures", "tune")
+	ix, _, err := index.Open(root, filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ix.Close() })
+	if _, err := ix.Sync(context.Background(), index.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Search(context.Background(), ix.Store(), "cadastrar fornecedor pelo CNPJ", Options{Ablate: Ablation{NoGit: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasHit(res.Evidence, "supplier/SupplierRegistry.go", "RegisterSupplier") {
+		t.Fatalf("domain acronym suppressed the translated supplier registration result: %v", names(res.Evidence))
+	}
+}
+
+func TestFilaDeEsperaPromptFindsEnqueueInTopFive(t *testing.T) {
+	root := filepath.Join("..", "..", "bench", "testdata", "fixtures", "tune")
+	ix, _, err := index.Open(root, filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ix.Close() })
+	if _, err := ix.Sync(context.Background(), index.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Search(context.Background(), ix.Store(), "onde um caminhão entra na fila de espera?", Options{Ablate: Ablation{LexicalOnly: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasHit(res.Evidence[:min(len(res.Evidence), 5)], "queue/ticket_queue.go", "Enqueue") {
+		t.Fatalf("fila de espera did not put Enqueue in the lexical top-5: %v", names(res.Evidence))
 	}
 }
 

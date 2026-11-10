@@ -703,22 +703,34 @@ func codeLike(tok string) bool {
 // and translations are absent from the repository's symbols.
 func absentAnchorTerms(st *store.Store, prompt string, noTranslation bool) (map[string]bool, error) {
 	var absent map[string]bool
+	normalizedPromptTerms := map[string]bool{}
+	for _, term := range lexical.Analyze(prompt) {
+		normalizedPromptTerms[term] = true
+	}
 	for _, loc := range identRe.FindAllStringIndex(prompt, -1) {
 		tok := prompt[loc[0]:loc[1]]
+		if isUpperAcronym(tok) {
+			continue
+		}
 		isCode := codeLike(tok)
 		midSentenceProper := loc[0] > 0 && tok[0] >= 'A' && tok[0] <= 'Z' && len(tok) >= 4 && !afterSentenceBreak(prompt, loc[0]) && lexical.Fold(tok) != "code"
 		if !isCode && !midSentenceProper {
 			continue
 		}
 		sub := lexical.Analyze(tok)
-		if len(sub) == 0 {
+		checkTerms := make([]string, 0, len(sub))
+		for _, term := range sub {
+			if normalizedPromptTerms[term] {
+				checkTerms = append(checkTerms, term)
+			}
+		}
+		if len(checkTerms) == 0 {
 			continue
 		}
 		// For CamelCase technology names like "MongoDB" -> ["mongo", "db"] or "PostgreSQL" -> ["postgre", "sql"],
 		// check the primary proper root rather than a generic 2-3 letter suffix ("db", "sql").
-		checkTerms := sub
-		if len(sub) > 1 && len(sub[0]) >= 4 {
-			checkTerms = sub[:1]
+		if len(checkTerms) > 1 && len(checkTerms[0]) >= 4 {
+			checkTerms = checkTerms[:1]
 		}
 		isTermPresent := func(t string) (bool, error) {
 			if isCode {
@@ -760,12 +772,27 @@ func absentAnchorTerms(st *store.Store, prompt string, noTranslation bool) (map[
 			if absent == nil {
 				absent = map[string]bool{}
 			}
-			for _, t := range sub {
+			for _, t := range checkTerms {
 				absent[t] = true
 			}
 		}
 	}
 	return absent, nil
+}
+
+// isUpperAcronym avoids treating short domain abbreviations such as CNPJ as missing code
+// identifiers. Underscored and numeric identifiers remain subject to absent-anchor checks.
+func isUpperAcronym(tok string) bool {
+	runes := []rune(tok)
+	if len(runes) < 2 || len(runes) > 5 {
+		return false
+	}
+	for _, r := range runes {
+		if r < 'A' || r > 'Z' {
+			return false
+		}
+	}
+	return true
 }
 
 func afterSentenceBreak(s string, pos int) bool {
