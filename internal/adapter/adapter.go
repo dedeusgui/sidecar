@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/dedeusgui/sidecar/internal/engine/contract"
 )
 
 // Agent names a supported coding agent.
@@ -18,6 +20,74 @@ const (
 	Codex       Agent = "codex"
 	Antigravity Agent = "antigravity"
 )
+
+// ObservationHook is a client event whose payload has a tested adapter contract.
+// Name is the event registered with the client; ObserveEvent is passed to
+// `sidecar observe` and may differ for clients with different event names.
+type ObservationHook struct {
+	Name         string
+	ObserveEvent string
+}
+
+// Capabilities describes prompt/observation contracts and their verification status for a client.
+// ObservationHooks also retains historical opt-in registrations whose client contract is unverified.
+// ExploreCapability remains unverified until a client-native path has been tested.
+type Capabilities struct {
+	PromptEvent          string
+	PromptCapability     contract.CapabilityStatus
+	ObservationHooks     []ObservationHook
+	Observability        contract.Observability
+	ToolEventsCapability contract.CapabilityStatus
+	PreCompactCapability contract.CapabilityStatus
+	ExploreCapability    contract.CapabilityStatus
+}
+
+// CapabilitiesFor returns hook capabilities established by adapter and install
+// contract tests. Unknown agents have no registered events and remain unverified.
+func CapabilitiesFor(agent Agent) Capabilities {
+	capabilities := Capabilities{
+		Observability: contract.Observability{
+			ToolEvents: contract.ObservationUnsupported,
+			PreCompact: contract.ObservationUnsupported,
+		},
+		PromptCapability:     contract.CapabilityUnverified,
+		ToolEventsCapability: contract.CapabilityUnverified,
+		PreCompactCapability: contract.CapabilityUnverified,
+		ExploreCapability:    contract.CapabilityUnverified,
+	}
+	switch agent {
+	case Claude:
+		capabilities.PromptEvent = "UserPromptSubmit"
+		capabilities.PromptCapability = contract.CapabilityAvailable
+		capabilities.ObservationHooks = []ObservationHook{
+			{Name: "PreToolUse", ObserveEvent: "PreToolUse"},
+			{Name: "PostToolUse", ObserveEvent: "PostToolUse"},
+			{Name: "PreCompact", ObserveEvent: "PreCompact"},
+		}
+		capabilities.Observability.ToolEvents = contract.ObservationSeen
+		capabilities.Observability.PreCompact = contract.ObservationSeen
+		capabilities.ToolEventsCapability = contract.CapabilityAvailable
+		capabilities.PreCompactCapability = contract.CapabilityAvailable
+	case Codex:
+		capabilities.PromptEvent = "UserPromptSubmit"
+		capabilities.PromptCapability = contract.CapabilityAvailable
+		capabilities.ToolEventsCapability = contract.CapabilityUnsupported
+		capabilities.PreCompactCapability = contract.CapabilityUnsupported
+	case Antigravity:
+		capabilities.PromptEvent = "PreInvocation"
+		capabilities.ObservationHooks = []ObservationHook{
+			{Name: "PreTool", ObserveEvent: "PreToolUse"},
+			{Name: "PostTool", ObserveEvent: "PostToolUse"},
+		}
+		// Adapter parsing and generated configuration do not prove that the client consumes
+		// these events. Keep the historical opt-in wiring, but do not use it as V3.5 evidence.
+		// Observability stays unsupported/unobserved (no client-consumption proof), and the
+		// absence of a PreCompact event is equally unproven, so every capability is unverified.
+		capabilities.ToolEventsCapability = contract.CapabilityUnverified
+		capabilities.PreCompactCapability = contract.CapabilityUnverified
+	}
+	return capabilities
+}
 
 // MaxInputBytes bounds the hook payload read from stdin.
 const MaxInputBytes = 1 << 20

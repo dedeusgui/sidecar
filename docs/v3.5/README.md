@@ -1,6 +1,6 @@
 # Sidecar V3.5 — Unified Context Engine
 
-**Status: PLANNED / NOT SHIPPED.** Design branch from `main@16aa8f68187bf0de9781f2d0a333ffde91713b90` (PR #21 is the implemented experimental **V3**). V3.5 will remain opt-in until benchmark validation and release gates pass.
+**Status: implementada, opt-in (`SIDECAR_ENGINE=v3.5`), gates de avaliação pendentes; ver [progress.md](progress.md).** Design branch from `main@16aa8f68187bf0de9781f2d0a333ffde91713b90` (PR #21 is the implemented experimental **V3**). V3.5 will remain opt-in until benchmark validation and release gates pass.
 
 **North star:** “Install once, ask normally, get the smallest **sufficient** context automatically.” Every feature already built stays available, coordinated by **one planner, one evidence registry, one global packer, one bounded session view**. The agent is not required to know or use `sidecar explore` or any Sidecar-specific command.
 

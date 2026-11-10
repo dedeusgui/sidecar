@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
+	"github.com/dedeusgui/sidecar/internal/engine"
 )
 
-// The hook keeps the v1 pipeline unless SIDECAR_ENGINE is exactly v2 or v3; only those read session memory.
+// The hook keeps the v1 pipeline unless SIDECAR_ENGINE explicitly selects an opt-in engine.
 func TestHookEngineSwitchDefaultsToV1(t *testing.T) {
 	t.Setenv("SIDECAR_PROFILE", "")
 	for _, value := range []string{"", "v1", "V3", "V2", "v4"} {
@@ -27,6 +28,10 @@ func TestHookEngineSwitchDefaultsToV1(t *testing.T) {
 	t.Setenv("SIDECAR_FEATURES", "adaptive")
 	if o := hookRetrieveOptions("/repo", filepath.Join(t.TempDir(), "s.json")); o.EngineVersion != "v3" || o.Adaptive || o.Seen == nil {
 		t.Errorf("SIDECAR_ENGINE=v3 gave engine %q adaptive=%v seen=%v; v3 owns its policy and reads session memory", o.EngineVersion, o.Adaptive, o.Seen != nil)
+	}
+	t.Setenv("SIDECAR_ENGINE", engine.Version35)
+	if o := hookRetrieveOptions("/repo", filepath.Join(t.TempDir(), "s.json")); o.EngineVersion != engine.Version35 || o.Adaptive || o.Seen == nil {
+		t.Errorf("SIDECAR_ENGINE=v3.5 gave engine %q adaptive=%v seen=%v; v3.5 owns its policy and reads session memory", o.EngineVersion, o.Adaptive, o.Seen != nil)
 	}
 	t.Setenv("SIDECAR_PROFILE", "minimal")
 	if o := hookRetrieveOptions("/repo", ""); o.Profile != "minimal" {

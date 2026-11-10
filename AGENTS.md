@@ -2,9 +2,9 @@
 
 > Fonte única de instruções de desenvolvimento deste repositório. Leia antes de alterar código, testes, benchmarks, documentação ou distribuição. Não confunda estas instruções para **contribuir no Sidecar** com instruções que o Sidecar injeta nos repositórios dos usuários.
 
-## Campanha atual: Sidecar V3.5 (arquitetura proposta, ainda não implementada)
+## Campanha atual: Sidecar V3.5 (implementada, opt-in, gates de avaliação pendentes)
 
-A V3 experimental já está implementada (PR #21, código em `internal/engine` e `internal/explore`). **V3.5 não está entregue.** A nova missão é unificar as capacidades existentes em um fluxo automático de assistência, sem o agente precisar aprender comandos Sidecar: **[visão V3.5](docs/v3.5/README.md)**, **[arquitetura e interfaces](docs/v3.5/architecture.md)**, **[migração executável](docs/v3.5/implementation-plan.md)**, **[evals/gates](docs/v3.5/evaluation.md)**. **Ler esses documentos antes de implementar V3.5**, preservando este contrato de privacidade, segurança, compatibilidade, licenças e testes. A V3 permanece como baseline factual em [progress.md](docs/v3/progress.md), [next-steps.md](docs/v3/next-steps.md) e [referências upstream](docs/v3/upstream-references.md). Não confundir metas da V3.5 com resultados publicados. Core local-first, sem LLM/serviço obrigatório; manter V1/V2/V3 funcionais e V3.5 opt-in até cumprir gates.
+A V3 experimental já está implementada (PR #21, código em `internal/engine` e `internal/explore`). **V3.5 está implementada na branch `feat/v3.5-unified-engine`, opt-in via `SIDECAR_ENGINE=v3.5`, sem gates de avaliação cumpridos nem ganho agentic medido** ([progress](docs/v3.5/progress.md)). A missão é unificar as capacidades existentes em um fluxo automático de assistência, sem o agente precisar aprender comandos Sidecar: **[visão V3.5](docs/v3.5/README.md)**, **[arquitetura e interfaces](docs/v3.5/architecture.md)**, **[migração executável](docs/v3.5/implementation-plan.md)**, **[evals/gates](docs/v3.5/evaluation.md)**. **Ler esses documentos antes de implementar V3.5**, preservando este contrato de privacidade, segurança, compatibilidade, licenças e testes. A V3 permanece como baseline factual em [progress.md](docs/v3/progress.md), [next-steps.md](docs/v3/next-steps.md) e [referências upstream](docs/v3/upstream-references.md). Não confundir metas da V3.5 com resultados publicados. Core local-first, sem LLM/serviço obrigatório; manter V1/V2/V3 funcionais e V3.5 opt-in até cumprir gates.
 
 ## Missão e limites
 
@@ -27,6 +27,7 @@ Princípios inegociáveis:
 - `internal/repo`, `gitx`: descoberta de raiz/worktree, mudanças e histórico.
 - `internal/extract`: parsing e símbolos; `internal/index`: sincronização incremental.
 - `internal/store`: SQLite/FTS5; `internal/lexical`: normalização e dicionário.
+- `internal/engine` (+`contract`): planner e contratos V3.5; `internal/explore` (+`core`, `service`): Explore e QuickExpand/DeepExplore.
 - `internal/retrieve`, `fusion`: recuperação, relações, ranking.
 - `internal/brief`, `ctxbuild`: evidência, contexto e orçamento.
 - `internal/install`, `paths`: hooks, instalação, manifest e cache fora do repo.
@@ -64,6 +65,8 @@ go run ./cmd/sidecar-eval --cases bench/cases.json --out /tmp/sidecar-eval.json
 go run ./cmd/sidecar explain --root . --json  # lê prompt de stdin
 go run ./cmd/sidecar doctor
 ```
+
+`sidecar-eval` omite casos `holdout` por padrão e informa a contagem omitida em stderr; use `--include-holdout` somente para um relatório final após o freeze explícito.
 
 `go test -race` depende do ambiente e não é gate Windows/macOS neste CI. `/tmp` é exemplo POSIX; escolher diretório temporário adequado em outros SOs. `sidecar explain` pode escrever índice no cache do usuário; usar ambiente isolado para experiências. Não rodar tarefas de benchmark agentic pagas em CI por padrão.
 

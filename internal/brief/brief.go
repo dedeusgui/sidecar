@@ -93,6 +93,22 @@ func SeenFor(statePath string) ctxbuild.Seen {
 	}
 }
 
+// Remember commits the evidence items selected by the unified packer to the existing bounded
+// session ledger. Callers invoke it only after the complete block has been packed.
+func Remember(statePath string, items []ctxbuild.Item) {
+	if statePath == "" || len(items) == 0 {
+		return
+	}
+	st := loadState(statePath)
+	st.Turn++
+	for _, item := range items {
+		if item.Key != "" {
+			st.Emitted[item.Key] = entry{Fingerprint: item.Fingerprint, Turn: st.Turn}
+		}
+	}
+	saveState(statePath, st)
+}
+
 type entry struct {
 	Fingerprint string `json:"fp"`
 	Turn        int    `json:"turn"`

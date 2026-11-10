@@ -18,6 +18,18 @@ const (
 	Git       = "GIT EVIDENCE"
 	Concerns  = "POTENTIAL CONCERNS"
 	TaskCheck = "TASK CHECK" // opt-in clarification note (feature "groom")
+
+	// V3.5 sections are separate labels so the legacy renderer keeps its existing
+	// section names and output order.
+	V35Relations      = "RELATIONS"
+	ContractsAndTests = "CONTRACTS & TESTS"
+	OpenDecision      = "OPEN DECISION"
+	ChangeImpact      = "CHANGE IMPACT"
+	Verification      = "VERIFICATION"
+	Gaps              = "GAPS"
+	Memory            = "MEMORY"
+	Session           = "SESSION"
+	Explore           = "EXPLORE"
 )
 
 var sectionOrder = []string{TaskCheck, TaskBrief, Code, Relations, Contracts, Git, Concerns}
@@ -36,6 +48,15 @@ type Item struct {
 	Key         string
 	Fingerprint string
 	Text        string
+	// Priority is a provider-supplied ordering hint for the V3.5 packer; higher
+	// values are considered first. Zero uses the section's default priority.
+	Priority int
+	// Source and Role identify the proposal provider and evidence role without
+	// changing the text emitted by legacy renderers.
+	Source     string
+	Role       string
+	Qualifier  string
+	Provenance string
 }
 
 // Seen reports whether an item with this key and fingerprint was already injected.
@@ -117,6 +138,21 @@ func render(sectionLines []string) string {
 func EstimateTokens(s string) int {
 	n := utf8.RuneCountInString(s)
 	return (n + 3) / 4
+}
+
+// PackFrameTokens is the fixed cost Pack charges against the global budget for the context
+// markers and preamble, before any section is rendered.
+func PackFrameTokens() int {
+	return EstimateTokens(openMarker + "\n" + preamble + "\n" + closeMarker + "\n")
+}
+
+// SectionFrameTokens is the rendering overhead Pack charges for a section header and the
+// bullets of items items, on top of the item text itself.
+func SectionFrameTokens(section string, items int) int {
+	if items <= 0 {
+		return 0
+	}
+	return EstimateTokens(section + "\n" + strings.Repeat("- \n", items))
 }
 
 // MaxTaskCheckRunes is the item limit of a clarification note: a question needs its options and evidence

@@ -10,8 +10,11 @@ import (
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/ctxbuild"
+	"github.com/dedeusgui/sidecar/internal/engine"
+	"github.com/dedeusgui/sidecar/internal/engine/contract"
 	"github.com/dedeusgui/sidecar/internal/gitx"
 	"github.com/dedeusgui/sidecar/internal/groom"
+	"github.com/dedeusgui/sidecar/internal/repo"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
 )
@@ -122,6 +125,17 @@ func awaitingAnswer(opts HookOptions, in adapter.Input) bool {
 	p := strings.TrimSpace(in.Prompt)
 	if p == "" || strings.HasPrefix(p, "/") || in.SessionID == "" || !retrieve.FeatureEnabled("groom") {
 		return false
+	}
+	if os.Getenv("SIDECAR_ENGINE") == engine.Version35 {
+		cwd := in.CWD
+		if cwd == "" {
+			cwd = "."
+		}
+		root, _ := repo.FindRoot(cwd)
+		scope := contract.NormalizeScope(contract.Scope{RepoRoot: root, WorktreeID: root,
+			SessionID: in.SessionID, WorktreeRevision: worktreeVersion(root)})
+		state := LoadGroomProposalState(scope)
+		return state.Pending != nil && state.Turn+1-state.Pending.Turn <= groom.PendingTurns
 	}
 	statePath := opts.StatePath(string(opts.Agent), in.SessionID)
 	if statePath == "" {

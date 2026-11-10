@@ -1,0 +1,542 @@
+{
+  "schema": "sidecar-v35-e2-navigation/1",
+  "cohort_id": "E2-v35-2026-11-09-a",
+  "split": "validation",
+  "freeze_status": "frozen-before-tuning",
+  "authoring": {
+    "role": "implementation-agent",
+    "independent_reviewer": null,
+    "independence": "author-coupled",
+    "gold_status": "source-span-checked",
+    "limitation": "Task and oracle authorship overlap with implementation; source spans are pinned and hash-verifiable, but semantic gold still needs an independent reviewer."
+  },
+  "repos": {
+    "gin": {
+      "language": "go",
+      "commit": "0f09c3a9b4626d9fe9979cf4d0521d6ae32ab646",
+      "source": "https://github.com/gin-gonic/gin",
+      "license": "MIT"
+    },
+    "fastapi": {
+      "language": "python",
+      "commit": "ba5d72bae32807f0af203c45cff695f80fd0f26c",
+      "source": "https://github.com/fastapi/fastapi",
+      "license": "MIT"
+    },
+    "koa": {
+      "language": "javascript",
+      "commit": "b7ead6f7a2bb56e2948b1c5e1cca77483e89c885",
+      "source": "https://github.com/koajs/koa",
+      "license": "MIT"
+    },
+    "axum": {
+      "language": "rust",
+      "commit": "1a25995c13a621b627385a9b91c97583b9a6bcb0",
+      "source": "https://github.com/tokio-rs/axum",
+      "license": "MIT"
+    },
+    "symfony-http-kernel": {
+      "language": "php",
+      "commit": "ee98a4a10a817c96d56f442ae765d48fd4152249",
+      "source": "https://github.com/symfony/http-kernel",
+      "license": "MIT"
+    }
+  },
+  "tasks": [
+    {
+      "id": "V35E2-GIN-01",
+      "repo": "gin",
+      "language": "go",
+      "prompt": "How does a Gin handler retrieve a named parameter from the matched route?",
+      "oracle": {
+        "facts": [
+          "Context.Param reads the named entry from Params.ByName"
+        ],
+        "spans": [
+          {
+            "path": "context.go",
+            "line_start": 512,
+            "line_end": 514,
+            "sha256": "e926aa074df9d7c1b7bcafa9c35b558553b1aa04c9492a3120dc4ff3ca7bec25"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "Context.Param",
+            "Params.ByName"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-GIN-02",
+      "repo": "gin",
+      "language": "go",
+      "prompt": "How does Context.Next execute the remaining middleware and handlers?",
+      "oracle": {
+        "facts": [
+          "Next advances the handler index and invokes each non-nil handler until the chain ends"
+        ],
+        "spans": [
+          {
+            "path": "context.go",
+            "line_start": 197,
+            "line_end": 205,
+            "sha256": "f327063489e4863191780f2374bf9707accfbc898a4560df6024fb86581350b5"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "c.index++",
+            "c.handlers[c.index](c)"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-GIN-03",
+      "repo": "gin",
+      "language": "go",
+      "prompt": "After authorization fails, how can middleware prevent later handlers from running?",
+      "oracle": {
+        "facts": [
+          "Abort moves the context index to abortIndex so pending handlers are skipped"
+        ],
+        "spans": [
+          {
+            "path": "context.go",
+            "line_start": 212,
+            "line_end": 218,
+            "sha256": "a7b4a591aa9e2601d4e9cbd1fd1b142a3f6b21b286a2d0755eded5c0f1f62101"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "c.index = abortIndex"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-GIN-04",
+      "repo": "gin",
+      "language": "go",
+      "prompt": "How does a RouterGroup inherit handlers and extend its route prefix?",
+      "oracle": {
+        "facts": [
+          "Group combines parent handlers with the supplied handlers and calculates an absolute path"
+        ],
+        "spans": [
+          {
+            "path": "routergroup.go",
+            "line_start": 94,
+            "line_end": 102,
+            "sha256": "a550fd3c529bbe7e49bdd30b1b3b203d1f5d2b63b7538a8c9772749c1b9d9c1b"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "combineHandlers",
+            "calculateAbsolutePath"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-FASTAPI-01",
+      "repo": "fastapi",
+      "language": "python",
+      "prompt": "How does FastAPI inspect an endpoint signature to build its dependency graph?",
+      "oracle": {
+        "facts": [
+          "get_dependant creates a Dependant and analyzes each endpoint signature parameter"
+        ],
+        "spans": [
+          {
+            "path": "fastapi/dependencies/utils.py",
+            "line_start": 300,
+            "line_end": 330,
+            "sha256": "6fbca471d5271272762bb28158fb47162061defbc56b396aee53f069847f991c"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "get_dependant",
+            "analyze_param"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-FASTAPI-02",
+      "repo": "fastapi",
+      "language": "python",
+      "prompt": "Where are dependencies walked and solved for one request?",
+      "oracle": {
+        "facts": [
+          "solve_dependencies iterates the dependant's sub-dependencies for the request"
+        ],
+        "spans": [
+          {
+            "path": "fastapi/dependencies/utils.py",
+            "line_start": 643,
+            "line_end": 712,
+            "sha256": "49a6ae1d140e42c7ec578e56931e53c0edd6e89fd31c2c3b370504695b20004c"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "for sub_dependant in dependant.dependencies",
+            "solve_dependencies("
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-FASTAPI-03",
+      "repo": "fastapi",
+      "language": "python",
+      "prompt": "How is endpoint response data validated before it is serialized?",
+      "oracle": {
+        "facts": [
+          "serialize_response validates response_content with the response field and raises ResponseValidationError on errors"
+        ],
+        "spans": [
+          {
+            "path": "fastapi/routing.py",
+            "line_start": 320,
+            "line_end": 360,
+            "sha256": "69d99624855bb6699fd55bd41766f2a491476667d3c94801b0fadce26c08d9e7"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "field.validate(response_content",
+            "ResponseValidationError"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-FASTAPI-04",
+      "repo": "fastapi",
+      "language": "python",
+      "prompt": "How does a FastAPI route include an API router with a custom prefix and dependencies?",
+      "oracle": {
+        "facts": [
+          "FastAPI.include_router delegates the router with a prefix and shared dependencies"
+        ],
+        "spans": [
+          {
+            "path": "fastapi/applications.py",
+            "line_start": 1675,
+            "line_end": 1686,
+            "sha256": "b9e4cb3813a0f17b2511cafb57b6795381970170fc052b50689c982a9260b7c0"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "self.router.include_router(",
+            "dependencies=dependencies"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-KOA-01",
+      "repo": "koa",
+      "language": "javascript",
+      "prompt": "What happens when application.use registers middleware?",
+      "oracle": {
+        "facts": [
+          "use validates that the value is a function and appends it to the middleware array"
+        ],
+        "spans": [
+          {
+            "path": "lib/application.js",
+            "line_start": 172,
+            "line_end": 177,
+            "sha256": "3132ddf0bfc4161af5af32ddfc51a0e85319598cc1b58e9c7c5e1a6824cf0d68"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "this.middleware.push(fn)",
+            "middleware must be a function"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-KOA-02",
+      "repo": "koa",
+      "language": "javascript",
+      "prompt": "How does Koa build the Node HTTP callback around its middleware?",
+      "oracle": {
+        "facts": [
+          "callback composes the middleware and creates a context for each request"
+        ],
+        "spans": [
+          {
+            "path": "lib/application.js",
+            "line_start": 187,
+            "line_end": 202,
+            "sha256": "d46d5a7276bfa239a61c617d9e35011c191087d657e3f7e68310ad6d279fdce7"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "this.compose(this.middleware)",
+            "this.createContext(req, res)"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-KOA-03",
+      "repo": "koa",
+      "language": "javascript",
+      "prompt": "How is the request handled after Koa creates a context?",
+      "oracle": {
+        "facts": [
+          "handleRequest runs composed middleware then responds, and routes promise errors to ctx.onerror"
+        ],
+        "spans": [
+          {
+            "path": "lib/application.js",
+            "line_start": 218,
+            "line_end": 225,
+            "sha256": "296a2945f0dfc1d8b7b6af6ee0411ce5c11f0bd748f93e55e387aa56dfaec540"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "fnMiddleware(ctx).then(handleResponse).catch(onerror)"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-KOA-04",
+      "repo": "koa",
+      "language": "javascript",
+      "prompt": "What does assigning a null response body do when the current status permits content?",
+      "oracle": {
+        "facts": [
+          "A null body sets status 204 unless the response status already disallows a body; JSON content type instead gets the string null"
+        ],
+        "spans": [
+          {
+            "path": "lib/response.js",
+            "line_start": 148,
+            "line_end": 177,
+            "sha256": "33f0eac5166031293cfa3dd01a009e0317c73331d31b2e492dc2acfb98d94070"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "this._body = 'null'",
+            "this.status = 204"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-AXUM-01",
+      "repo": "axum",
+      "language": "rust",
+      "prompt": "How does Router register a method router at a path?",
+      "oracle": {
+        "facts": [
+          "Router.route passes the path and method router to the path router"
+        ],
+        "spans": [
+          {
+            "path": "axum/src/routing/mod.rs",
+            "line_start": 185,
+            "line_end": 189,
+            "sha256": "1af55e74babf4d98e15f77f40d959f151a7443e97b59ba81d29faa2c0dc07ed4"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "this.path_router.route(path, method_router)"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-AXUM-02",
+      "repo": "axum",
+      "language": "rust",
+      "prompt": "How are typed path parameters extracted from the request parts?",
+      "oracle": {
+        "facts": [
+          "Path implements FromRequestParts and deserializes URL parameters through get_params and serialize_path_params"
+        ],
+        "spans": [
+          {
+            "path": "axum/src/extract/path/mod.rs",
+            "line_start": 167,
+            "line_end": 177,
+            "sha256": "a26f9a4013d7ac87d4ff7d5e25d03afff2a7bd27330137e0534151e100b51a4b"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "get_params(parts).and_then(serialize_path_params)"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-AXUM-03",
+      "repo": "axum",
+      "language": "rust",
+      "prompt": "How does Router.route_layer apply middleware to matching routes?",
+      "oracle": {
+        "facts": [
+          "route_layer wraps the path router's routes while leaving default and catch-all fallbacks unchanged"
+        ],
+        "spans": [
+          {
+            "path": "axum/src/routing/mod.rs",
+            "line_start": 304,
+            "line_end": 319,
+            "sha256": "575ecc6b1e14117ec1c0ea383bd2d5674e6ef743d556d0b7f641ef8332a56d76"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "this.path_router.route_layer(layer)"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-AXUM-04",
+      "repo": "axum",
+      "language": "rust",
+      "prompt": "How does middleware built with from_fn pass the request to the next service?",
+      "oracle": {
+        "facts": [
+          "Next.run calls its inner service with the request and returns its response"
+        ],
+        "spans": [
+          {
+            "path": "axum/src/middleware/from_fn.rs",
+            "line_start": 338,
+            "line_end": 349,
+            "sha256": "bde7de6ecfc4495e30ee8422875514ce839803fcfc0f86555a2eee5b4dbe1193"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "self.inner.call(req).await"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-SYMFONY-01",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "prompt": "How does HttpKernel handle the request and turn a caught exception into a response?",
+      "oracle": {
+        "facts": [
+          "handle calls handleRaw and sends caught throwables through handleThrowable when catch is enabled"
+        ],
+        "spans": [
+          {
+            "path": "HttpKernel.php",
+            "line_start": 73,
+            "line_end": 96,
+            "sha256": "6aae4cc804eab66f1c68c50d5b9767a6f106298b58ecb33eea7434d0937f24cb"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "handleRaw($request, $type, $controllerMetadata)",
+            "handleThrowable($e, $request, $type, $controllerMetadata)"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-SYMFONY-02",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "prompt": "What request, controller, and argument events are dispatched before invoking the controller?",
+      "oracle": {
+        "facts": [
+          "handleRaw dispatches request, controller, and controller-arguments events before calling the controller"
+        ],
+        "spans": [
+          {
+            "path": "HttpKernel.php",
+            "line_start": 170,
+            "line_end": 200,
+            "sha256": "731ddacb962faabb4144a20f74710d307091f12a6844f074404e8a677cd0d5b5"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "KernelEvents::REQUEST",
+            "KernelEvents::CONTROLLER_ARGUMENTS",
+            "$controller(...$arguments)"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-SYMFONY-03",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "prompt": "How does RouterListener match the request and expose the route parameters?",
+      "oracle": {
+        "facts": [
+          "onKernelRequest matches the Request or path and stores the returned parameters as request attributes"
+        ],
+        "spans": [
+          {
+            "path": "EventListener/RouterListener.php",
+            "line_start": 130,
+            "line_end": 194,
+            "sha256": "849dffc7a994193af1c353f604c2958b3234aa1d64bcae0a8b24ba8aadbc929e"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "$this->matcher->matchRequest($request)",
+            "$request->attributes->add($attributes)"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "V35E2-SYMFONY-04",
+      "repo": "symfony-http-kernel",
+      "language": "php",
+      "prompt": "How does ControllerResolver turn the _controller request attribute into a callable?",
+      "oracle": {
+        "facts": [
+          "getController reads _controller, returns false when missing, and validates or creates a callable"
+        ],
+        "spans": [
+          {
+            "path": "Controller/ControllerResolver.php",
+            "line_start": 54,
+            "line_end": 104,
+            "sha256": "1507c62ccc636991233402768f994d2b34d9345cf8b03511dda74c882510563a"
+          }
+        ],
+        "answer_must_mention": [
+          [
+            "attributes->get('_controller')",
+            "createController($controller)"
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -112,7 +112,7 @@ func main() {
 	impactHistory := flag.String("impact-history", "", "evaluate change-impact analysis on the Git history of this repository (needs history)")
 	impactN := flag.Int("impact-commits", 40, "commits to use with --impact-history")
 	groomFlag := flag.Bool("groom", false, "clarification benchmark: run the V2 pipeline and the ask/assume policy over cases with expect_ask labels")
-	includeHoldout := flag.Bool("include-holdout", false, "with --replay: also run the holdout split (a final report; never used to choose variants)")
+	includeHoldout := flag.Bool("include-holdout", false, "also evaluate the holdout split (final report only; never use it to choose variants)")
 	perfRuns := flag.Int("perf", 0, "measure cold/warm latency per pipeline stage with this many warm runs per case (p50/p95/p99)")
 	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
 	v3Decisions := flag.String("v3-decisions", "", "write the V3 router decision (signals, action, reasons) of every case to this JSON file")
@@ -157,6 +157,11 @@ func main() {
 		must(json.Unmarshal(raw, &cf))
 		base := filepath.Dir(filepath.Dir(*casesPath)) // fixtures are relative to the repo root
 		indexes = buildFixtures(cf, base, tmp)
+	}
+	filteredCases, skippedHoldout := filterHoldoutCases(cf.Cases, *includeHoldout)
+	cf.Cases = filteredCases
+	if skippedHoldout > 0 {
+		fmt.Fprintf(os.Stderr, "sidecar-eval: %d casos holdout omitidos; use --include-holdout só para relatório final\n", skippedHoldout)
 	}
 	defer func() {
 		for _, ix := range indexes {
@@ -236,6 +241,22 @@ func main() {
 		must(os.WriteFile(*outPath, data, 0o644))
 		fmt.Fprintln(os.Stderr, "wrote", *outPath)
 	}
+}
+
+func filterHoldoutCases(cases []caseSpec, includeHoldout bool) ([]caseSpec, int) {
+	if includeHoldout {
+		return cases, 0
+	}
+	filtered := make([]caseSpec, 0, len(cases))
+	skipped := 0
+	for _, c := range cases {
+		if c.Split == "holdout" {
+			skipped++
+			continue
+		}
+		filtered = append(filtered, c)
+	}
+	return filtered, skipped
 }
 
 func retrieveRun(ab retrieve.Ablation) runner {

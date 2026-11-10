@@ -62,7 +62,8 @@ var codeAbbrevs = map[string][]string{
 // Callers verify each returned candidate against the repository's FTS5 vocabulary (TermDocFreq > 0).
 func CognateCandidates(word string) []string {
 	w := Fold(word)
-	if len(w) < 5 {
+	phonetic := phoneticTechTerms(w)
+	if len(w) < 5 && len(phonetic) == 0 {
 		return nil
 	}
 	var out []string
@@ -79,7 +80,7 @@ func CognateCandidates(word string) []string {
 	}
 
 	// Phonetic / transcription normalization for spoken technical terms (e.g. "esquelite" -> "sqlite").
-	for _, p := range phoneticTechTerms(w) {
+	for _, p := range phonetic {
 		add(p)
 	}
 
@@ -118,7 +119,7 @@ func normalizeRomanceOrthography(w string) string {
 	s := w
 	if strings.HasPrefix(s, "esqu") {
 		s = "sch" + s[4:]
-	} else if len(s) >= 6 && strings.HasPrefix(s, "es") && isConsonant(s[2]) {
+	} else if len(s) >= 6 && strings.HasPrefix(s, "es") && isConsonant(s[2]) && !strings.HasPrefix(s, "esper") {
 		s = s[1:]
 	}
 	replacer := strings.NewReplacer(
@@ -247,6 +248,10 @@ func transduceSuffixes(w string) []string {
 // phoneticTechTerms normalizes common Voice Mode / spoken PT-BR transcriptions of English tech terms.
 func phoneticTechTerms(w string) []string {
 	switch w {
+	case "giin":
+		return []string{"engine"}
+	case "ader":
+		return []string{"aider"}
 	case "esquelite", "sequelite", "sqlit":
 		return []string{"sqlite"}
 	case "haiku", "haai", "haiq":

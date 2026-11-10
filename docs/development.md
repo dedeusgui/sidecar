@@ -30,6 +30,8 @@ go run ./cmd/sidecar-eval --agentic-report <diretorio-com-runs.jsonl> --agentic-
 go run ./cmd/sidecar doctor
 ```
 
+`sidecar-eval` omite o split `holdout` por padrão e informa a contagem omitida em stderr; `--include-holdout` fica reservado a um relatório final após o freeze explícito.
+
 `--external-cases` exige que cada repositório esteja limpo e no commit fixado no manifesto; não clona nem faz checkout. `--agentic-report` só lê registros; não executa agentes, e com `--report-md` grava o relatório no arquivo indicado. Tarefas `draft` do manifesto não recebem veredito. Os experimentos rejeitados (peso RRF dos vizinhos e marcação de vizinhos) estão em [benchmark.md](benchmark.md), seção Rodada E.
 
 O método `v2.1 (intent router)` roteia só prompts com confiança de intenção ≥ 0,55 e limita a expansão estrutural às famílias da intenção; os demais produzem os mesmos itens do v1 (coberto por `TestRoutingFallsBackToV1BelowThreshold`). Ele não tem baseline em `final-state.json`, então aparece como não comparado até uma nova rodada congelada. Para ver quantos prompts roteiam, use `sidecar explain --json` e leia `intent` e `intent_routed`.

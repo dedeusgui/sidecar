@@ -97,7 +97,7 @@ Uso:
   sidecar activity [--json] [--limit N]               últimas execuções do hook (sem prompt)
   sidecar statusline                                  linha de status (lê JSON do Claude Code)
   sidecar doctor                                      diagnóstico de instalação e ambiente
-  sidecar explain [--root DIR] [--json] [--engine v1|v2|v3]   mostra o rastro de um prompt (lê stdin)
+  sidecar explain [--root DIR] [--json] [--engine v1|v2|v3|v3.5]   mostra o rastro de um prompt (lê stdin)
   sidecar explore --query TEXTO [--root DIR] [--json] [--max-files N] [--max-chars N] [--impact]
                                                       exploração estrutural sob demanda (docs/explore.md)
   sidecar lsp status|doctor|trust|setup               servidores de linguagem (opt-in; veja sidecar lsp)
@@ -244,9 +244,26 @@ func cmdStatus(args []string, out, errOut io.Writer) int {
 	if *asJSON {
 		return writeJSON(out, errOut, info)
 	}
-	for _, k := range []string{"root", "database", "files", "symbols", "commits", "dirty_files", "indexed_head", "last_sync", "index"} {
+	for _, k := range []string{"engine", "v35_active", "engine_detail", "root", "database", "files", "symbols", "commits", "dirty_files", "indexed_head", "last_sync", "index"} {
 		if v, ok := info[k]; ok {
 			_, _ = fmt.Fprintf(out, "%-14s %v\n", k+":", v)
+		}
+	}
+	if clients, ok := info["client_capabilities"].([]app.ClientCapabilities); ok {
+		_, _ = fmt.Fprintln(out, "clientes:")
+		for _, client := range clients {
+			detected := "não detectado"
+			if client.Detected {
+				detected = "detectado"
+			}
+			_, _ = fmt.Fprintf(out, "  %-13s %s; prompt=%s; tools=%s; PreCompact=%s; explore=%s\n",
+				client.Client, detected, client.Prompt, client.ToolEvents, client.PreCompact, client.Explore)
+		}
+		if v, ok := info["engine_activation"]; ok {
+			_, _ = fmt.Fprintf(out, "ativar V3.5: %v\n", v)
+		}
+		if v, ok := info["engine_deactivation"]; ok {
+			_, _ = fmt.Fprintf(out, "desativar V3.5: %v\n", v)
 		}
 	}
 	return 0
@@ -273,9 +290,9 @@ func cmdDoctor(out, errOut io.Writer) int {
 	return 0
 }
 
-// defaultEngine is v2 or v3 only when SIDECAR_ENGINE asks for it; the product default stays v1.
+// defaultEngine selects an opt-in pipeline only when SIDECAR_ENGINE asks for it; default stays v1.
 func defaultEngine() string {
-	if e := os.Getenv("SIDECAR_ENGINE"); e == "v2" || e == "v3" {
+	if e := os.Getenv("SIDECAR_ENGINE"); e == "v2" || e == "v3" || e == "v3.5" {
 		return e
 	}
 	return "v1"
@@ -286,12 +303,12 @@ func cmdExplain(args []string, in io.Reader, out, errOut io.Writer) int {
 	fs.SetOutput(errOut)
 	root := fs.String("root", ".", "folder inside the repository")
 	asJSON := fs.Bool("json", false, "print the trace as JSON")
-	engine := fs.String("engine", defaultEngine(), "retrieval pipeline: v1, v2 or v3 (default from SIDECAR_ENGINE)")
+	engine := fs.String("engine", defaultEngine(), "retrieval pipeline: v1, v2, v3 or v3.5 (default from SIDECAR_ENGINE)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if *engine != "v1" && *engine != "v2" && *engine != "v3" {
-		_, _ = fmt.Fprintf(errOut, "--engine deve ser v1, v2 ou v3, não %q\n", *engine)
+	if *engine != "v1" && *engine != "v2" && *engine != "v3" && *engine != "v3.5" {
+		_, _ = fmt.Fprintf(errOut, "--engine deve ser v1, v2, v3 ou v3.5, não %q\n", *engine)
 		return 2
 	}
 	prompt, err := io.ReadAll(io.LimitReader(in, adapter.MaxInputBytes))

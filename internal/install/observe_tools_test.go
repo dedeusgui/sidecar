@@ -149,6 +149,26 @@ func TestObserveToolsIsOptIn(t *testing.T) {
 	}
 }
 
+func TestInstallOmitsUnverifiedCodexObservationEvents(t *testing.T) {
+	env := testEnv(t)
+	if _, err := Install(Options{Env: env, Agents: []string{"codex"}, Yes: true, Out: &bytes.Buffer{}, ObserveTools: true}); err != nil {
+		t.Fatal(err)
+	}
+	obj := readJSON(t, env.CodexHooks)
+	hooks, _ := obj["hooks"].(map[string]any)
+	if len(hooks) != 1 || len(asList(hooks["UserPromptSubmit"])) != 1 {
+		t.Fatalf("Codex should receive only its verified prompt hook, got %v", hooks)
+	}
+	for _, event := range []string{"PreToolUse", "PostToolUse", "PreCompact"} {
+		if len(asList(hooks[event])) != 0 {
+			t.Fatalf("Codex received unverified %s event: %v", event, hooks[event])
+		}
+	}
+	if m, err := readManifest(env.Manifest); err != nil || len(m.Entries) != 1 || m.Entries[0].Event != "UserPromptSubmit" {
+		t.Fatalf("manifest should record only the prompt hook, entries=%+v err=%v", m.Entries, err)
+	}
+}
+
 // A manifest written before tool observation has no event field; its entries are prompt hooks
 // and must still be removed by uninstall.
 func TestUninstallReadsManifestWithoutEvents(t *testing.T) {

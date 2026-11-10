@@ -29,18 +29,21 @@ const (
 // commit) and Expires invalidate it when the code changes or the session goes idle.
 // Reads, Searches and Errors describe the current epoch, which starts at the last edit.
 type SessionSignals struct {
-	Version      string          `json:"version"`
-	Expires      int64           `json:"expires"`
-	Stage        string          `json:"stage"`
-	Compactions  int             `json:"compactions,omitempty"`
-	EvidenceSent int             `json:"evidence_sent"`
-	Symbols      map[string]bool `json:"symbols_visited"`
-	Files        map[string]bool `json:"files_seen"`
-	Edits        map[string]int  `json:"file_edits"`
-	Reads        map[string]int  `json:"reads"`
-	Searches     map[string]bool `json:"searches"`
-	Errors       map[string]int  `json:"errors"`
-	Signals      map[string]int  `json:"signals"`
+	Version string `json:"version"`
+	// ScopeFingerprint binds persisted signals to one worktree and session. It is a hash,
+	// so the on-disk record does not expose the session ID or repository path.
+	ScopeFingerprint string          `json:"scope_fingerprint,omitempty"`
+	Expires          int64           `json:"expires"`
+	Stage            string          `json:"stage"`
+	Compactions      int             `json:"compactions,omitempty"`
+	EvidenceSent     int             `json:"evidence_sent"`
+	Symbols          map[string]bool `json:"symbols_visited"`
+	Files            map[string]bool `json:"files_seen"`
+	Edits            map[string]int  `json:"file_edits"`
+	Reads            map[string]int  `json:"reads"`
+	Searches         map[string]bool `json:"searches"`
+	Errors           map[string]int  `json:"errors"`
+	Signals          map[string]int  `json:"signals"`
 	// Presented holds hashes of the evidence the hook actually injected into this session: one per
 	// path and one per path and symbol. Feedback is only attributed to evidence found here.
 	Presented map[string]bool `json:"evidence_presented,omitempty"`

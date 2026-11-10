@@ -89,6 +89,21 @@ func TestPackKeepsRankingOrder(t *testing.T) {
 	}
 }
 
+func TestPackPrefersImplementationOnlyWhenRequested(t *testing.T) {
+	doc := item("target", "a.md", 1, "feedback")
+	source := item("target", "a.go", 0.6, "feedback")
+	doc.ID, source.ID = "doc", "source"
+	budget := costOf(doc)
+	gotDefault, _, _ := Pack([]Evidence{doc, source}, PackOptions{Budget: budget})
+	if len(gotDefault) != 1 || gotDefault[0].ID != "doc" {
+		t.Fatalf("default selection = %v, want docs under the original ranking", selectedIDs(gotDefault))
+	}
+	gotPreferred, _, _ := Pack([]Evidence{doc, source}, PackOptions{Budget: budget, PreferImplementation: true})
+	if len(gotPreferred) != 1 || gotPreferred[0].ID != "source" {
+		t.Fatalf("preferred selection = %v, want production source", selectedIDs(gotPreferred))
+	}
+}
+
 // Session memory is the "new?" question: evidence already delivered is never sent again.
 func TestPackSkipsEvidenceAlreadyDelivered(t *testing.T) {
 	a := item("alpha", "a.go", 1, "fila")

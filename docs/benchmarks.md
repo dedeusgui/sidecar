@@ -36,8 +36,7 @@ Gerado de `bench/registry.json` (2026-11-09) por `python3 bench/consolidate.py`.
 ### Dados e comandos
 
 **B01-retrieval-internal** — dados: bench/cases.json (71 casos, 3 fixtures); escrito pelo autor do código  
-comando: `go run ./cmd/sidecar-eval --cases bench/cases.json`  
-artefatos: `bench/cases.json`
+comando histórico de três splits: `go run ./cmd/sidecar-eval --cases bench/cases.json --include-holdout` (holdout já inspecionado; não usar para tuning); artefato: `bench/cases.json`
 
 **B02-retrieval-external** — dados: bench/ten_repos_cases.json (40 positivos, commits fixados)  
 comando: `bash bench/agentic/setup_10_repos.sh /tmp/sidecar-real-bench && go run ./cmd/sidecar-eval --external-cases /tmp/sidecar-real-bench/ten-repos-manifest.json`  

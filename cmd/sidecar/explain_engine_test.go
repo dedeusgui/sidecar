@@ -13,8 +13,15 @@ func TestExplainRejectsUnknownEngine(t *testing.T) {
 	if code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
-	if !strings.Contains(errOut.String(), "v1, v2 ou v3") {
+	if !strings.Contains(errOut.String(), "v1, v2, v3 ou v3.5") {
 		t.Errorf("stderr = %q, want the engine choices", errOut.String())
+	}
+}
+
+func TestDefaultEngineAcceptsExplicitV35(t *testing.T) {
+	t.Setenv("SIDECAR_ENGINE", "v3.5")
+	if got := defaultEngine(); got != "v3.5" {
+		t.Fatalf("default engine = %q, want v3.5", got)
 	}
 }
 

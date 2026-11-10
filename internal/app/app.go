@@ -17,6 +17,7 @@ import (
 
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
+	"github.com/dedeusgui/sidecar/internal/ctxbuild"
 	"github.com/dedeusgui/sidecar/internal/engine"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/lsp"
@@ -49,6 +50,10 @@ type HookOptions struct {
 // Hook answers one UserPromptSubmit. It never fails the agent: every error is logged,
 // nothing is written to stdout, and the function returns 0.
 func Hook(opts HookOptions) (exit int) {
+	return hookWithAnswer(opts, answer)
+}
+
+func hookWithAnswer(opts HookOptions, answerFn func(context.Context, adapter.Input, HookOptions, logRecord) (string, error)) (exit int) {
 	if opts.Budget <= 0 {
 		opts.Budget = SyncBudget
 	}
@@ -96,7 +101,7 @@ func Hook(opts HookOptions) (exit int) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), opts.Budget+time.Second)
 	defer cancel()
-	block, err := answer(ctx, in, opts, rec)
+	block, err := answerFn(ctx, in, opts, rec)
 	var damage *damagedIndexError
 	if errors.As(err, &damage) && store.Quarantine(damage.db) == nil {
 		// Damage that appeared after the index opened: move it aside and answer once from a rebuilt index.
@@ -166,7 +171,40 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 		statePath = opts.StatePath(string(opts.Agent), in.SessionID)
 	}
 	ropts := hookRetrieveOptions(root, statePath)
+	if ropts.EngineVersion == engine.Version35 && statePath != "" {
+		statePath = v35SessionStatePath(root, statePath)
+		ropts.Seen = brief.SeenFor(statePath)
+	}
 	rec["engine"] = engineOf(ropts)
+	if ropts.EngineVersion == engine.Version35 {
+		t = time.Now()
+		unified, err := runV35Safe(ctx, ix.Store(), root, in.Prompt, ropts, opts.Agent, in.SessionID, statePath, time.Now(), false)
+		if err != nil {
+			return "", err
+		}
+		rec["v35_action"], rec["v35_class"], rec["v35_relevance"] = string(unified.Decision.Action), string(unified.Decision.Class), string(unified.Decision.Relevance)
+		rec["v35_budget"], rec["v35_tokens"] = unified.Plan.BudgetTokens, unified.Packed.EstimatedTokens
+		rec["evidence"] = len(unified.Result.Evidence)
+		rec["lexical"] = unified.Result.Trace.Lexical
+		rec["exact"] = unified.Result.Trace.Exact
+		used := packedSourceEvidenceKeys(unified.Packed.Items)
+		if in.SessionID != "" {
+			remembered := append([]ctxbuild.Item(nil), unified.Packed.Items...)
+			remembered = append(remembered, v35RememberAliases(root, unified.Packed.Items)...)
+			brief.Remember(statePath, remembered)
+			recordEvidence(root, opts.Agent, in.SessionID, used)
+		}
+		rec["render_ms"] = ms(time.Since(t))
+		rec["injected_chars"] = len(unified.Packed.Text)
+		rec["status"] = "ok"
+		if !sync.Complete {
+			rec["status"] = "partial"
+		}
+		if unified.Packed.Text == "" && rec["status"] == "ok" {
+			rec["status"] = "no_evidence"
+		}
+		return unified.Packed.Text, nil
+	}
 	t = time.Now()
 	var res retrieve.Result
 	var decision *engine.Decision
@@ -244,7 +282,7 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 // memory is read only for v2, because only the v2 packer uses it.
 func hookRetrieveOptions(root, statePath string) retrieve.Options {
 	o := retrieve.Options{Root: root, Profile: os.Getenv("SIDECAR_PROFILE")}
-	if e := os.Getenv("SIDECAR_ENGINE"); e == "v2" || e == engine.Version {
+	if e := os.Getenv("SIDECAR_ENGINE"); e == "v2" || e == engine.Version || e == engine.Version35 {
 		o.EngineVersion = e
 		o.Adaptive = e == "v2" && retrieve.FeatureEnabled("adaptive") // v3 applies the policy itself
 		o.Seen = brief.SeenFor(statePath)

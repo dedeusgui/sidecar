@@ -14,7 +14,7 @@
 ## Dois níveis independentes
 
 **Nível A — retrieval determinístico e sem LLM (executável hoje):**
-- Manter `go run ./cmd/sidecar-eval --cases bench/cases.json` como regressão de desenvolvimento.
+- Manter `go run ./cmd/sidecar-eval --cases bench/cases.json` como regressão de desenvolvimento; `sidecar-eval` omite `holdout` por padrão e só o inclui com `--include-holdout` em relatório final após freeze.
 - Comparar `grep/rg` lexical, SQLite BM25 bruto, BM25 + normalização/tradução, + grafo, + Git; avaliar também custo por componente e evidência correta.
 - Medir Precision@K, Recall@K, Hit@1/5, MRR, NDCG se houver relevância graduada, cobertura, falso positivo para consultas negativas, p50/p95/p99 cold/warm, tamanho do índice, memória, indexação e tokens de contexto.
 - Nenhum conjunto ajustado depois de sua inspeção pode continuar rotulado `holdout` cego.

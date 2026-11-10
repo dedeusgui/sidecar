@@ -112,20 +112,69 @@ func Stem(w string) string {
 func Analyze(text string) []string {
 	var out []string
 	seen := map[string]bool{}
+	if !hasVoiceTranscription(text) {
+		for _, word := range splitOn(text, isSeparator) {
+			for _, part := range splitCamel(word) {
+				folded := Fold(part)
+				if len(folded) < 2 || stopwords[folded] {
+					continue
+				}
+				stemmed := Stem(folded)
+				if !seen[stemmed] {
+					seen[stemmed] = true
+					out = append(out, stemmed)
+				}
+			}
+		}
+		return out
+	}
+	var words []string
 	for _, word := range splitOn(text, isSeparator) {
-		for _, part := range splitCamel(word) {
-			folded := Fold(part)
-			if len(folded) < 2 || stopwords[folded] {
-				continue
-			}
-			stemmed := Stem(folded)
-			if !seen[stemmed] {
-				seen[stemmed] = true
-				out = append(out, stemmed)
-			}
+		words = append(words, splitCamel(word)...)
+	}
+	for _, part := range normalizeVoiceTranscriptions(words) {
+		folded := Fold(part)
+		if len(folded) < 2 || stopwords[folded] {
+			continue
+		}
+		stemmed := Stem(folded)
+		if !seen[stemmed] {
+			seen[stemmed] = true
+			out = append(out, stemmed)
 		}
 	}
 	return out
+}
+
+// normalizeVoiceTranscriptions repairs only a few high-confidence multiword ASR confusions.
+// Phrase-level matching keeps common words such as "cold", "byte" and "ripple" unchanged alone.
+func normalizeVoiceTranscriptions(words []string) []string {
+	out := words[:0]
+	for i := 0; i < len(words); {
+		if i+2 < len(words) && Fold(words[i]) == "byte" && Fold(words[i+1]) == "en" && Fold(words[i+2]) == "giin" {
+			out = append(out, "engine")
+			i += 3
+			continue
+		}
+		if i+1 < len(words) && Fold(words[i]) == "cold" && Fold(words[i+1]) == "graph" {
+			out = append(out, "code", "graph")
+			i += 2
+			continue
+		}
+		if i+1 < len(words) && Fold(words[i]) == "ader" && Fold(words[i+1]) == "ripple" {
+			out = append(out, "aider")
+			i += 2
+			continue
+		}
+		out = append(out, words[i])
+		i++
+	}
+	return out
+}
+
+func hasVoiceTranscription(text string) bool {
+	text = strings.ToLower(text)
+	return strings.Contains(text, "byte en giin") || strings.Contains(text, "cold graph") || strings.Contains(text, "ader ripple")
 }
 
 var stopwords = toSet(

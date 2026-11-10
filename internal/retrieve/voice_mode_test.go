@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dedeusgui/sidecar/internal/lexical"
 	"github.com/dedeusgui/sidecar/internal/store"
 )
 
@@ -72,6 +73,73 @@ func TestVoiceGreetingAbstainsWithoutEvidence(t *testing.T) {
 	}
 }
 
+func TestVoicePhoneticTranscriptionsResolveOrAbstain(t *testing.T) {
+	anchored := buildIndexFromFiles(t, map[string]string{
+		"engine/engine.go": `package engine
+// Engine owns local context assembly.
+type Engine struct{}
+`,
+		"graph/code_graph.go": `package graph
+// CodeGraph maps local code relations.
+type CodeGraph struct{}
+`,
+		"aider/repo_map.go": `package aider
+// Aider RepoMap gathers local repository context.
+type AiderRepoMap struct{}
+`,
+	})
+	for _, tc := range []struct{ prompt, path, name string }{
+		{"byte en giin", "engine/engine.go", "Engine"},
+		{"cold graph", "graph/code_graph.go", "CodeGraph"},
+		{"Ader Ripple", "aider/repo_map.go", "AiderRepoMap"},
+	} {
+		res, err := Search(context.Background(), anchored.Store(), tc.prompt, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !hasHit(res.Evidence, tc.path, tc.name) {
+			t.Errorf("transcription %q did not resolve to %s:%s; terms=%v translations=%v candidates=%+v evidence=%v", tc.prompt, tc.path, tc.name, res.Trace.Terms, res.Trace.Translations, res.Trace.Candidates, names(res.Evidence))
+		}
+	}
+
+	decoys := buildIndexFromFiles(t, map[string]string{
+		"buffers/byte_buffer.go": `package buffers
+type ByteBuffer struct{}
+type Ripple struct{}
+type ColdStorage struct{}
+`,
+	})
+	t.Cleanup(func() { _ = decoys.Close() })
+	for _, prompt := range []string{"byte en giin", "cold graph", "Ader Ripple"} {
+		res, err := Search(context.Background(), decoys.Store(), prompt, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Evidence) != 0 {
+			t.Errorf("noise-only transcription %q injected unrelated evidence: %v", prompt, names(res.Evidence))
+		}
+	}
+	spokenNoAnchor := "Cara, tipo, eu estava tentando explicar uma ideia sem apontar para função ou arquivo; byte en giin, cold graph e Ader Ripple foram só ruídos da transcrição, sabe?"
+	res, err := Search(context.Background(), decoys.Store(), spokenNoAnchor, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Evidence) != 0 {
+		t.Fatalf("spoken prompt without a repository anchor injected evidence: %v", names(res.Evidence))
+	}
+}
+
+func TestFocalTermsPreserveNoisyTechnicalAnchorsInLongVoicePrompt(t *testing.T) {
+	prompt := "Cara, tipo, deixa eu explicar um pouco mais sobre as coisas que eu estou tentando entender, sabe? " +
+		"No fim, onde fica byte en giin, cold graph e Ader Ripple?"
+	got := focalTerms(prompt)
+	for _, want := range []string{"engine", "code", "graph", "aider"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("focal terms %v omit normalized anchor %q", got, want)
+		}
+	}
+}
+
 // Feedback from an earlier Voice Mode session reorders the same two copies on the next voice query.
 func TestVoiceFeedbackPromotesHelpfulAndDemotesMisleading(t *testing.T) {
 	root, ix := dispatchFixture(t)
@@ -108,5 +176,46 @@ func TestUserNaturalSpokenPortugueseVoicePrompt(t *testing.T) {
 	}
 	if !raceDetector && latency >= 15*time.Millisecond {
 		t.Fatalf("natural voice retrieval took %v, want < 15ms", latency)
+	}
+}
+
+func BenchmarkVoicePromptSearch(b *testing.B) {
+	ix := buildIndex(b)
+	queries := []struct{ name, prompt string }{
+		{"clean", voiceClean},
+		{"long_voice", voicePrompt},
+		{"noisy_terms_without_code_anchor", "Cara, eu queria falar da byte en giin, cold graph e Ader Ripple, sabe, enfim, isso era só conversa."},
+	}
+	for _, q := range queries {
+		b.Run(q.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := Search(context.Background(), ix.Store(), q.prompt, Options{}); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkVoiceNormalization(b *testing.B) {
+	queries := []struct{ name, prompt string }{
+		{"clean", voiceClean},
+		{"long_voice", voicePrompt},
+		{"noisy_terms", "byte en giin cold graph Ader Ripple"},
+	}
+	for _, q := range queries {
+		b.Run(q.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				terms := lexical.Analyze(q.prompt)
+				for _, term := range terms {
+					_ = lexical.Translations(term)
+				}
+				_ = focalTerms(q.prompt)
+			}
+		})
 	}
 }

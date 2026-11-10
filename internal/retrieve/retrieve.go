@@ -56,6 +56,9 @@ type Options struct {
 	// NoExactDominance keeps partial word matches next to an exact identifier instead of dropping them.
 	// On-demand exploration wants the neighbourhood; the hook keeps the default (false).
 	NoExactDominance bool
+	// PreferImplementation gives production source a stronger packing preference. V3.5 uses it
+	// when a code anchor is required so nearby docs and tests do not crowd out the implementation.
+	PreferImplementation bool
 	// feedbackMults holds the post-task feedback multipliers of Root, keyed "path#symbol" or "path".
 	feedbackMults   map[string]float64
 	hasAbsentAnchor bool
@@ -295,8 +298,9 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 
 	t = time.Now()
 	seeds := pickSeeds(cands, opts.Seeds)
+	lexicalTopKLocked := lexicalCandidatesFillTopK(cands, lexOrder, opts)
 	added := 0
-	if !opts.Ablate.NoStructure {
+	if !opts.Ablate.NoStructure && !lexicalTopKLocked {
 		added, err = expand(st, seeds, cands, !opts.Ablate.NoGit, families)
 		if err != nil {
 			return res, err
@@ -307,7 +311,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 
 	t = time.Now()
 	var dirty []string
-	if !opts.Ablate.NoGit {
+	if !opts.Ablate.NoGit && !lexicalTopKLocked {
 		dirty, err = st.DirtyPaths()
 		if err != nil {
 			return res, err
@@ -361,6 +365,37 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	return res, nil
 }
 
+// lexicalCandidatesFillTopK reports whether enough eligible, non-file lexical results already fill
+// the output limit. In that case structural expansion and Git state cannot change the selected set.
+// Excluding file rows is conservative: fuse may suppress them when a more specific symbol exists.
+func lexicalCandidatesFillTopK(cands map[int64]*candidate, lexOrder []int64, opts Options) bool {
+	hasExact := false
+	for _, c := range cands {
+		if c.exact {
+			hasExact = true
+			break
+		}
+	}
+	count := 0
+	for _, id := range lexOrder {
+		c := cands[id]
+		if c == nil || c.hit.Kind == "file" || repo.IsGenerated(c.hit.Path, nil) || gate(c) == "no evidence" {
+			continue
+		}
+		if hasExact && !opts.NoExactDominance && !c.exact && !c.neighbor && len(c.rels) == 0 && c.coverage < 1 {
+			continue
+		}
+		if opts.hasAbsentAnchor && !hasExact && !c.exact && len(c.matched) <= 1 {
+			continue
+		}
+		count++
+		if count >= opts.MaxItems {
+			return true
+		}
+	}
+	return false
+}
+
 // v2Pipeline adds contract evidence to the ranked pool, then (unless ablated) packs the set
 // sent under the budget. It returns the evidence to send and, per excluded item, the reason.
 func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evidence, opts Options, budget int, tr *Trace) ([]Evidence, map[string]string, error) {
@@ -406,7 +441,9 @@ func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evid
 		}
 		return append(out, concerns...), nil, nil
 	}
-	selected, excluded, pt := Pack(append(pool, concerns...), PackOptions{Budget: budget, Seen: opts.Seen, Tuning: opts.Tuning})
+	selected, excluded, pt := Pack(append(pool, concerns...), PackOptions{
+		Budget: budget, Seen: opts.Seen, Tuning: opts.Tuning, PreferImplementation: opts.PreferImplementation,
+	})
 	tr.Packing = &pt
 	return selected, excluded, nil
 }
@@ -671,22 +708,34 @@ func codeLike(tok string) bool {
 // and translations are absent from the repository's symbols.
 func absentAnchorTerms(st *store.Store, prompt string, noTranslation bool) (map[string]bool, error) {
 	var absent map[string]bool
+	normalizedPromptTerms := map[string]bool{}
+	for _, term := range lexical.Analyze(prompt) {
+		normalizedPromptTerms[term] = true
+	}
 	for _, loc := range identRe.FindAllStringIndex(prompt, -1) {
 		tok := prompt[loc[0]:loc[1]]
+		if isUpperAcronym(tok) {
+			continue
+		}
 		isCode := codeLike(tok)
 		midSentenceProper := loc[0] > 0 && tok[0] >= 'A' && tok[0] <= 'Z' && len(tok) >= 4 && !afterSentenceBreak(prompt, loc[0]) && lexical.Fold(tok) != "code"
 		if !isCode && !midSentenceProper {
 			continue
 		}
 		sub := lexical.Analyze(tok)
-		if len(sub) == 0 {
+		checkTerms := make([]string, 0, len(sub))
+		for _, term := range sub {
+			if normalizedPromptTerms[term] {
+				checkTerms = append(checkTerms, term)
+			}
+		}
+		if len(checkTerms) == 0 {
 			continue
 		}
 		// For CamelCase technology names like "MongoDB" -> ["mongo", "db"] or "PostgreSQL" -> ["postgre", "sql"],
 		// check the primary proper root rather than a generic 2-3 letter suffix ("db", "sql").
-		checkTerms := sub
-		if len(sub) > 1 && len(sub[0]) >= 4 {
-			checkTerms = sub[:1]
+		if len(checkTerms) > 1 && len(checkTerms[0]) >= 4 {
+			checkTerms = checkTerms[:1]
 		}
 		isTermPresent := func(t string) (bool, error) {
 			if isCode {
@@ -728,12 +777,27 @@ func absentAnchorTerms(st *store.Store, prompt string, noTranslation bool) (map[
 			if absent == nil {
 				absent = map[string]bool{}
 			}
-			for _, t := range sub {
+			for _, t := range checkTerms {
 				absent[t] = true
 			}
 		}
 	}
 	return absent, nil
+}
+
+// isUpperAcronym avoids treating short domain abbreviations such as CNPJ as missing code
+// identifiers. Underscored and numeric identifiers remain subject to absent-anchor checks.
+func isUpperAcronym(tok string) bool {
+	runes := []rune(tok)
+	if len(runes) < 2 || len(runes) > 5 {
+		return false
+	}
+	for _, r := range runes {
+		if r < 'A' || r > 'Z' {
+			return false
+		}
+	}
+	return true
 }
 
 func afterSentenceBreak(s string, pos int) bool {
@@ -1086,7 +1150,7 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 		}
 	}
 	for _, c := range pool {
-		if c.neighbor {
+		if c.neighbor && c.lexRank == 0 {
 			structList = append(structList, idx(c))
 		}
 	}
@@ -1117,13 +1181,65 @@ func fuse(cands map[int64]*candidate, lexOrder []int64, opts Options) []*candida
 		c := byKey[key]
 		scored = append(scored, fusion.Scored{Key: key, File: c.hit.Path, Score: c.score})
 	}
-	// Direct matches claim the per-file budget before structural neighbours do: a neighbour
-	// that matches nothing in the prompt is supporting context, not the answer.
+	// Keep BM25's eligible order as the base ranking. Relations may add candidates after it, but
+	// cannot push a lexical result out of the top-K or displace one lexical result with another.
 	sort.SliceStable(scored, func(i, j int) bool {
 		di, dj := byKey[scored[i].Key].direct(), byKey[scored[j].Key].direct()
 		return di && !dj
 	})
-	kept := fusion.Diversify(scored, opts.MaxPerFile, opts.MaxItems)
+	ordered := make([]fusion.Scored, 0, len(pool))
+	seen := map[string]bool{}
+	lexicalIDs := append([]int64(nil), lexOrder...)
+	// Explicit post-task feedback is a user signal and may change lexical ordering; graph
+	// evidence never does. Structural scores are excluded from lexical candidates above.
+	feedbackChangedLexicalRank := false
+	for _, id := range lexicalIDs {
+		if c := cands[id]; c != nil && c.feedback != "" {
+			feedbackChangedLexicalRank = true
+			break
+		}
+	}
+	if feedbackChangedLexicalRank {
+		sort.SliceStable(lexicalIDs, func(i, j int) bool {
+			a, b := cands[lexicalIDs[i]], cands[lexicalIDs[j]]
+			if a.score != b.score {
+				return a.score > b.score
+			}
+			return a.lexRank < b.lexRank
+		})
+	}
+	for _, id := range lexicalIDs {
+		c, ok := cands[id]
+		if !ok || !gated(c) {
+			continue
+		}
+		key := idx(c)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		ordered = append(ordered, fusion.Scored{Key: key, File: c.hit.Path, Score: c.score})
+	}
+	for _, it := range scored {
+		if seen[it.Key] {
+			continue
+		}
+		ordered = append(ordered, it)
+	}
+	// Lexical matches keep their BM25 order and are not subject to graph diversification. The
+	// per-file cap applies to expansion candidates, using lexical items as already-consumed slots.
+	perFile := map[string]int{}
+	var kept []fusion.Scored
+	for _, it := range ordered {
+		if len(kept) >= opts.MaxItems {
+			break
+		}
+		if byKey[it.Key].lexRank == 0 && perFile[it.File] >= opts.MaxPerFile {
+			continue
+		}
+		perFile[it.File]++
+		kept = append(kept, it)
+	}
 	keptSet := map[string]bool{}
 	for _, k := range kept {
 		keptSet[k.Key] = true

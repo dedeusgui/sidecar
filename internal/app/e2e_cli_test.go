@@ -194,7 +194,9 @@ func TestCLIEndToEndWithAllAdapters(t *testing.T) {
 		}
 	}
 
-	if out, code := runCLI(t, installed, repo, "", "doctor"); code != 0 || !strings.Contains(out, "hook UserPromptSubmit instalado") {
+	if out, code := runCLI(t, installed, repo, "", "doctor"); code != 0 || !strings.Contains(out, "hook UserPromptSubmit instalado") ||
+		!strings.Contains(out, "V3.5 inativa") || !strings.Contains(out, "export SIDECAR_ENGINE=v3.5") ||
+		!strings.Contains(out, "antigravity") || !strings.Contains(out, "prompt=unverified") {
 		t.Fatalf("doctor exit=%d:\n%s", code, out)
 	}
 
@@ -256,8 +258,20 @@ func TestCLIEndToEndWithAllAdapters(t *testing.T) {
 	// Status commands read what the hooks left behind.
 	out, code = runCLI(t, installed, repo, "", "status", "--root", repo, "--json")
 	var status map[string]any
-	if code != 0 || json.Unmarshal([]byte(out), &status) != nil || status["files"].(float64) < 1 {
+	if code != 0 || json.Unmarshal([]byte(out), &status) != nil || status["files"].(float64) < 1 ||
+		status["engine"] != "v1" || status["v35_active"] != false ||
+		!strings.Contains(status["engine_activation"].(string), "SIDECAR_ENGINE=v3.5") {
 		t.Fatalf("status exit=%d:\n%s", code, out)
+	}
+	t.Setenv("SIDECAR_ENGINE", "v3.5")
+	out, code = runCLI(t, installed, repo, "", "status", "--root", repo, "--json")
+	if code != 0 || json.Unmarshal([]byte(out), &status) != nil || status["engine"] != "v3.5" || status["v35_active"] != true {
+		t.Fatalf("status did not report the opt-in engine immediately: exit=%d\n%s", code, out)
+	}
+	t.Setenv("SIDECAR_ENGINE", "")
+	out, code = runCLI(t, installed, repo, "", "status", "--root", repo, "--json")
+	if code != 0 || json.Unmarshal([]byte(out), &status) != nil || status["engine"] != "v1" || status["v35_active"] != false {
+		t.Fatalf("status did not report immediate rollback to default: exit=%d\n%s", code, out)
 	}
 	out, code = runCLI(t, installed, repo, "", "activity", "--json")
 	var activity map[string]any

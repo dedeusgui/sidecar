@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -12,6 +13,9 @@ import (
 
 // Version is the engine name written to logs and explain output.
 const Version = "v3"
+
+// Version35 selects the opt-in unified context transaction built on the V3 decision layer.
+const Version35 = "v3.5"
 
 // Action is what the engine decided to deliver. They are distinct actions, not a bundle that is
 // always on: ABSTAIN emits zero bytes, EXPLORE_AVAILABLE only offers the on-demand tool.
@@ -61,7 +65,8 @@ type Decision struct {
 // Options configures Run. Retrieve carries the V2 options (root, profile, seen, LSP hooks); the
 // engine forces EngineVersion "v2" and the adaptive context policy on it.
 type Options struct {
-	Retrieve retrieve.Options
+	Retrieve          retrieve.Options
+	RequireCodeAnchor bool // V3.5 abstains when retrieval has no anchored code symbol.
 }
 
 // Budgets per action, in estimated tokens. Heuristics chosen before measurement; not fitted to the
@@ -105,6 +110,12 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 	ro := opts.Retrieve
 	ro.EngineVersion = "v2"
 	ro.Adaptive = true // contracts and docs only when the intent can use them (retrieve.PolicyFor)
+	if opts.RequireCodeAnchor && ro.MaxItems < 60 {
+		// V3.5 may favor implementation files over nearby docs and tests after retrieval. Keep a
+		// full ranked window so that choice is made from evidence the V2 result limit hid.
+		ro.MaxItems = 60
+	}
+	ro.PreferImplementation = opts.RequireCodeAnchor
 	res, err := retrieve.Search(ctx, st, prompt, ro)
 	if err != nil {
 		return res, d, err
@@ -117,6 +128,10 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 	d.Signals = sig
 
 	rel, reasons := relevanceGate(sig, res)
+	if opts.RequireCodeAnchor && rel != Irrelevant && !hasCodeAnchor(sig, res) {
+		rel = Irrelevant
+		reasons = append(reasons, "no explicit code anchor or matching symbol name")
+	}
 	d.Relevance = rel
 	if rel == Irrelevant {
 		d.Action, d.Class = ActionAbstain, ClassOffRepo
@@ -128,9 +143,17 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 		res.Trace.Final = 0
 		return finish(res)
 	}
+	if opts.RequireCodeAnchor {
+		preferImplementationEvidence(res.Evidence)
+	}
 
 	d.Class = classify(sig, res)
 	d.Action, d.Budget, d.MaxItems = route(d.Class, sig)
+	if opts.RequireCodeAnchor && d.MaxItems < 12 {
+		// The V3.5 output planner can choose among several independent source anchors under one
+		// global token budget; extra items remain subject to that budget.
+		d.MaxItems = 12
+	}
 	if rel == Ambiguous {
 		d.Action, d.Budget, d.MaxItems = ActionLean, ambiguousBudget, ambiguousItems
 		d.LowConfidence = reasons
@@ -141,6 +164,25 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 	res = pack(res, &d)
 	d.Signals = sig
 	return finish(res)
+}
+
+// preferImplementationEvidence puts production source ahead of nearby docs, tests and benchmark
+// helpers for V3.5's bounded output. The original V2 and V3 rankings remain untouched.
+func preferImplementationEvidence(evidence []retrieve.Evidence) {
+	score := func(ev retrieve.Evidence) int {
+		path := strings.ToLower(filepath.ToSlash(ev.Hit.Path))
+		ext := filepath.Ext(path)
+		if !strings.Contains(" .go .py .js .jsx .ts .tsx .rs .java .kt .cs .php .rb .swift .c .cc .cpp .h .hpp .ex .exs .scala ", " "+ext+" ") {
+			return 0
+		}
+		s := 2
+		if strings.Contains(path, "/bench/") || strings.Contains(path, "/test/") || strings.Contains(path, "/tests/") ||
+			strings.Contains(path, "_test.") || strings.Contains(path, ".test.") || strings.Contains(path, ".spec.") {
+			s--
+		}
+		return s
+	}
+	sort.SliceStable(evidence, func(i, j int) bool { return score(evidence[i]) > score(evidence[j]) })
 }
 
 // Relevance is the gate verdict.

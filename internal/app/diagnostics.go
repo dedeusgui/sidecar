@@ -16,6 +16,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/adapter"
 	"github.com/dedeusgui/sidecar/internal/brief"
 	"github.com/dedeusgui/sidecar/internal/engine"
+	"github.com/dedeusgui/sidecar/internal/engine/contract"
 	"github.com/dedeusgui/sidecar/internal/explore"
 	"github.com/dedeusgui/sidecar/internal/index"
 	"github.com/dedeusgui/sidecar/internal/install"
@@ -49,12 +50,14 @@ type ExplainReport struct {
 	Packing       *retrieve.PackTrace       `json:"packing,omitempty"`
 	Context       string                    `json:"context"`
 	Decision      *engine.Decision          `json:"v3_decision,omitempty"` // v3 only
+	V35Plan       *contract.OutputPlan      `json:"v35_plan,omitempty"`
+	V35Tokens     int                       `json:"v35_tokens,omitempty"`
 }
 
-// engineOf names the pipeline that produced a result. Only the exact values "v2" and "v3" select them.
+// engineOf names the pipeline that produced a result. Unknown values keep the v1 compatibility default.
 func engineOf(opts retrieve.Options) string {
 	switch opts.EngineVersion {
-	case "v2", engine.Version:
+	case "v2", engine.Version, engine.Version35:
 		return opts.EngineVersion
 	}
 	return "v1"
@@ -109,7 +112,14 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 	}
 	var res retrieve.Result
 	var decision *engine.Decision
-	if engineOf(opts) == engine.Version {
+	var unified *v35Output
+	if engineOf(opts) == engine.Version35 {
+		r, err := runV35Safe(ctx, ix.Store(), root, prompt, opts, adapter.Agent(""), "", "", time.Now(), true)
+		if err == nil {
+			res, unified = r.Result, &r
+			decision = &r.Decision
+		}
+	} else if engineOf(opts) == engine.Version {
 		r, d, err := engine.Run(ctx, ix.Store(), prompt, engine.Options{Retrieve: opts})
 		if err != nil {
 			return ExplainReport{}, err
@@ -122,7 +132,7 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 		}
 		res = r
 	}
-	if engineOf(opts) == "v2" || decision != nil && decision.Action != engine.ActionAbstain {
+	if engineOf(opts) != engine.Version35 && (engineOf(opts) == "v2" || decision != nil && decision.Action != engine.ActionAbstain) {
 		if _, err := attachDecisions(ix.Store(), root, prompt, &res, time.Now()); err != nil {
 			return ExplainReport{}, err
 		}
@@ -152,7 +162,11 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 		Context:       renderContext(res, opts),
 		Decision:      decision,
 	}
-	if decision != nil {
+	if unified != nil {
+		rep.Context = unified.Packed.Text
+		rep.V35Plan = &unified.Plan
+		rep.V35Tokens = unified.Packed.EstimatedTokens
+	} else if decision != nil {
 		rep.Context = engine.Render(res, *decision, nil)
 	}
 	for k, d := range res.Trace.Timings {
@@ -193,10 +207,17 @@ func WriteExplain(w io.Writer, rep ExplainReport, asJSON bool) error {
 	_, _ = fmt.Fprintf(w, "Intenção: %s (confiança %.2f)\n", strings.Join(rep.Intent.Kinds, ", "), rep.Intent.Confidence)
 	_, _ = fmt.Fprintf(w, "Motor: %s\n", rep.Engine)
 	if d := rep.Decision; d != nil {
-		_, _ = fmt.Fprintf(w, "Decisão V3: %s · classe %s · relevância %s · orçamento %d tokens · %d itens\n", d.Action, d.Class, d.Relevance, d.Budget, len(d.Included))
+		version := "V3"
+		if rep.Engine == engine.Version35 {
+			version = "V3.5"
+		}
+		_, _ = fmt.Fprintf(w, "Decisão %s: %s · classe %s · relevância %s · orçamento %d tokens · %d itens\n", version, d.Action, d.Class, d.Relevance, d.Budget, len(d.Included))
 		for _, r := range append(append([]string{}, d.AbstainReasons...), d.LowConfidence...) {
 			_, _ = fmt.Fprintf(w, "  motivo: %s\n", r)
 		}
+	}
+	if rep.V35Plan != nil {
+		_, _ = fmt.Fprintf(w, "Plano V3.5: %d tokens alocados · %d tokens empacotados · %d seções\n", rep.V35Plan.BudgetTokens, rep.V35Tokens, len(rep.V35Plan.Sections))
 	}
 	if pk := rep.Packing; pk != nil {
 		_, _ = fmt.Fprintf(w, "Pacote: %d itens · %d/%d tokens · abstenção=%v %s\n", pk.Selected, pk.Used, pk.Budget, pk.Abstained, pk.Reason)
@@ -247,10 +268,85 @@ type Check struct {
 	Detail string
 }
 
+type ClientCapabilities struct {
+	Client      string                    `json:"client"`
+	Detected    bool                      `json:"detected"`
+	PromptEvent string                    `json:"prompt_event,omitempty"`
+	Prompt      contract.CapabilityStatus `json:"prompt"`
+	ToolEvents  contract.CapabilityStatus `json:"tool_events"`
+	PreCompact  contract.CapabilityStatus `json:"pre_compact"`
+	Explore     contract.CapabilityStatus `json:"explore"`
+}
+
+func engineReadiness() map[string]any {
+	selected := configuredEngine()
+	active := selected == engine.Version35
+	activation := "export SIDECAR_ENGINE=v3.5"
+	deactivation := "unset SIDECAR_ENGINE (default: v1; applies on the next hook)"
+	detail := "motor atual: " + selected + "; V3.5 inativa (opt-in); ativar: " + activation + "; desativar: " + deactivation
+	if active {
+		detail = "motor atual: v3.5; rollback imediato: " + deactivation
+	}
+	env, err := install.DefaultEnv()
+	var detected []string
+	if err == nil {
+		detected = install.Detect(env)
+	}
+	clients := clientCapabilityMatrix(detected)
+	return map[string]any{
+		"engine": selected, "v35_active": active, "engine_detail": detail,
+		"engine_activation": activation, "engine_deactivation": deactivation,
+		"client_capabilities": clients,
+	}
+}
+
+func configuredEngine() string {
+	switch os.Getenv("SIDECAR_ENGINE") {
+	case "v2", engine.Version, engine.Version35:
+		return os.Getenv("SIDECAR_ENGINE")
+	default:
+		return "v1"
+	}
+}
+
+func clientCapabilityMatrix(detected []string) []ClientCapabilities {
+	present := make(map[string]bool, len(detected))
+	for _, name := range detected {
+		present[name] = true
+	}
+	clients := []adapter.Agent{adapter.Claude, adapter.Codex, adapter.Antigravity}
+	result := make([]ClientCapabilities, 0, len(clients))
+	for _, client := range clients {
+		capabilities := adapter.CapabilitiesFor(client)
+		result = append(result, ClientCapabilities{
+			Client: string(client), Detected: present[string(client)], PromptEvent: capabilities.PromptEvent,
+			Prompt: capabilities.PromptCapability, ToolEvents: capabilities.ToolEventsCapability,
+			PreCompact: capabilities.PreCompactCapability, Explore: capabilities.ExploreCapability,
+		})
+	}
+	return result
+}
+
+func clientCapabilityDetail(env install.Env) string {
+	clients := clientCapabilityMatrix(install.Detect(env))
+	parts := make([]string, 0, len(clients))
+	for _, client := range clients {
+		name := client.Client
+		if !client.Detected {
+			name += " (não detectado)"
+		}
+		parts = append(parts, fmt.Sprintf("%s: prompt=%s, tools=%s, PreCompact=%s, explore=%s",
+			name, client.Prompt, client.ToolEvents, client.PreCompact, client.Explore))
+	}
+	return strings.Join(parts, "; ")
+}
+
 // Doctor inspects the installation, the environment and the index for cwd.
 func Doctor(env install.Env, cwd string) []Check {
 	var checks []Check
 	add := func(name, status, detail string) { checks = append(checks, Check{name, status, detail}) }
+	add("motor", "info", engineReadiness()["engine_detail"].(string))
+	add("matriz de clientes", "info", clientCapabilityDetail(env))
 
 	if exe, err := os.Executable(); err == nil {
 		add("binário", "ok", exe)
@@ -435,9 +531,12 @@ func hookLogSummary(path string) (errs int, p50, p95 float64, n int) {
 
 // Status summarizes the index for cwd.
 func Status(root string) (map[string]any, error) {
+	info := engineReadiness()
+	info["root"] = root
 	db := paths.IndexDB(root)
 	if _, err := os.Stat(db); err != nil {
-		return map[string]any{"root": root, "index": "not created yet"}, nil
+		info["index"] = "not created yet"
+		return info, nil
 	}
 	st, err := store.Open(db)
 	if err != nil {
@@ -450,10 +549,13 @@ func Status(root string) (map[string]any, error) {
 	dirty, _ := st.DirtyPaths()
 	lastSync, _ := st.GetMeta("last_sync")
 	head, _ := st.GetMeta("indexed_head")
-	return map[string]any{
+	for key, value := range map[string]any{
 		"root": root, "files": len(files), "symbols": symbols, "commits": commits,
 		"dirty_files": len(dirty), "indexed_head": head, "last_sync": lastSync, "database": db,
-	}, nil
+	} {
+		info[key] = value
+	}
+	return info, nil
 }
 
 // SupportedAgents lists agent names for help text.
