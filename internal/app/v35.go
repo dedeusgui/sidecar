@@ -90,7 +90,7 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 
 	// The decision action is the planner's request for bounded structural evidence. Hooks use
 	// QuickExpand; explain is an explicit diagnostic surface and can use the wider shared traversal.
-	if !deep && (decision.Action == engine.ActionExploreAvailable || decision.Action == engine.ActionVerify) {
+	if decision.Action == engine.ActionExploreAvailable || decision.Action == engine.ActionVerify {
 		var expansion service.ExpansionResult
 		if deep {
 			expansion = service.DeepExplore(ctx, st, service.DeepRequest{
