@@ -153,6 +153,8 @@ A V3.6 é uma revisão experimental de seleção e entrega da V3.5, ativada por 
 - [CLAUDE.md](CLAUDE.md): entrada de instruções Claude Code, reutilizando AGENTS.md.
 - [docs/development.md](docs/development.md): mapa do código, testes, depuração e dogfooding.
 - [docs/engines.md](docs/engines.md): histórico, diferenças entre engines, evidências e marcos futuros.
+- [docs/product-milestones.md](docs/product-milestones.md): milestones de produto Sidecar 3.6–4.0, entregas, gates e objetivo competitivo de superar alternativas em benchmarks justos e econômicos.
+- [docs/benchmark-observatory.md](docs/benchmark-observatory.md): plano para um painel HTML offline, comparativos reproduzíveis e inspeção dos dados por engine, concorrente e execução.
 - [docs/v3.7/research-plan.md](docs/v3.7/research-plan.md): estudo proposto de generalização, uso pelo agente e arquitetura unificada.
 - [docs/context-engine-v2.md](docs/context-engine-v2.md): arquitetura proposta de recuperação por intenção e contexto por token.
 - [docs/lsp-strategy.md](docs/lsp-strategy.md): suporte LSP, coexistência com plugins e instalação segura.
