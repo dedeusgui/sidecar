@@ -1,6 +1,6 @@
 # Sidecar V3.5 — implementation roadmap and agent handoff
 
-**Status:** planning, no V3.5 runtime delivered. **Start from latest `main`** and [architecture.md](architecture.md); don't assume the historical baseline SHA is still HEAD. Use [evaluation.md](evaluation.md) for proof gates and [docs/v3/progress.md](../v3/progress.md) for facts. Pre-existing PR #21 is merged; no need to recreate V3.
+**Status:** historical implementation plan and handoff, written before V3.5 was implemented. The instructions and acceptance criteria below preserve the original plan, not the current work queue. See [progress.md](progress.md) for implementation and later measurements, [engine milestones](../engines.md) for current navigation, and [evaluation.md](evaluation.md) for proof gates.
 
 ## Operational contract for the implementation agent
 

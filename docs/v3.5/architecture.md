@@ -1,6 +1,6 @@
 # Sidecar V3.5 — Unified Context Engine
 
-**Status:** architecture proposal / implementation contract, **NOT implemented**. Based on `main@16aa8f68187bf0de9781f2d0a333ffde91713b90` (V3, PR #21), 2026-11-09. See [delivery plan](implementation-plan.md) and [measurement contract](evaluation.md).
+**Status:** historical architecture proposal and implementation contract based on `main@16aa8f68187bf0de9781f2d0a333ffde91713b90` (V3, PR #21), 2026-11-09. V3.5 was subsequently implemented as opt-in; promotion gates and independent agentic validation remain pending. See [current progress](progress.md), [delivery plan](implementation-plan.md), [measurement contract](evaluation.md), and [engine milestones](../engines.md). Sections below describe the original target, not proof that every target is delivered.
 
 > **Product intent:** Sidecar is an invisible, local, deterministic engineering-assistance layer beside coding agents. Installation is once per user. The agent must benefit automatically from the context it receives, without needing to learn a Sidecar CLI, workflow, prompt language or skill. The CLI is an additional lens, not the main product.
 
@@ -241,6 +241,6 @@ Render in a single shared canonical order: `TASK BRIEF / RELEVANT CODE / RELATIO
 
 ## 10. Required output from this design
 
-This document is a **specification**, not a delivered engine. Implementation sequencing, per-PR acceptance and migration appear in [implementation-plan.md](implementation-plan.md). Evaluation and comparisons in [evaluation.md](evaluation.md). Preserve [the V3 record](../v3/progress.md) as factual baseline: the V3 E1 trade-offs and E2 offline facts are not superseded by this design.
+This document records the original **specification**; see [progress.md](progress.md) for what was implemented and measured. Implementation sequencing, per-PR acceptance and migration appear in [implementation-plan.md](implementation-plan.md). Evaluation and comparisons in [evaluation.md](evaluation.md). Preserve [the V3 record](../v3/progress.md) as factual baseline: the V3 E1 trade-offs and E2 offline facts are not superseded by this design.
 
 **Release condition:** users can install once, ask normal coding questions, and obtain an automatically composed small, relevant and actionable task context; optional deep exploration remains available without becoming a learning burden. The benchmark must prove quality preserved and net cost/time benefit.

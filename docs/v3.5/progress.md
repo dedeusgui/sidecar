@@ -1,6 +1,6 @@
 # Sidecar V3.5 — progresso de implementação
 
-> Estado: **implementada, opt-in, gates de avaliação pendentes.** Referências `arquivo:linha` são do commit da branch `feat/v3.5-unified-engine` na data desta escrita; revalide ao mudar o código. Nenhum resultado end-to-end com agentes foi medido. Visão e contratos: [README](README.md), [architecture.md](architecture.md), [implementation-plan.md](implementation-plan.md), [evaluation.md](evaluation.md).
+> Estado: **implementada, opt-in, gates de avaliação pendentes.** Referências `arquivo:linha` são do commit da branch `feat/v3.5-unified-engine` na data desta escrita; revalide ao mudar o código. Experimentos posteriores com agentes foram executados, sem comprovação de ganho generalizável; veja a campanha abaixo. Visão e contratos: [README](README.md), [architecture.md](architecture.md), [implementation-plan.md](implementation-plan.md), [evaluation.md](evaluation.md).
 
 ## Entregue por componente
 
@@ -30,10 +30,10 @@ Opt-in; o default continua V1. Mecanismo real:
 
 ## Limitações conhecidas
 
-- Coortes E1/E2 são **author-coupled** (prompts e gold escritos pelo mesmo autor que implementou) e **ainda não executadas** contra a V3.5; revisão semântica independente pendente.
+- Coortes E1/E2 são **author-coupled** (prompts e gold escritos pelo mesmo autor que implementou) e foram executadas posteriormente contra V3 e V3.5; revisão semântica independente pendente.
 - Capacidade de Explore nativo por cliente não verificada (`unverified`).
-- Validação offline local (2026-11-09, fixture, sem agente): testes E2E do hook para Claude Code e Codex (injeção, Explore embutido, sessão em várias voltas, abstenção, saída idêntica com V3.5 desligada, readiness em `doctor`/`status`) em `internal/app/v35_test.go` e `e2e_cli_test.go`; `go test -count=1 ./...` e `-race` nos pacotes concorrentes passam. Latência do hook em `BenchmarkHookPathLatency` (p50, 20 iterações, uma máquina): quente V2 11,7 ms, V3 13,0 ms, V3.5 17,8 ms (p95 20,9); frio V2 39,3 ms, V3 40,0 ms, V3.5 45,1 ms. **Não feito:** comparação de V1/V2/V3 contra um binário da `main`, E2E com cliente real, e as referências `arquivo:linha` deste documento não foram reconferidas após os últimos commits.
-- O packer e o planner usam heurísticas determinísticas sem modelo; regressões em prompts curtos de domínio documentadas na V3 não foram reavaliadas nas coortes novas.
+- Validação offline local (2026-11-09, fixture, sem agente): testes E2E do hook para Claude Code e Codex (injeção, Explore embutido, sessão em várias voltas, abstenção, saída idêntica com V3.5 desligada, readiness em `doctor`/`status`) em `internal/app/v35_test.go` e `e2e_cli_test.go`; `go test -count=1 ./...` e `-race` nos pacotes concorrentes passam. Latência do hook em `BenchmarkHookPathLatency` (p50, 20 iterações, uma máquina): quente V2 11,7 ms, V3 13,0 ms, V3.5 17,8 ms (p95 20,9); frio V2 39,3 ms, V3 40,0 ms, V3.5 45,1 ms. **Na data dessa validação não havia sido feita** comparação de V1/V2/V3 contra um binário da `main` nem E2E com cliente real; as referências `arquivo:linha` deste documento não foram reconferidas após os últimos commits.
+- O packer e o planner usam heurísticas determinísticas sem modelo; a campanha posterior investigou prompts curtos nas coortes novas e encontrou perda de entrega de caminhos na V3.5.
 
 ## Resultados offline obtidos (e ressalvas)
 
@@ -43,9 +43,13 @@ Opt-in; o default continua V1. Mecanismo real:
 | Tradução / Voice Mode | tune 13/20→20/20 | Medido no **mesmo split usado para ajustar**; eval não reportado depois. **Não confirmado.** |
 | Explore | development 10/14→11/14 fatos; 23.308→29.071 caracteres | Mais fatos custou mais caracteres. Alvo 24/26 (CodeGraph) **não verificado**. |
 
-## O que NÃO foi medido
+## Campanha posterior e lacunas
 
-Ganho agentic (tempo/custo/correção por tarefa) com Sidecar on vs off; holdout (nenhum aberto); coortes E1/E2 de `bench/v3.5`; tokens e latência do hook V3.5 ponta a ponta; abstinência e E2E em Codex/Antigravity. Nada acima deve ser lido como aceleração do agente.
+A [campanha de 2026-11-10](../../bench/results/v35-campaign-2026-11-10/relatorio.md) executou E1/E2 contra V3 e V3.5. Em E1, com cache quente e `explain`, o caminho esperado apareceu em 21/30 e 2/30 positivos, respectivamente; houve saída em 19/40 e 13/40 negativos. A chamada direta ao hook com payload Codex não equivale ao cliente Codex real; E2 usa comparação literal sem avaliação de equivalência semântica. Essas coortes são de autoria acoplada, e a latência não foi controlada.
+
+Em localização com Claude, OFF e V3.5 acertaram 49/50 cada, com uma execução por braço; ali o contexto foi inserido como prefixo, não pelo hook real. Em nove tarefas de edição/validação com hook real, o veredito estrito foi OFF 9/9, V2 9/9 e V3.5 7/9; as duas falhas envolveram restrição de arquivos e uma também uma verificação textual de invariante. Amostra pequena, uma repetição e limitações do oráculo não estabelecem causalidade nem ganho generalizável.
+
+Permanecem pendentes validação independente, comparação controlada e repetida de custo/tempo por tarefa correta, cobertura de clientes reais e avaliação final cega sob o protocolo aplicável. Não confundir os dados já observados com holdout cego, nem interpretar essas medições como aceleração comprovada do agente.
 
 ## Proveniência (reuso de código aberto)
 

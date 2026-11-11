@@ -1,5 +1,7 @@
 # Roadmap consolidado — Sidecar V2, produto completo
 
+> **Navegação atual:** este roadmap preserva a campanha V2 e suas rodadas. Para os marcos posteriores das engines, consulte [engines.md](engines.md) e o [plano proposto da V3.7](v3.7/research-plan.md). Itens abaixo devem ser confrontados com o progresso datado e o código.
+
 **Atualização de direção:** 2026-11-08. **Fonte operacional prioritária a partir do PR #6:** [roadmap-next-iterations.md](roadmap-next-iterations.md) — rodadas R1–R7 para avaliação de qualidade de patch, retrieval adaptativo, Task Evidence Brief, Task Grooming, impacto/verificação, sessões e Studio. O histórico abaixo (rodadas A–E/W0–W10) permanece para rastreabilidade; seus status datados não devem ser lidos como estado atual sem consultar Git e os relatórios de avaliação.
 
 **Última consolidação detalhada das rodadas históricas:** 2026-11-06. **Estado:** arquitetura e plano de implementação, NÃO prova de funcionalidades concluídas.

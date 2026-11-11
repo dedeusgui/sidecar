@@ -135,7 +135,7 @@ O projeto segue funcional na versão atual. A **V2 completa ainda está em desen
 - [Roadmap integral e matriz de todos os testes pendentes](docs/roadmap.md)
 - [Implementações open source de referência, caminhos de código e licenças](docs/reference-implementations.md)
 
-As funções novas são **planejadas, não entregues**. Toda alegação de ganho precisará de benchmark offline e A/B agentic, incluindo efeitos negativos.
+O documento V2 descreve a meta completa: várias capacidades foram implementadas em etapas posteriores, enquanto integração e gates de produto permanecem pendentes. Consulte o [mapa por engine](docs/engines.md) para separar implementação, resultados e planos. Toda alegação de ganho precisará de benchmark offline e A/B agentic, incluindo efeitos negativos.
 
 ## Engine V3 (experimental, opt-in)
 
@@ -143,13 +143,17 @@ As funções novas são **planejadas, não entregues**. Toda alegação de ganho
 
 ## Motor unificado V3.5 (implementado, opt-in, gates de avaliação pendentes)
 
-A V3.5 unifica as capacidades existentes sob um único motor determinístico: **Brief curto junto de código selecionado, Explore estrutural automático e limitado, Grooming, Impact, memória e sinais de sessão com um só orçamento**, sem exigir que o agente aprenda comandos Sidecar. O `sidecar explore` permanece uma ferramenta opcional para aprofundamento, não uma dependência da experiência padrão. A V1 continua default; ative com `SIDECAR_ENGINE=v3.5`; ganho agentic não foi medido ([progresso](docs/v3.5/progress.md)). Consulte [a visão geral](docs/v3.5/README.md), [arquitetura](docs/v3.5/architecture.md), [implementação](docs/v3.5/implementation-plan.md) e [avaliação](docs/v3.5/evaluation.md).
+A V3.5 unifica as capacidades existentes sob um único motor determinístico: **Brief curto junto de código selecionado, Explore estrutural automático e limitado, Grooming, Impact, memória e sinais de sessão com um só orçamento**, sem exigir que o agente aprenda comandos Sidecar. O `sidecar explore` permanece uma ferramenta opcional para aprofundamento, não uma dependência da experiência padrão. A V1 continua default; ative com `SIDECAR_ENGINE=v3.5`; ganho agentic não foi comprovado ([progresso](docs/v3.5/progress.md)). Consulte [a visão geral](docs/v3.5/README.md), [arquitetura](docs/v3.5/architecture.md), [implementação](docs/v3.5/implementation-plan.md) e [avaliação](docs/v3.5/evaluation.md).
+
+A V3.6 é uma revisão experimental de seleção e entrega da V3.5, desenvolvida fora da `main`; sua implementação ainda não está disponível neste checkout. Seus resultados mostram ganhos e regressões, sem comprovar superioridade geral; a V1 permanece padrão. Veja [resultados e limitações](docs/v3.6/progress.md) e [critérios de progressão das engines](docs/engine-progression.md).
 
 ## Engenharia, benchmarks e roadmap
 
 - [AGENTS.md](AGENTS.md): contrato dos agentes que desenvolvem o Sidecar (não exige regras no repositório do usuário).
 - [CLAUDE.md](CLAUDE.md): entrada de instruções Claude Code, reutilizando AGENTS.md.
 - [docs/development.md](docs/development.md): mapa do código, testes, depuração e dogfooding.
+- [docs/engines.md](docs/engines.md): histórico, diferenças entre engines, evidências e marcos futuros.
+- [docs/v3.7/research-plan.md](docs/v3.7/research-plan.md): estudo proposto de generalização, uso pelo agente e arquitetura unificada.
 - [docs/context-engine-v2.md](docs/context-engine-v2.md): arquitetura proposta de recuperação por intenção e contexto por token.
 - [docs/lsp-strategy.md](docs/lsp-strategy.md): suporte LSP, coexistência com plugins e instalação segura.
 - [docs/agent-feedback.md](docs/agent-feedback.md): observabilidade do loop e feedback parametrizado sem autoaprendizado.
