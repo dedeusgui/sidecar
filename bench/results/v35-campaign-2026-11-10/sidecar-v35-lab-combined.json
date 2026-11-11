@@ -1,0 +1,1653 @@
+{
+  "schema": "lab-scorecard/1",
+  "sections": {
+    "agentic": {
+      "arms": {
+        "OFF": {
+          "runs": 9,
+          "comparable": 9,
+          "excluded": 0,
+          "passed": 9,
+          "pass_rate": 1.0,
+          "hidden_tests_passed": 9,
+          "scope_violations": 0,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 0,
+          "infra_errors": 0,
+          "cost_total": 0.0598,
+          "cost_per_success": 0.0066,
+          "wall_per_success_p50": 63.58,
+          "wall_p95": 103.48,
+          "tool_calls_mean": 10.22,
+          "injected_chars_mean": 0,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0,
+          "progress_runs": 0,
+          "redundant_calls_mean": null,
+          "stagnant_runs": 0,
+          "sufficiency": {
+            "explore_again": 0,
+            "read_returned": 0,
+            "read_named": 0,
+            "read_not_returned": 0,
+            "search": 0,
+            "moved_on": 0,
+            "errored": 0,
+            "total": 0,
+            "concurrent": 0,
+            "redundant_rereads": 1,
+            "stale_reads_after_edit": 0,
+            "deliveries_without_effect": 0,
+            "runs_with_report": 9,
+            "moved_on_and_passed": 0
+          },
+          "measured": {
+            "input_uncached": 162,
+            "cache_read": 1688874,
+            "cache_create": 106697,
+            "output": 43112
+          }
+        },
+        "V2": {
+          "runs": 9,
+          "comparable": 9,
+          "excluded": 0,
+          "passed": 9,
+          "pass_rate": 1.0,
+          "hidden_tests_passed": 9,
+          "scope_violations": 0,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 0,
+          "infra_errors": 0,
+          "cost_total": 0.064,
+          "cost_per_success": 0.0071,
+          "wall_per_success_p50": 64.7,
+          "wall_p95": 148.9,
+          "tool_calls_mean": 11.89,
+          "injected_chars_mean": 1455.7,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0,
+          "progress_runs": 8,
+          "redundant_calls_mean": 0.62,
+          "stagnant_runs": 0,
+          "sufficiency": {
+            "explore_again": 0,
+            "read_returned": 3,
+            "read_named": 0,
+            "read_not_returned": 0,
+            "search": 2,
+            "moved_on": 4,
+            "errored": 0,
+            "total": 9,
+            "concurrent": 0,
+            "redundant_rereads": 6,
+            "stale_reads_after_edit": 1,
+            "deliveries_without_effect": 2,
+            "runs_with_report": 9,
+            "moved_on_and_passed": 4
+          },
+          "measured": {
+            "input_uncached": 168,
+            "cache_read": 1862454,
+            "cache_create": 103767,
+            "output": 49263,
+            "index_ms": 13798.252,
+            "hook_ms": 976.287,
+            "sync_ms": 56.75,
+            "retrieve_ms": 555.358
+          }
+        },
+        "V35": {
+          "runs": 9,
+          "comparable": 9,
+          "excluded": 0,
+          "passed": 7,
+          "pass_rate": 0.778,
+          "hidden_tests_passed": 9,
+          "scope_violations": 2,
+          "scope_violations_non_test": 0,
+          "invariant_violations": 1,
+          "infra_errors": 0,
+          "cost_total": 0.0639,
+          "cost_per_success": 0.0091,
+          "wall_per_success_p50": 43.95,
+          "wall_p95": 204.22,
+          "tool_calls_mean": 12,
+          "injected_chars_mean": 627.6,
+          "models_served": [
+            "claude-haiku-5-5"
+          ],
+          "cost_unknown_runs": 0,
+          "progress_runs": 8,
+          "redundant_calls_mean": 0.5,
+          "stagnant_runs": 0,
+          "sufficiency": {
+            "explore_again": 0,
+            "read_returned": 1,
+            "read_named": 0,
+            "read_not_returned": 1,
+            "search": 3,
+            "moved_on": 3,
+            "errored": 0,
+            "total": 8,
+            "concurrent": 0,
+            "redundant_rereads": 4,
+            "stale_reads_after_edit": 1,
+            "deliveries_without_effect": 1,
+            "runs_with_report": 9,
+            "moved_on_and_passed": 1
+          },
+          "measured": {
+            "input_uncached": 172,
+            "cache_read": 1864830,
+            "cache_create": 104050,
+            "output": 48883,
+            "index_ms": 13513.153,
+            "hook_ms": 1347.065,
+            "sync_ms": 72.825
+          }
+        }
+      },
+      "by_split": {
+        "development": {
+          "OFF": {
+            "runs": 4,
+            "comparable": 4,
+            "excluded": 0,
+            "passed": 4,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 4,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0319,
+            "cost_per_success": 0.008,
+            "wall_per_success_p50": 31.66,
+            "wall_p95": 103.48,
+            "tool_calls_mean": 12.25,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 0,
+              "concurrent": 0,
+              "redundant_rereads": 1,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 4,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 88,
+              "cache_read": 966266,
+              "cache_create": 58273,
+              "output": 21146
+            }
+          },
+          "V2": {
+            "runs": 4,
+            "comparable": 4,
+            "excluded": 0,
+            "passed": 4,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 4,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0288,
+            "cost_per_success": 0.0072,
+            "wall_per_success_p50": 64.7,
+            "wall_p95": 110.62,
+            "tool_calls_mean": 14,
+            "injected_chars_mean": 1005.2,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 4,
+            "redundant_calls_mean": 0.25,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 1,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 1,
+              "moved_on": 2,
+              "errored": 0,
+              "total": 4,
+              "concurrent": 0,
+              "redundant_rereads": 4,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 1,
+              "runs_with_report": 4,
+              "moved_on_and_passed": 2
+            },
+            "measured": {
+              "input_uncached": 84,
+              "cache_read": 879807,
+              "cache_create": 45846,
+              "output": 21721,
+              "index_ms": 6440.686,
+              "hook_ms": 517.374,
+              "sync_ms": 26.29,
+              "retrieve_ms": 220.589
+            }
+          },
+          "V35": {
+            "runs": 4,
+            "comparable": 4,
+            "excluded": 0,
+            "passed": 3,
+            "pass_rate": 0.75,
+            "hidden_tests_passed": 4,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0277,
+            "cost_per_success": 0.0092,
+            "wall_per_success_p50": 66.63,
+            "wall_p95": 92.24,
+            "tool_calls_mean": 13,
+            "injected_chars_mean": 407.2,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 4,
+            "redundant_calls_mean": 0.5,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 1,
+              "search": 1,
+              "moved_on": 2,
+              "errored": 0,
+              "total": 4,
+              "concurrent": 0,
+              "redundant_rereads": 3,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 4,
+              "moved_on_and_passed": 1
+            },
+            "measured": {
+              "input_uncached": 86,
+              "cache_read": 917389,
+              "cache_create": 44756,
+              "output": 19042,
+              "index_ms": 5994.064,
+              "hook_ms": 667.675,
+              "sync_ms": 23.606
+            }
+          }
+        },
+        "validation": {
+          "OFF": {
+            "runs": 5,
+            "comparable": 5,
+            "excluded": 0,
+            "passed": 5,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 5,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0279,
+            "cost_per_success": 0.0056,
+            "wall_per_success_p50": 63.58,
+            "wall_p95": 91.74,
+            "tool_calls_mean": 8.6,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 0,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 5,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 74,
+              "cache_read": 722608,
+              "cache_create": 48424,
+              "output": 21966
+            }
+          },
+          "V2": {
+            "runs": 5,
+            "comparable": 5,
+            "excluded": 0,
+            "passed": 5,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 5,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0352,
+            "cost_per_success": 0.007,
+            "wall_per_success_p50": 46.66,
+            "wall_p95": 148.9,
+            "tool_calls_mean": 10.2,
+            "injected_chars_mean": 1816,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 4,
+            "redundant_calls_mean": 1,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 2,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 1,
+              "moved_on": 2,
+              "errored": 0,
+              "total": 5,
+              "concurrent": 0,
+              "redundant_rereads": 2,
+              "stale_reads_after_edit": 1,
+              "deliveries_without_effect": 1,
+              "runs_with_report": 5,
+              "moved_on_and_passed": 2
+            },
+            "measured": {
+              "input_uncached": 84,
+              "cache_read": 982647,
+              "cache_create": 57921,
+              "output": 27542,
+              "index_ms": 7357.566,
+              "hook_ms": 458.913,
+              "sync_ms": 30.46,
+              "retrieve_ms": 334.769
+            }
+          },
+          "V35": {
+            "runs": 5,
+            "comparable": 5,
+            "excluded": 0,
+            "passed": 4,
+            "pass_rate": 0.8,
+            "hidden_tests_passed": 5,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 1,
+            "infra_errors": 0,
+            "cost_total": 0.0363,
+            "cost_per_success": 0.0091,
+            "wall_per_success_p50": 11.19,
+            "wall_p95": 204.22,
+            "tool_calls_mean": 11.2,
+            "injected_chars_mean": 803.8,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 4,
+            "redundant_calls_mean": 0.5,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 1,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 2,
+              "moved_on": 1,
+              "errored": 0,
+              "total": 4,
+              "concurrent": 0,
+              "redundant_rereads": 1,
+              "stale_reads_after_edit": 1,
+              "deliveries_without_effect": 1,
+              "runs_with_report": 5,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 86,
+              "cache_read": 947441,
+              "cache_create": 59294,
+              "output": 29841,
+              "index_ms": 7519.089,
+              "hook_ms": 679.39,
+              "sync_ms": 49.219
+            }
+          }
+        }
+      },
+      "by_class": {
+        "contract-change": {
+          "OFF": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0089,
+            "cost_per_success": 0.0089,
+            "wall_per_success_p50": 79.19,
+            "wall_p95": 79.19,
+            "tool_calls_mean": 16,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 0,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 1,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 20,
+              "cache_read": 213648,
+              "cache_create": 15718,
+              "output": 7196
+            }
+          },
+          "V2": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0105,
+            "cost_per_success": 0.0105,
+            "wall_per_success_p50": 137.5,
+            "wall_p95": 137.5,
+            "tool_calls_mean": 19,
+            "injected_chars_mean": 1827,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 2,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 1,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 1,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 1,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 1,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 32,
+              "cache_read": 377405,
+              "cache_create": 16729,
+              "output": 6812,
+              "index_ms": 2356.015,
+              "hook_ms": 104.207,
+              "sync_ms": 5.552,
+              "retrieve_ms": 53.781
+            }
+          },
+          "V35": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0071,
+            "cost_per_success": 0.0071,
+            "wall_per_success_p50": 43.95,
+            "wall_p95": 43.95,
+            "tool_calls_mean": 12,
+            "injected_chars_mean": 1434,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 1,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 1,
+              "concurrent": 0,
+              "redundant_rereads": 1,
+              "stale_reads_after_edit": 1,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 1,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 18,
+              "cache_read": 185641,
+              "cache_create": 14029,
+              "output": 4797,
+              "index_ms": 1958.548,
+              "hook_ms": 83.861,
+              "sync_ms": 5.524
+            }
+          }
+        },
+        "debug": {
+          "OFF": {
+            "runs": 2,
+            "comparable": 2,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 2,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.025,
+            "cost_per_success": 0.0125,
+            "wall_per_success_p50": 82.57,
+            "wall_p95": 103.48,
+            "tool_calls_mean": 20.5,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 0,
+              "concurrent": 0,
+              "redundant_rereads": 1,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 2,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 70,
+              "cache_read": 844026,
+              "cache_create": 37887,
+              "output": 18044
+            }
+          },
+          "V2": {
+            "runs": 2,
+            "comparable": 2,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 2,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.023,
+            "cost_per_success": 0.0115,
+            "wall_per_success_p50": 80.51,
+            "wall_p95": 110.62,
+            "tool_calls_mean": 22,
+            "injected_chars_mean": 924.5,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 2,
+            "redundant_calls_mean": 0.5,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 1,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 1,
+              "errored": 0,
+              "total": 2,
+              "concurrent": 0,
+              "redundant_rereads": 3,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 2,
+              "moved_on_and_passed": 1
+            },
+            "measured": {
+              "input_uncached": 62,
+              "cache_read": 701150,
+              "cache_create": 35302,
+              "output": 17919,
+              "index_ms": 2835.552,
+              "hook_ms": 384.157,
+              "sync_ms": 14.916,
+              "retrieve_ms": 121.361
+            }
+          },
+          "V35": {
+            "runs": 2,
+            "comparable": 2,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 0.5,
+            "hidden_tests_passed": 2,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0219,
+            "cost_per_success": 0.0219,
+            "wall_per_success_p50": 92.24,
+            "wall_p95": 92.24,
+            "tool_calls_mean": 20.5,
+            "injected_chars_mean": 551.5,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 2,
+            "redundant_calls_mean": 1,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 1,
+              "search": 0,
+              "moved_on": 1,
+              "errored": 0,
+              "total": 2,
+              "concurrent": 0,
+              "redundant_rereads": 2,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 2,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 66,
+              "cache_read": 762930,
+              "cache_create": 35403,
+              "output": 14441,
+              "index_ms": 2967.064,
+              "hook_ms": 517.874,
+              "sync_ms": 11.142
+            }
+          }
+        },
+        "edit": {
+          "OFF": {
+            "runs": 2,
+            "comparable": 2,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 2,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0122,
+            "cost_per_success": 0.0061,
+            "wall_per_success_p50": 31.66,
+            "wall_p95": 63.58,
+            "tool_calls_mean": 9,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 0,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 2,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 36,
+              "cache_read": 294604,
+              "cache_create": 28925,
+              "output": 7012
+            }
+          },
+          "V2": {
+            "runs": 2,
+            "comparable": 2,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 2,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0099,
+            "cost_per_success": 0.005,
+            "wall_per_success_p50": 46.66,
+            "wall_p95": 64.7,
+            "tool_calls_mean": 9.5,
+            "injected_chars_mean": 737.5,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 2,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 1,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 1,
+              "errored": 0,
+              "total": 2,
+              "concurrent": 0,
+              "redundant_rereads": 1,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 2,
+              "moved_on_and_passed": 1
+            },
+            "measured": {
+              "input_uncached": 34,
+              "cache_read": 293504,
+              "cache_create": 15589,
+              "output": 7712,
+              "index_ms": 3509.273,
+              "hook_ms": 165.616,
+              "sync_ms": 10.975,
+              "retrieve_ms": 132.347
+            }
+          },
+          "V35": {
+            "runs": 2,
+            "comparable": 2,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 2,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0125,
+            "cost_per_success": 0.0063,
+            "wall_per_success_p50": 66.63,
+            "wall_p95": 76.01,
+            "tool_calls_mean": 11.5,
+            "injected_chars_mean": 263,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 2,
+            "redundant_calls_mean": 0.5,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 1,
+              "moved_on": 1,
+              "errored": 0,
+              "total": 2,
+              "concurrent": 0,
+              "redundant_rereads": 1,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 2,
+              "moved_on_and_passed": 1
+            },
+            "measured": {
+              "input_uncached": 38,
+              "cache_read": 337980,
+              "cache_create": 19825,
+              "output": 10361,
+              "index_ms": 2980.213,
+              "hook_ms": 260.317,
+              "sync_ms": 12.679
+            }
+          }
+        },
+        "locate": {
+          "OFF": {
+            "runs": 2,
+            "comparable": 2,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 2,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0025,
+            "cost_per_success": 0.0012,
+            "wall_per_success_p50": 5.35,
+            "wall_p95": 7.49,
+            "tool_calls_mean": 1.5,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 0,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 2,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 10,
+              "cache_read": 69615,
+              "cache_create": 6836,
+              "output": 832
+            }
+          },
+          "V2": {
+            "runs": 2,
+            "comparable": 2,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 2,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0027,
+            "cost_per_success": 0.0014,
+            "wall_per_success_p50": 7.41,
+            "wall_p95": 9.47,
+            "tool_calls_mean": 1.5,
+            "injected_chars_mean": 2321,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 2,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 2,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 2,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 1,
+              "runs_with_report": 2,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 10,
+              "cache_read": 71393,
+              "cache_create": 7444,
+              "output": 1082,
+              "index_ms": 2972.962,
+              "hook_ms": 145.074,
+              "sync_ms": 12.327,
+              "retrieve_ms": 109.778
+            }
+          },
+          "V35": {
+            "runs": 2,
+            "comparable": 2,
+            "excluded": 0,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 2,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0028,
+            "cost_per_success": 0.0014,
+            "wall_per_success_p50": 7.21,
+            "wall_p95": 11.19,
+            "tool_calls_mean": 2.5,
+            "injected_chars_mean": 736,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 2,
+            "redundant_calls_mean": 0,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 2,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 2,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 1,
+              "runs_with_report": 2,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 12,
+              "cache_read": 85648,
+              "cache_create": 6488,
+              "output": 1284,
+              "index_ms": 3179.996,
+              "hook_ms": 262.428,
+              "sync_ms": 11.647
+            }
+          }
+        },
+        "multi-file": {
+          "OFF": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0106,
+            "cost_per_success": 0.0106,
+            "wall_per_success_p50": 91.74,
+            "wall_p95": 91.74,
+            "tool_calls_mean": 14,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 0,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 1,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 24,
+              "cache_read": 254519,
+              "cache_create": 15673,
+              "output": 9861
+            }
+          },
+          "V2": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0171,
+            "cost_per_success": 0.0171,
+            "wall_per_success_p50": 148.9,
+            "wall_p95": 148.9,
+            "tool_calls_mean": 22,
+            "injected_chars_mean": 2108,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 2,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 1,
+              "errored": 0,
+              "total": 1,
+              "concurrent": 0,
+              "redundant_rereads": 2,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 1,
+              "moved_on_and_passed": 1
+            },
+            "measured": {
+              "input_uncached": 28,
+              "cache_read": 406540,
+              "cache_create": 26475,
+              "output": 15537,
+              "index_ms": 1461.51,
+              "hook_ms": 96.605,
+              "sync_ms": 5.756,
+              "retrieve_ms": 78.751
+            }
+          },
+          "V35": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 1,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 1,
+            "infra_errors": 0,
+            "cost_total": 0.0191,
+            "cost_per_success": null,
+            "wall_per_success_p50": null,
+            "wall_p95": 204.22,
+            "tool_calls_mean": 27,
+            "injected_chars_mean": 1113,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 1,
+            "redundant_calls_mean": 1,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 1,
+              "errored": 0,
+              "total": 1,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 1,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 36,
+              "cache_read": 480169,
+              "cache_create": 26646,
+              "output": 17838,
+              "index_ms": 1507.282,
+              "hook_ms": 116.196,
+              "sync_ms": 5.609
+            }
+          }
+        },
+        "negative": {
+          "OFF": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0005,
+            "cost_per_success": 0.0005,
+            "wall_per_success_p50": 4.27,
+            "wall_p95": 4.27,
+            "tool_calls_mean": 0,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 0,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 1,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 2,
+              "cache_read": 12462,
+              "cache_create": 1658,
+              "output": 167
+            }
+          },
+          "V2": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0007,
+            "cost_per_success": 0.0007,
+            "wall_per_success_p50": 5.0,
+            "wall_p95": 5.0,
+            "tool_calls_mean": 0,
+            "injected_chars_mean": 1200,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 1,
+              "errored": 0,
+              "total": 1,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 1,
+              "runs_with_report": 1,
+              "moved_on_and_passed": 1
+            },
+            "measured": {
+              "input_uncached": 2,
+              "cache_read": 12462,
+              "cache_create": 2228,
+              "output": 201,
+              "index_ms": 662.94,
+              "hook_ms": 80.628,
+              "sync_ms": 7.224,
+              "retrieve_ms": 59.34
+            }
+          },
+          "V35": {
+            "runs": 1,
+            "comparable": 1,
+            "excluded": 0,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "hidden_tests_passed": 1,
+            "scope_violations": 0,
+            "scope_violations_non_test": 0,
+            "invariant_violations": 0,
+            "infra_errors": 0,
+            "cost_total": 0.0005,
+            "cost_per_success": 0.0005,
+            "wall_per_success_p50": 5.82,
+            "wall_p95": 5.82,
+            "tool_calls_mean": 0,
+            "injected_chars_mean": 0,
+            "models_served": [
+              "claude-haiku-5-5"
+            ],
+            "cost_unknown_runs": 0,
+            "progress_runs": 0,
+            "redundant_calls_mean": null,
+            "stagnant_runs": 0,
+            "sufficiency": {
+              "explore_again": 0,
+              "read_returned": 0,
+              "read_named": 0,
+              "read_not_returned": 0,
+              "search": 0,
+              "moved_on": 0,
+              "errored": 0,
+              "total": 0,
+              "concurrent": 0,
+              "redundant_rereads": 0,
+              "stale_reads_after_edit": 0,
+              "deliveries_without_effect": 0,
+              "runs_with_report": 1,
+              "moved_on_and_passed": 0
+            },
+            "measured": {
+              "input_uncached": 2,
+              "cache_read": 12462,
+              "cache_create": 1659,
+              "output": 162,
+              "index_ms": 920.05,
+              "hook_ms": 106.389,
+              "sync_ms": 26.224
+            }
+          }
+        }
+      },
+      "paired_vs_OFF": {
+        "V2": {
+          "pairs": 9,
+          "d_pass_mean": 0,
+          "d_pass_ci95": [
+            0,
+            0
+          ],
+          "d_cost_mean": 0.0005,
+          "d_cost_ci95": [
+            -0.001046844444444444,
+            0.00223181
+          ],
+          "conclusion": "inconclusivo"
+        },
+        "V35": {
+          "pairs": 9,
+          "d_pass_mean": -0.222,
+          "d_pass_ci95": [
+            -0.5555555555555556,
+            0
+          ],
+          "d_cost_mean": 0.0005,
+          "d_cost_ci95": [
+            -0.0010734455555555555,
+            0.002593493333333334
+          ],
+          "conclusion": "inconclusivo"
+        }
+      },
+      "comparisons": [
+        {
+          "arm": "V2",
+          "base": "OFF",
+          "pairs": 9,
+          "tasks": 9,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 1.0,
+              "arm": 1.0,
+              "n_tasks": 9,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 1.0,
+              "n_tasks": 9,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 10.2222,
+              "arm": 11.8889,
+              "n_tasks": 9,
+              "delta_pct": 16.3,
+              "ci95_pct": [
+                -8.6,
+                41.7
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 204316.1111,
+              "arm": 223961.3333,
+              "n_tasks": 9,
+              "delta_pct": 9.6,
+              "ci95_pct": [
+                -18.0,
+                47.1
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0066,
+              "arm": 0.0071,
+              "n_tasks": 9,
+              "delta_pct": 7.1,
+              "ci95_pct": [
+                -16.6,
+                33.8
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 52.1478,
+              "arm": 67.8633,
+              "n_tasks": 9,
+              "delta_pct": 30.1,
+              "ci95_pct": [
+                0.2,
+                62.5
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": null
+          }
+        },
+        {
+          "arm": "V35",
+          "base": "OFF",
+          "pairs": 9,
+          "tasks": 9,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 1.0,
+              "arm": 0.7778,
+              "n_tasks": 9,
+              "delta_pct": -22.2,
+              "ci95_pct": [
+                -55.6,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 1.0,
+              "n_tasks": 9,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 10.2222,
+              "arm": 12,
+              "n_tasks": 9,
+              "delta_pct": 17.4,
+              "ci95_pct": [
+                -11.0,
+                55.9
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 204316.1111,
+              "arm": 224215,
+              "n_tasks": 9,
+              "delta_pct": 9.7,
+              "ci95_pct": [
+                -9.7,
+                45.6
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0066,
+              "arm": 0.0071,
+              "n_tasks": 9,
+              "delta_pct": 6.9,
+              "ci95_pct": [
+                -15.5,
+                41.4
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 52.1478,
+              "arm": 66.18,
+              "n_tasks": 9,
+              "delta_pct": 26.9,
+              "ci95_pct": [
+                -15.3,
+                80.9
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": null
+          }
+        },
+        {
+          "arm": "V35",
+          "base": "V2",
+          "pairs": 9,
+          "tasks": 9,
+          "metrics": {
+            "pass_rate": {
+              "label": "taxa de aprovação (estrita: teste+escopo+invariantes)",
+              "base": 1.0,
+              "arm": 0.7778,
+              "n_tasks": 9,
+              "delta_pct": -22.2,
+              "ci95_pct": [
+                -55.6,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "hidden_pass": {
+              "label": "testes ocultos passaram (sem escopo)",
+              "base": 1.0,
+              "arm": 1.0,
+              "n_tasks": 9,
+              "delta_pct": 0.0,
+              "ci95_pct": [
+                0.0,
+                0.0
+              ],
+              "reading": "inconclusivo"
+            },
+            "tool_calls": {
+              "label": "chamadas de ferramenta",
+              "base": 11.8889,
+              "arm": 12,
+              "n_tasks": 9,
+              "delta_pct": 0.9,
+              "ci95_pct": [
+                -17.9,
+                25.3
+              ],
+              "reading": "inconclusivo"
+            },
+            "tokens": {
+              "label": "tokens (entrada+saída)",
+              "base": 223961.3333,
+              "arm": 224215,
+              "n_tasks": 9,
+              "delta_pct": 0.1,
+              "ci95_pct": [
+                -25.4,
+                28.1
+              ],
+              "reading": "inconclusivo"
+            },
+            "cost_usd": {
+              "label": "custo US$",
+              "base": 0.0071,
+              "arm": 0.0071,
+              "n_tasks": 9,
+              "delta_pct": -0.2,
+              "ci95_pct": [
+                -19.7,
+                22.7
+              ],
+              "reading": "inconclusivo"
+            },
+            "wall_s": {
+              "label": "tempo s",
+              "base": 67.8633,
+              "arm": 66.18,
+              "n_tasks": 9,
+              "delta_pct": -2.5,
+              "ci95_pct": [
+                -40.0,
+                31.4
+              ],
+              "reading": "inconclusivo"
+            },
+            "redundant": {
+              "label": "chamadas redundantes",
+              "base": 0.625,
+              "arm": 0.5,
+              "n_tasks": 8,
+              "delta_pct": -20.0,
+              "ci95_pct": [
+                -100.0,
+                200.0
+              ],
+              "reading": "inconclusivo"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "limits": [
+    "N pequeno é descritivo; sem significância não há ganho comprovado.",
+    "Execuções com evidence=simulated validam a infraestrutura, não o produto.",
+    "Retrieval offline não é resultado de desenvolvimento; ver seção offline separadamente.",
+    "Custo ausente (None) não é zero; cost_per_success só aparece quando todas as execuções comparáveis têm custo."
+  ]
+}

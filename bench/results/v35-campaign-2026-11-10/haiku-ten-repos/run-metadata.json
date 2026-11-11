@@ -1,0 +1,733 @@
+{
+  "manifest_sha256": "e8227c5ac8d2d8d9d365a2b164a32dec054dfda4f0032e5e7abc1bfc34495967",
+  "sidecar_sha256": "2dd41ea7e6d2a8ef6ca9b0949fb37c591f7cf438e07072573096f71bcb41a0d6",
+  "runner_sha256": "3f449d13c1da689bc084ec46abed448e78d1aa5b4a4184c86e50216b5822f2cf",
+  "clients": {
+    "claude": "2.1.321 (Claude Code)"
+  },
+  "models": [
+    "claude:claude-haiku-5-5"
+  ],
+  "engine": "v3.5",
+  "reps": 1,
+  "timeout_s": 180,
+  "max_budget_usd_claude": 0.08,
+  "total_budget_usd": 8.0,
+  "claude_reserved_usd": 8.0,
+  "seed": 11,
+  "raw_saved": false,
+  "repos": {
+    "chi": "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf",
+    "click": "8abb77a8432e03ed14a95f972b44f905279415a7",
+    "dapper": "eb47546a408bbf6c178bda4f04dc205bc51ffbfe",
+    "express": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+    "hono": "eb754bd5ef22c63f1634a4c374a86be086f85710",
+    "kotlinx-datetime": "77c95cc8125015f83ea8fd900404c295fba7276e",
+    "monolog": "3bed304b1905fed5c30d172872f4d890cbb03c6a",
+    "serde-json": "8c535a260ce561eaab4111aafc29038eb9f77ff3",
+    "sinatra": "cb22afd7902b566b6eaba6c4ea89739494a65d12",
+    "spring-petclinic": "500158f732419217507c7656904b8e6aa1bcc0d6"
+  },
+  "jobs": [
+    {
+      "case": "R09-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R09-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R05-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R05-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R06-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R06-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R09-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R09-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R02-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R02-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R01-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R01-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R09-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R09-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R04-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R04-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R05-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R05-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R04-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R04-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R05-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R05-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R02-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R02-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R04-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R04-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R05-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R05-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R02-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R02-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R02-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R02-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R07-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R07-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R01-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R01-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R07-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R07-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R04-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R04-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R07-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R07-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R09-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R09-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R04-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R04-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R01-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R01-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R05-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R05-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R01-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R01-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R06-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R06-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R03-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R03-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R06-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R06-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R10-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R10-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R10-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R10-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R07-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R07-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R07-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R07-1",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R03-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R03-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R10-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R10-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R01-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R01-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R06-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R06-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R02-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R02-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-2",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R08-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R03-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R10-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R10-5",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R10-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R10-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R06-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "R06-4",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R09-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "R09-3",
+      "agent": "claude",
+      "model": "claude-haiku-5-5",
+      "arm": "OFF",
+      "rep": 0
+    }
+  ]
+}

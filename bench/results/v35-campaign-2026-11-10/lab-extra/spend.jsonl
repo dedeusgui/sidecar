@@ -1,0 +1,6 @@
+{"task": "CLK-LOC-01", "arm": "OFF", "model": "claude-haiku-5-5", "cost_usd": 0.0016442000000000002, "estimated": false}
+{"task": "CLK-LOC-01", "arm": "V2", "model": "claude-haiku-5-5", "cost_usd": 0.00160093, "estimated": false}
+{"task": "CLK-LOC-01", "arm": "V35", "model": "claude-haiku-5-5", "cost_usd": 0.0018860900000000002, "estimated": false}
+{"task": "EXP-NEG-01", "arm": "V2", "model": "claude-haiku-5-5", "cost_usd": 0.00067092, "estimated": false}
+{"task": "EXP-NEG-01", "arm": "V35", "model": "claude-haiku-5-5", "cost_usd": 0.00053762, "estimated": false}
+{"task": "EXP-NEG-01", "arm": "OFF", "model": "claude-haiku-5-5", "cost_usd": 0.00053992, "estimated": false}

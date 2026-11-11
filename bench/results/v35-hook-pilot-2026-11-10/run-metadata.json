@@ -1,0 +1,73 @@
+{
+  "repo_commit": "9096b39e173d73dd97fff727bcdda2c9f1411fb3",
+  "claude_version": "2.1.321 (Claude Code)",
+  "model": "claude-haiku-5-5",
+  "engine": "v3.5",
+  "sidecar_sha256": "2dd41ea7e6d2a8ef6ca9b0949fb37c591f7cf438e07072573096f71bcb41a0d6",
+  "pilot_sha256": "23499f752535818271f358aca1f0c9d7362b1ee5a21cb8066ee00da48176195b",
+  "runner_sha256": "431f32d0d40fc2de0564118e1abb166cf2ce21b5aec837c0152498b15db8a3a8",
+  "cases_sha256": "6278da36d40080e85507474653a5553e294e76ff08fdc002ec6c82d86c04ac41",
+  "reps": 1,
+  "max_budget_usd_per_run": 0.25,
+  "reserved_usd": 2.5,
+  "isolation": [
+    "clone --shared descartável por execução",
+    "SIDECAR_HOME por execução",
+    "--setting-sources project,local",
+    "--strict-mcp-config",
+    "--disable-slash-commands",
+    "Edit/Write/NotebookEdit bloqueados, modo plan"
+  ],
+  "jobs": [
+    {
+      "case": "H01-weight",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "H01-weight",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "H02-migration",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "H02-migration",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "H03-trace",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "H03-trace",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "H04-model",
+      "arm": "ON",
+      "rep": 0
+    },
+    {
+      "case": "H04-model",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "N01-negative",
+      "arm": "OFF",
+      "rep": 0
+    },
+    {
+      "case": "N01-negative",
+      "arm": "ON",
+      "rep": 0
+    }
+  ]
+}

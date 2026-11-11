@@ -1,0 +1,3 @@
+{"task": "CHI-EDIT-01", "arm": "OFF", "model": "claude-haiku-5-5", "cost_usd": 0.00601625, "estimated": false}
+{"task": "CHI-EDIT-01", "arm": "V2", "model": "claude-haiku-5-5", "cost_usd": 0.00465477, "estimated": false}
+{"task": "CHI-EDIT-01", "arm": "V35", "model": "claude-haiku-5-5", "cost_usd": 0.0048065, "estimated": false}
