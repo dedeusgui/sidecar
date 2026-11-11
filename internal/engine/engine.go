@@ -17,6 +17,14 @@ const Version = "v3"
 // Version35 selects the opt-in unified context transaction built on the V3 decision layer.
 const Version35 = "v3.5"
 
+// Version36 selects the V3.6 refinement of the unified transaction: same architecture and
+// contracts as V3.5, with the delivery fixes recorded in docs/v3.6. V3.5 stays byte-frozen
+// as the comparison baseline.
+const Version36 = "v3.6"
+
+// Unified reports whether version runs the unified (V3.5-family) context transaction.
+func Unified(version string) bool { return version == Version35 || version == Version36 }
+
 // Action is what the engine decided to deliver. They are distinct actions, not a bundle that is
 // always on: ABSTAIN emits zero bytes, EXPLORE_AVAILABLE only offers the on-demand tool.
 type Action string
@@ -67,6 +75,12 @@ type Decision struct {
 type Options struct {
 	Retrieve          retrieve.Options
 	RequireCodeAnchor bool // V3.5 abstains when retrieval has no anchored code symbol.
+	// Refined selects the V3.6 corrections on top of RequireCodeAnchor. The code-anchor gate also
+	// matches a symbol name through the dictionary translation of a prompt term, as retrieval
+	// already does (a Portuguese "pedido" anchors OrderService). The route's item limit is kept:
+	// V3.5 raised it to 12 because it then cut the selection to one anchor; V3.6 delivers the
+	// ranked selection, so the V3 limits per action apply again.
+	Refined bool
 }
 
 // Budgets per action, in estimated tokens. Heuristics chosen before measurement; not fitted to the
@@ -128,7 +142,7 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 	d.Signals = sig
 
 	rel, reasons := relevanceGate(sig, res)
-	if opts.RequireCodeAnchor && rel != Irrelevant && !hasCodeAnchor(sig, res) {
+	if opts.RequireCodeAnchor && rel != Irrelevant && !hasCodeAnchor(sig, res, opts.Refined) {
 		rel = Irrelevant
 		reasons = append(reasons, "no explicit code anchor or matching symbol name")
 	}
@@ -149,7 +163,7 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 
 	d.Class = classify(sig, res)
 	d.Action, d.Budget, d.MaxItems = route(d.Class, sig)
-	if opts.RequireCodeAnchor && d.MaxItems < 12 {
+	if opts.RequireCodeAnchor && !opts.Refined && d.MaxItems < 12 {
 		// The V3.5 output planner can choose among several independent source anchors under one
 		// global token budget; extra items remain subject to that budget.
 		d.MaxItems = 12

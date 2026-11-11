@@ -1,6 +1,6 @@
 # Engines Sidecar — marcos, diferenças e aprendizados
 
-Este é o mapa de leitura das engines para produto, engenharia e avaliação. Foi conferido no workspace `feat/v3.6-delivery-fixes`, com base em `0c7eebd` e alterações locais **ainda não commitadas**; não confundir essas alterações com o conteúdo da `main` ou de uma release. A V1 é o padrão; V2, V3 e V3.5 são opt-in. A V3.6 descrita aqui existe no workspace experimental e ainda não está commitada neste estado. Consulte o Git e o código do checkout usado antes de reproduzir uma comparação.
+Este é o mapa de leitura das engines para produto, engenharia e avaliação. A V1 é o padrão; V2, V3, V3.5 e V3.6 são opt-in. A V3.6 permanece experimental, sem promoção nem evidência de superioridade geral. Os resultados históricos foram obtidos no workspace de desenvolvimento, não em uma release. Consulte o Git e o código do checkout usado antes de reproduzir uma comparação.
 
 ## O produto e o que chamamos de engine
 
@@ -15,7 +15,7 @@ Sidecar recebe um prompt por um hook, descobre e indexa o repositório localment
 | **V3.6** | Revisão experimental da V3.5: custo renderizado, escolha/ordem por seção, snippets e tratamento de evidência e rótulos. | Reduzir a perda entre seleção, planejamento e entrega, sem reescrever a arquitetura. | Recupera parte das perdas da V3.5 na amostra externa, com regressões de abstenção/custo e perdas em fixtures. Trabalho local e testes ainda incompletos; não promovida. Ver [progresso V3.6](v3.6/progress.md). |
 | **V3.7** | **Proposta, não implementada:** estudar e testar o meio-termo entre contexto automático, exploração seletiva e aprofundamento opcional. | Preservar o benefício de ser automático, sem perder evidência, desperdiçar tokens ou bloquear as ferramentas do agente. | Depende do [plano de pesquisa](v3.7/research-plan.md); número de versão é um marco de investigação, não garantia de melhoria. |
 
-As versões são cumulativas em parte, mas uma camada posterior pode mudar o comportamento ou deixar de entregar uma capacidade anterior. A tabela não afirma paridade total. Evidências úteis no código: seleção de engines e hint em `internal/app/app.go`; roteamento V2 em `internal/retrieve/retrieve.go`; gate e rota V3 em `internal/engine/engine.go`; transação unificada em `internal/app/v35.go`; refinamentos no workspace experimental em `internal/app/v36.go` e `internal/engine/planner.go`; o primeiro ainda não está na `main`. As flags e capacidades de cliente devem ser verificadas no checkout exato e em [integrations.md](integrations.md).
+As versões são cumulativas em parte, mas uma camada posterior pode mudar o comportamento ou deixar de entregar uma capacidade anterior. A tabela não afirma paridade total. Evidências úteis no código: seleção de engines e hint em `internal/app/app.go`; roteamento V2 em `internal/retrieve/retrieve.go`; gate e rota V3 em `internal/engine/engine.go`; transação unificada em `internal/app/v35.go`; refinamentos em `internal/app/v36.go` e `internal/engine/planner.go`. As flags e capacidades de cliente devem ser verificadas no checkout exato e em [integrations.md](integrations.md).
 
 ## O que os dados permitem dizer
 

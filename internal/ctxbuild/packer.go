@@ -37,11 +37,38 @@ type packCandidate struct {
 	sequence int
 }
 
-// Pack maps the plan's selected evidence keys and grounded guidance proposals
+// PackOptions selects packer refinements. The zero value is the frozen V3.5 behaviour.
+type PackOptions struct {
+	// Ranked breaks priority ties by arrival order (the plan's evidence order, then each
+	// proposal's item order) instead of by item key, so retrieval rank decides both what
+	// survives a tight budget and the order the agent reads.
+	Ranked bool
+}
+
+// Pack is PackWith under the V3.5 options.
+func Pack[T any](
+	plan contract.OutputPlan,
+	evidence *contract.EvidenceRegistry[T],
+	mapEvidence func(contract.EvidenceEntry[T]) []Item,
+	proposals []GuidanceProposal,
+	seen Seen,
+) PackResult {
+	return PackWith(PackOptions{}, plan, evidence, mapEvidence, proposals, seen)
+}
+
+// PackItemTokens is what Pack charges for one item: its sanitized text with the qualifier and
+// provenance suffix, plus its body lines. Planners must budget with it, not with a metadata
+// estimate, or an allocated item is dropped at packing time.
+func PackItemTokens(item Item) int {
+	return EstimateTokens(renderPackItem(sanitizePackItem(item)))
+}
+
+// PackWith maps the plan's selected evidence keys and grounded guidance proposals
 // into one sanitized context block. The mapper adapts caller-owned evidence
 // values to one or more rendered items; the registry remains the shared source
 // of identity, freshness and worktree scope.
-func Pack[T any](
+func PackWith[T any](
+	options PackOptions,
 	plan contract.OutputPlan,
 	evidence *contract.EvidenceRegistry[T],
 	mapEvidence func(contract.EvidenceEntry[T]) []Item,
@@ -196,6 +223,9 @@ func Pack[T any](
 		if sectionRank(left.item.Section) != sectionRank(right.item.Section) {
 			return sectionRank(left.item.Section) < sectionRank(right.item.Section)
 		}
+		if options.Ranked {
+			return left.sequence < right.sequence
+		}
 		if left.item.Key != right.item.Key {
 			return left.item.Key < right.item.Key
 		}
@@ -233,10 +263,9 @@ func Pack[T any](
 		if section == nil || section.budget <= 0 || section.maxItems <= 0 {
 			continue
 		}
-		if len(result.Items) >= plan.MaxItems {
-			continue
-		}
-		if sectionItemCounts[item.Section] >= section.maxItems {
+		// An allocated item that does not fit is reported, never dropped silently.
+		if len(result.Items) >= plan.MaxItems || sectionItemCounts[item.Section] >= section.maxItems {
+			result.NotDelivered = append(result.NotDelivered, contract.PlanReason{Code: "pack_item_limit", Kind: item.Section, Key: item.Key})
 			continue
 		}
 
@@ -244,10 +273,12 @@ func Pack[T any](
 		trial[item.Section] = append(trial[item.Section], item)
 		sectionText := renderPackSection(item.Section, trial[item.Section])
 		if EstimateTokens(sectionText) > section.budget {
+			result.NotDelivered = append(result.NotDelivered, contract.PlanReason{Code: "pack_section_over_budget", Kind: item.Section, Key: item.Key})
 			continue
 		}
 		block := renderPack(trial)
 		if EstimateTokens(block) > plan.BudgetTokens {
+			result.NotDelivered = append(result.NotDelivered, contract.PlanReason{Code: "pack_over_budget", Kind: item.Section, Key: item.Key})
 			continue
 		}
 		selected = trial
@@ -376,7 +407,54 @@ func sanitizePackItem(item Item) Item {
 		item.Text = ""
 	}
 	item.Text = strings.TrimSpace(item.Text + suffixText)
+	if len(item.Body) > 0 {
+		body := make([]string, 0, len(item.Body))
+		for _, line := range item.Body {
+			if line = sanitizeBodyLine(line); line != "" {
+				body = append(body, line)
+			}
+		}
+		item.Body = body
+	}
 	return item
+}
+
+// maxBodyLineRunes caps one rendered source line; minified or generated lines are cut, not dropped.
+const maxBodyLineRunes = 160
+
+// sanitizeBodyLine renders one "N<tab>source" line as "N| source". Indentation survives (a tab
+// becomes two spaces); control characters and forged block markers do not. Every body line is
+// emitted behind a fixed indent, so repository text can never start a line of the block.
+func sanitizeBodyLine(line string) string {
+	number, source, numbered := strings.Cut(line, "\t")
+	if !numbered {
+		number, source = "", line
+	}
+	source = strings.TrimRight(source, " \t\r\n")
+	indent := 0
+indentLoop:
+	for _, r := range source {
+		switch r {
+		case ' ':
+			indent++
+		case '\t':
+			indent += 2
+		default:
+			break indentLoop
+		}
+	}
+	text := sanitizeTo(strings.TrimLeft(source, " \t"), maxBodyLineRunes)
+	if text == "" {
+		return ""
+	}
+	return sanitizeTo(number, 8) + "| " + strings.Repeat(" ", min(indent, 24)) + text
+}
+
+func renderPackItem(item Item) string {
+	if len(item.Body) == 0 {
+		return item.Text
+	}
+	return item.Text + "\n    " + strings.Join(item.Body, "\n    ")
 }
 
 func renderPackSection(section string, items []Item) string {
@@ -388,7 +466,7 @@ func renderPackSection(section string, items []Item) string {
 	b.WriteByte('\n')
 	for _, item := range items {
 		b.WriteString("- ")
-		b.WriteString(item.Text)
+		b.WriteString(renderPackItem(item))
 		b.WriteByte('\n')
 	}
 	return b.String()

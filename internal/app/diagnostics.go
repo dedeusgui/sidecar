@@ -57,7 +57,7 @@ type ExplainReport struct {
 // engineOf names the pipeline that produced a result. Unknown values keep the v1 compatibility default.
 func engineOf(opts retrieve.Options) string {
 	switch opts.EngineVersion {
-	case "v2", engine.Version, engine.Version35:
+	case "v2", engine.Version, engine.Version35, engine.Version36:
 		return opts.EngineVersion
 	}
 	return "v1"
@@ -113,7 +113,7 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 	var res retrieve.Result
 	var decision *engine.Decision
 	var unified *v35Output
-	if engineOf(opts) == engine.Version35 {
+	if engine.Unified(engineOf(opts)) {
 		r, err := runV35Safe(ctx, ix.Store(), root, prompt, opts, adapter.Agent(""), "", "", time.Now(), true)
 		if err == nil {
 			res, unified = r.Result, &r
@@ -132,7 +132,7 @@ func Explain(root, prompt string, opts retrieve.Options) (ExplainReport, error) 
 		}
 		res = r
 	}
-	if engineOf(opts) != engine.Version35 && (engineOf(opts) == "v2" || decision != nil && decision.Action != engine.ActionAbstain) {
+	if !engine.Unified(engineOf(opts)) && (engineOf(opts) == "v2" || decision != nil && decision.Action != engine.ActionAbstain) {
 		if _, err := attachDecisions(ix.Store(), root, prompt, &res, time.Now()); err != nil {
 			return ExplainReport{}, err
 		}
@@ -208,8 +208,8 @@ func WriteExplain(w io.Writer, rep ExplainReport, asJSON bool) error {
 	_, _ = fmt.Fprintf(w, "Motor: %s\n", rep.Engine)
 	if d := rep.Decision; d != nil {
 		version := "V3"
-		if rep.Engine == engine.Version35 {
-			version = "V3.5"
+		if engine.Unified(rep.Engine) {
+			version = strings.ToUpper(rep.Engine)
 		}
 		_, _ = fmt.Fprintf(w, "Decisão %s: %s · classe %s · relevância %s · orçamento %d tokens · %d itens\n", version, d.Action, d.Class, d.Relevance, d.Budget, len(d.Included))
 		for _, r := range append(append([]string{}, d.AbstainReasons...), d.LowConfidence...) {
@@ -280,12 +280,12 @@ type ClientCapabilities struct {
 
 func engineReadiness() map[string]any {
 	selected := configuredEngine()
-	active := selected == engine.Version35
+	active := engine.Unified(selected)
 	activation := "export SIDECAR_ENGINE=v3.5"
 	deactivation := "unset SIDECAR_ENGINE (default: v1; applies on the next hook)"
-	detail := "motor atual: " + selected + "; V3.5 inativa (opt-in); ativar: " + activation + "; desativar: " + deactivation
+	detail := "motor atual: " + selected + "; V3.5 inativa (opt-in); ativar: " + activation + " (ou v3.6, a revisão de entrega)" + "; desativar: " + deactivation
 	if active {
-		detail = "motor atual: v3.5; rollback imediato: " + deactivation
+		detail = "motor atual: " + selected + "; rollback imediato: " + deactivation
 	}
 	env, err := install.DefaultEnv()
 	var detected []string
@@ -302,7 +302,7 @@ func engineReadiness() map[string]any {
 
 func configuredEngine() string {
 	switch os.Getenv("SIDECAR_ENGINE") {
-	case "v2", engine.Version, engine.Version35:
+	case "v2", engine.Version, engine.Version35, engine.Version36:
 		return os.Getenv("SIDECAR_ENGINE")
 	default:
 		return "v1"

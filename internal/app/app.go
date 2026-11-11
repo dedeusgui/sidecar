@@ -171,12 +171,12 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 		statePath = opts.StatePath(string(opts.Agent), in.SessionID)
 	}
 	ropts := hookRetrieveOptions(root, statePath)
-	if ropts.EngineVersion == engine.Version35 && statePath != "" {
+	if engine.Unified(ropts.EngineVersion) && statePath != "" {
 		statePath = v35SessionStatePath(root, statePath)
 		ropts.Seen = brief.SeenFor(statePath)
 	}
 	rec["engine"] = engineOf(ropts)
-	if ropts.EngineVersion == engine.Version35 {
+	if engine.Unified(ropts.EngineVersion) {
 		t = time.Now()
 		unified, err := runV35Safe(ctx, ix.Store(), root, in.Prompt, ropts, opts.Agent, in.SessionID, statePath, time.Now(), false)
 		if err != nil {
@@ -282,7 +282,7 @@ func answer(ctx context.Context, in adapter.Input, opts HookOptions, rec logReco
 // memory is read only for v2, because only the v2 packer uses it.
 func hookRetrieveOptions(root, statePath string) retrieve.Options {
 	o := retrieve.Options{Root: root, Profile: os.Getenv("SIDECAR_PROFILE")}
-	if e := os.Getenv("SIDECAR_ENGINE"); e == "v2" || e == engine.Version || e == engine.Version35 {
+	if e := os.Getenv("SIDECAR_ENGINE"); e == "v2" || e == engine.Version || engine.Unified(e) {
 		o.EngineVersion = e
 		o.Adaptive = e == "v2" && retrieve.FeatureEnabled("adaptive") // v3 applies the policy itself
 		o.Seen = brief.SeenFor(statePath)

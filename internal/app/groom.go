@@ -126,7 +126,7 @@ func awaitingAnswer(opts HookOptions, in adapter.Input) bool {
 	if p == "" || strings.HasPrefix(p, "/") || in.SessionID == "" || !retrieve.FeatureEnabled("groom") {
 		return false
 	}
-	if os.Getenv("SIDECAR_ENGINE") == engine.Version35 {
+	if engine.Unified(os.Getenv("SIDECAR_ENGINE")) {
 		cwd := in.CWD
 		if cwd == "" {
 			cwd = "."

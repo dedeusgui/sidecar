@@ -211,6 +211,9 @@ type GuidanceProposal struct {
 	DeliveryReason      string
 	Phase               TaskPhase
 	RequiresObservation ObservationEvent
+	// Items is how many rendered items the proposal carries. Zero means one, the V3.5
+	// allocation; V3.6 providers set it so a multi-line brief is not cut to one line.
+	Items int
 }
 
 // SectionEvidence is the common allocation for selected repository evidence.

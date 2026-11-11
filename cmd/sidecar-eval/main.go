@@ -117,6 +117,10 @@ func main() {
 	comparePath := flag.String("compare", "", "compare against a baseline results file written by --out")
 	v3Decisions := flag.String("v3-decisions", "", "write the V3 router decision (signals, action, reasons) of every case to this JSON file")
 	reportMD := flag.String("report-md", "", "write a Markdown report to this path (includes the comparison when --compare is set)")
+	delivery := flag.Bool("delivery", false, "delivery scorecard: score what the real hook entry point hands the agent, per engine (no model, no network)")
+	deliveryEngines := flag.String("delivery-engines", "v3,v3.5,v3.6", "comma-separated engines for --delivery")
+	deliveryContexts := flag.Bool("delivery-contexts", false, "keep the delivered text in --out (local diagnosis only; it contains repository source)")
+	deliveryNegatives := flag.String("delivery-negatives", "", "hard negatives file; its dev and validation splits (never holdout) are run against every repository")
 	flag.Parse()
 
 	if *agenticDir != "" {
@@ -169,6 +173,21 @@ func main() {
 		}
 	}()
 
+	if *delivery {
+		cases := cf.Cases
+		if *deliveryNegatives != "" {
+			repos := make([]string, 0, len(indexes))
+			for name := range indexes {
+				repos = append(repos, name)
+			}
+			sort.Strings(repos)
+			negatives, err := hardNegatives(*deliveryNegatives, repos)
+			must(err)
+			cases = append(cases, negatives...)
+		}
+		must(runDelivery(cases, indexes, strings.Split(*deliveryEngines, ","), tmp, *outPath, *reportMD, *deliveryContexts))
+		return
+	}
 	if *groomFlag {
 		must(runGroomEval(cf, indexes, *outPath))
 		return

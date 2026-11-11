@@ -1,6 +1,6 @@
 # V3.6: progresso experimental
 
-A implementação está em desenvolvimento fora da `main`; no workspace experimental é opt-in por `SIDECAR_ENGINE=v3.6`. Este relatório registra aquele workspace, não uma funcionalidade disponível neste checkout. Não há demonstração de ganho em tarefas de agentes nem evidência suficiente para promovê-la. A V3.5 permanece disponível.
+A implementação está em desenvolvimento e é opt-in por `SIDECAR_ENGINE=v3.6`. Não há demonstração de ganho em tarefas de agentes nem evidência suficiente para promovê-la. A V3.5 permanece disponível.
 
 O trabalho procura corrigir divergências entre seleção, orçamento e entrega: estimativa pelo conteúdo renderizado, alocação por seção e ordem, snippets de código e rótulos de confiança. Os testes cobrem casos pontuais, mas a bateria de regressão e a revisão da implementação ainda não estão completas.
 

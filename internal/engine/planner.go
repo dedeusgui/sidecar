@@ -17,7 +17,18 @@ type PlanInput struct {
 	Decision     Decision
 	Evidence     *contract.EvidenceRegistry[retrieve.Evidence]
 	BudgetTokens int
+	// PriorityAware selects the V3.6 allocation order: proposals at or above the code priority
+	// (bounded source snippets) first, then ranked evidence, then the remaining guidance, for
+	// which a bounded share of the budget is held back. False keeps V3.5: evidence, then guidance.
+	PriorityAware bool
 }
+
+// evidencePriority mirrors the packer's default priority of a RELEVANT CODE item.
+const evidencePriority = 100
+
+// guidanceReserveDivisor bounds the budget share held back from ranked evidence for
+// lower-priority guidance (orientation, impact, memory): at most one quarter.
+const guidanceReserveDivisor = 4
 
 // Planner creates a deterministic dry-run allocation. Its zero value is
 // ready to use; it does not retrieve, persist or render evidence.
@@ -100,7 +111,8 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 	// budget as the item text, so the plan reserves them here, in the only place that allocates.
 	remainingTokens, remainingItems := max(0, plan.BudgetTokens-ctxbuild.PackFrameTokens()), plan.MaxItems
 	selected := make([]string, 0, min(len(taskEvidence), remainingItems))
-	selectedCost := 0
+	evidenceSections := map[string]*contract.SectionAllocation{}
+	var sectionOrder []string
 	keys := make([]string, 0, len(taskEvidence))
 	for key := range taskEvidence {
 		keys = append(keys, key)
@@ -111,6 +123,91 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "evidence_missing", Key: key})
 		}
 	}
+	proposals := append([]contract.GuidanceProposal(nil), task.Guidance...)
+	sort.SliceStable(proposals, func(i, j int) bool {
+		if proposals[i].Priority != proposals[j].Priority {
+			return proposals[i].Priority > proposals[j].Priority
+		}
+		if proposals[i].Kind != proposals[j].Kind {
+			return proposals[i].Kind < proposals[j].Kind
+		}
+		if proposals[i].DeliveryReason != proposals[j].DeliveryReason {
+			return proposals[i].DeliveryReason < proposals[j].DeliveryReason
+		}
+		return strings.Join(sortedCopy(proposals[i].EvidenceKeys), "\x00") < strings.Join(sortedCopy(proposals[j].EvidenceKeys), "\x00")
+	})
+	var guidanceSections []contract.SectionAllocation
+	allocateProposal := func(proposal contract.GuidanceProposal) {
+		if strings.TrimSpace(proposal.Kind) == "" || proposal.TokenEstimate <= 0 {
+			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "proposal_invalid", Kind: proposal.Kind})
+			return
+		}
+		if proposal.Phase != "" && proposal.Phase != phase {
+			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "phase_mismatch", Kind: proposal.Kind})
+			return
+		}
+		if !observationSatisfied(task.Observability, proposal.RequiresObservation) {
+			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "observation_unverified", Kind: proposal.Kind})
+			return
+		}
+		proposalKeys := sortedCopy(proposal.EvidenceKeys)
+		if len(proposalKeys) == 0 {
+			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "proposal_without_evidence", Kind: proposal.Kind})
+			return
+		}
+		allAvailable := true
+		for _, key := range proposalKeys {
+			if _, inTask := taskEvidence[key]; !inTask {
+				allAvailable = false
+				break
+			}
+			if entry, inRegistry := registry[key]; !inRegistry || entry.Ref.Freshness == contract.FreshnessStale {
+				allAvailable = false
+				break
+			}
+		}
+		if !allAvailable {
+			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "proposal_evidence_unavailable", Kind: proposal.Kind})
+			return
+		}
+		if len(proposalKeys) != len(uniqueStrings(proposalKeys)) {
+			proposalKeys = uniqueStrings(proposalKeys)
+		}
+		if proposal.TokenEstimate > remainingTokens {
+			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "proposal_over_budget", Kind: proposal.Kind})
+			return
+		}
+		items := max(1, proposal.Items)
+		if remainingItems < items {
+			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "item_budget_full", Kind: proposal.Kind})
+			return
+		}
+		guidanceSections = append(guidanceSections, contract.SectionAllocation{
+			Section:      proposal.Kind,
+			BudgetTokens: proposal.TokenEstimate,
+			MaxItems:     items,
+			EvidenceKeys: proposalKeys,
+		})
+		remainingTokens -= proposal.TokenEstimate
+		remainingItems -= items
+	}
+	reserve := 0
+	if input.PriorityAware {
+		var later []contract.GuidanceProposal
+		for _, proposal := range proposals {
+			if proposal.Priority >= evidencePriority {
+				allocateProposal(proposal)
+				continue
+			}
+			later = append(later, proposal)
+			if proposal.TokenEstimate > 0 && (proposal.Phase == "" || proposal.Phase == phase) {
+				reserve += proposal.TokenEstimate
+			}
+		}
+		proposals = later
+		reserve = min(reserve, remainingTokens/guidanceReserveDivisor)
+	}
+
 	considered := make(map[string]struct{})
 	for _, choice := range input.Decision.Included {
 		if !input.Decision.RetrievalRan {
@@ -133,9 +230,20 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 				plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "evidence_cost_unknown", Key: key})
 				continue
 			}
-			cost := ref.Ref.CostEstimate + ctxbuild.SectionFrameTokens(contract.SectionEvidence, len(selected)+1) -
-				ctxbuild.SectionFrameTokens(contract.SectionEvidence, len(selected))
-			if cost > remainingTokens {
+			// V3.6 keeps an item in the section retrieval gave it (contracts and tests are not
+			// code); V3.5 allocated everything as RELEVANT CODE and the packer skipped the rest.
+			section := contract.SectionEvidence
+			if input.PriorityAware && ref.Value.Section != "" {
+				section = ref.Value.Section
+			}
+			allocation := evidenceSections[section]
+			if allocation == nil {
+				allocation = &contract.SectionAllocation{Section: section}
+			}
+			cost := ref.Ref.CostEstimate + ctxbuild.SectionFrameTokens(section, allocation.MaxItems+1) -
+				ctxbuild.SectionFrameTokens(section, allocation.MaxItems)
+			// The first ranked item is never displaced by the guidance reserve.
+			if cost > remainingTokens || len(selected) > 0 && cost > remainingTokens-reserve {
 				plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "evidence_over_budget", Key: key})
 				continue
 			}
@@ -143,87 +251,26 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 				plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "item_budget_full", Key: key})
 				continue
 			}
+			if evidenceSections[section] == nil {
+				evidenceSections[section] = allocation
+				sectionOrder = append(sectionOrder, section)
+			}
+			allocation.EvidenceKeys = append(allocation.EvidenceKeys, key)
+			allocation.BudgetTokens += cost
+			allocation.MaxItems++
 			selected = append(selected, key)
-			selectedCost += cost
 			remainingTokens -= cost
 			remainingItems--
 		}
 	}
-	if len(selected) > 0 {
-		plan.Sections = append(plan.Sections, contract.SectionAllocation{
-			Section:      contract.SectionEvidence,
-			BudgetTokens: selectedCost,
-			MaxItems:     len(selected),
-			EvidenceKeys: selected,
-		})
+	for _, section := range sectionOrder {
+		plan.Sections = append(plan.Sections, *evidenceSections[section])
 	}
 
-	proposals := append([]contract.GuidanceProposal(nil), task.Guidance...)
-	sort.SliceStable(proposals, func(i, j int) bool {
-		if proposals[i].Priority != proposals[j].Priority {
-			return proposals[i].Priority > proposals[j].Priority
-		}
-		if proposals[i].Kind != proposals[j].Kind {
-			return proposals[i].Kind < proposals[j].Kind
-		}
-		if proposals[i].DeliveryReason != proposals[j].DeliveryReason {
-			return proposals[i].DeliveryReason < proposals[j].DeliveryReason
-		}
-		return strings.Join(sortedCopy(proposals[i].EvidenceKeys), "\x00") < strings.Join(sortedCopy(proposals[j].EvidenceKeys), "\x00")
-	})
 	for _, proposal := range proposals {
-		if strings.TrimSpace(proposal.Kind) == "" || proposal.TokenEstimate <= 0 {
-			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "proposal_invalid", Kind: proposal.Kind})
-			continue
-		}
-		if proposal.Phase != "" && proposal.Phase != phase {
-			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "phase_mismatch", Kind: proposal.Kind})
-			continue
-		}
-		if !observationSatisfied(task.Observability, proposal.RequiresObservation) {
-			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "observation_unverified", Kind: proposal.Kind})
-			continue
-		}
-		proposalKeys := sortedCopy(proposal.EvidenceKeys)
-		if len(proposalKeys) == 0 {
-			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "proposal_without_evidence", Kind: proposal.Kind})
-			continue
-		}
-		allAvailable := true
-		for _, key := range proposalKeys {
-			if _, inTask := taskEvidence[key]; !inTask {
-				allAvailable = false
-				break
-			}
-			if entry, inRegistry := registry[key]; !inRegistry || entry.Ref.Freshness == contract.FreshnessStale {
-				allAvailable = false
-				break
-			}
-		}
-		if !allAvailable {
-			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "proposal_evidence_unavailable", Kind: proposal.Kind})
-			continue
-		}
-		if len(proposalKeys) != len(uniqueStrings(proposalKeys)) {
-			proposalKeys = uniqueStrings(proposalKeys)
-		}
-		if proposal.TokenEstimate > remainingTokens {
-			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "proposal_over_budget", Kind: proposal.Kind})
-			continue
-		}
-		if remainingItems == 0 {
-			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "item_budget_full", Kind: proposal.Kind})
-			continue
-		}
-		plan.Sections = append(plan.Sections, contract.SectionAllocation{
-			Section:      proposal.Kind,
-			BudgetTokens: proposal.TokenEstimate,
-			MaxItems:     1,
-			EvidenceKeys: proposalKeys,
-		})
-		remainingTokens -= proposal.TokenEstimate
-		remainingItems--
+		allocateProposal(proposal)
 	}
+	plan.Sections = append(plan.Sections, guidanceSections...)
 	return plan
 }
 

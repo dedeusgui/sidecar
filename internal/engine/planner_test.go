@@ -109,6 +109,22 @@ func TestPlannerPreservesV3EvidenceOrderWhenBudgetIsTight(t *testing.T) {
 	}
 }
 
+func TestPriorityAwarePlannerAllocatesEvidenceToItsOwnSection(t *testing.T) {
+	input, _ := plannerFixture(t)
+	input.Task.Guidance = nil
+	ref, _, err := input.Evidence.Add(contract.EvidenceRef{Path: "internal/router_test.go", Fingerprint: "test-v1", Freshness: contract.FreshnessCurrent, CostEstimate: 12}, retrieve.Evidence{ID: "test-evidence", Section: ctxbuild.ContractsAndTests})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input.Task.Evidence = append(input.Task.Evidence, ref)
+	input.Decision.Included = []Choice{{ID: "test-evidence"}}
+	input.PriorityAware = true
+	plan := (Planner{}).Plan(input)
+	if len(plan.Sections) != 1 || plan.Sections[0].Section != ctxbuild.ContractsAndTests || !reflect.DeepEqual(plan.Sections[0].EvidenceKeys, []string{ref.Key}) {
+		t.Fatalf("test evidence allocated to wrong section: %+v", plan.Sections)
+	}
+}
+
 func TestPlannerRejectsEvidenceFromAnotherScope(t *testing.T) {
 	input, _ := plannerFixture(t)
 	for _, test := range []struct {

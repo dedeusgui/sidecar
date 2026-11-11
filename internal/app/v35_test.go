@@ -235,9 +235,17 @@ func TestV35ReadinessReportsOptInRollbackAndClientMatrix(t *testing.T) {
 }
 
 func TestV35BinaryHookUsesClaudeAndCodexContracts(t *testing.T) {
+	testUnifiedBinaryHookContracts(t, engine.Version35)
+}
+
+func TestV36BinaryHookUsesClaudeAndCodexContracts(t *testing.T) {
+	testUnifiedBinaryHookContracts(t, engine.Version36)
+}
+
+func testUnifiedBinaryHookContracts(t *testing.T, version string) {
 	setupHome(t)
 	root := makeV35Project(t)
-	t.Setenv("SIDECAR_ENGINE", engine.Version35)
+	t.Setenv("SIDECAR_ENGINE", version)
 	t.Setenv("SIDECAR_FEATURES", "")
 	bin := buildSidecar(t)
 	const canary = "ORIGINAL_PROMPT_MUST_STAY_WITH_CLIENT"

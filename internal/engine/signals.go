@@ -207,7 +207,7 @@ func codeIdentifier(tok string) bool {
 // hasCodeAnchor is the stricter V3.5 delivery gate. A documentation heading or a generic
 // lexical coincidence is not enough: there must be a retrieved code symbol plus a repository
 // cue, verified locator, or a prompt term that names that symbol.
-func hasCodeAnchor(s TaskSignals, res retrieve.Result) bool {
+func hasCodeAnchor(s TaskSignals, res retrieve.Result, translated bool) bool {
 	var symbols []string
 	for _, evidence := range res.Evidence {
 		if evidence.Hit.Name == "" || evidence.Hit.Kind == "file" || evidence.Hit.Kind == "section" {
@@ -230,6 +230,18 @@ func hasCodeAnchor(s TaskSignals, res retrieve.Result) bool {
 	for _, term := range res.Trace.Terms {
 		if len(term) >= 3 && !genericAnchorTerms[term] {
 			terms[term] = true
+		}
+	}
+	if translated {
+		for term, translations := range res.Trace.Translations {
+			if genericAnchorTerms[term] {
+				continue
+			}
+			for _, translation := range translations {
+				if len(translation) >= 3 && !genericAnchorTerms[translation] {
+					terms[translation] = true
+				}
+			}
 		}
 	}
 	for _, name := range symbols {

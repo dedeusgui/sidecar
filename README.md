@@ -145,7 +145,7 @@ O documento V2 descreve a meta completa: várias capacidades foram implementadas
 
 A V3.5 unifica as capacidades existentes sob um único motor determinístico: **Brief curto junto de código selecionado, Explore estrutural automático e limitado, Grooming, Impact, memória e sinais de sessão com um só orçamento**, sem exigir que o agente aprenda comandos Sidecar. O `sidecar explore` permanece uma ferramenta opcional para aprofundamento, não uma dependência da experiência padrão. A V1 continua default; ative com `SIDECAR_ENGINE=v3.5`; ganho agentic não foi comprovado ([progresso](docs/v3.5/progress.md)). Consulte [a visão geral](docs/v3.5/README.md), [arquitetura](docs/v3.5/architecture.md), [implementação](docs/v3.5/implementation-plan.md) e [avaliação](docs/v3.5/evaluation.md).
 
-A V3.6 é uma revisão experimental de seleção e entrega da V3.5, desenvolvida fora da `main`; sua implementação ainda não está disponível neste checkout. Seus resultados mostram ganhos e regressões, sem comprovar superioridade geral; a V1 permanece padrão. Veja [resultados e limitações](docs/v3.6/progress.md) e [critérios de progressão das engines](docs/engine-progression.md).
+A V3.6 é uma revisão experimental de seleção e entrega da V3.5, ativada por `SIDECAR_ENGINE=v3.6`. Seus resultados mostram ganhos e regressões, sem comprovar superioridade geral; a V1 permanece padrão. Veja [resultados e limitações](docs/v3.6/progress.md) e [critérios de progressão das engines](docs/engine-progression.md).
 
 ## Engenharia, benchmarks e roadmap
 

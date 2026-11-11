@@ -57,6 +57,9 @@ type Item struct {
 	Role       string
 	Qualifier  string
 	Provenance string
+	// Body holds numbered source lines ("32\tfunc Timeout(...) {") that the V3.6 packer renders
+	// under the bullet, one sanitized line each. Legacy renderers ignore it.
+	Body []string
 }
 
 // Seen reports whether an item with this key and fingerprint was already injected.

@@ -2,24 +2,36 @@ package retrieve
 
 import (
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 )
 
 // Describe renders one evidence item as the single line the context block shows. Packing
 // uses the same text to price an item, so the estimate matches what is actually sent.
-func Describe(ev Evidence) string {
+func Describe(ev Evidence) string { return describe(ev, false) }
+
+// DescribeBare is Describe without the location and the verdict, for renderers that state
+// both once themselves (the V3.6 packer appends one trust label and one source location).
+func DescribeBare(ev Evidence) string { return describe(ev, true) }
+
+func describe(ev Evidence, bare bool) string {
 	if ev.Note != "" {
 		return ev.Note
 	}
 	h := ev.Hit
 	var b strings.Builder
-	if h.Kind == "file" {
+	switch {
+	case bare && h.Kind == "file":
+		fmt.Fprintf(&b, "file %s", path.Base(h.Path))
+	case bare:
+		fmt.Fprintf(&b, "%s %s", h.Kind, h.Name)
+	case h.Kind == "file":
 		fmt.Fprintf(&b, "file %s", h.Path)
-	} else {
+	default:
 		fmt.Fprintf(&b, "%s %s (%s:%d-%d)", h.Kind, h.Name, h.Path, h.Line, h.EndLine)
 	}
-	if ev.Verdict != "" {
+	if ev.Verdict != "" && !bare {
 		fmt.Fprintf(&b, " [%s]", ev.Verdict)
 	}
 	if h.Value != "" {
