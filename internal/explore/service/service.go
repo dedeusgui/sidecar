@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,11 +50,12 @@ type Limits struct {
 
 // QuickRequest describes a small expansion around evidence already present in the registry.
 type QuickRequest struct {
-	Enabled bool
-	Root    string
-	Query   string
-	Anchors []contract.EvidenceRef
-	Limits  Limits
+	Enabled              bool
+	Root                 string
+	Query                string
+	Anchors              []contract.EvidenceRef
+	Limits               Limits
+	AllowCandidateAnchor bool
 }
 
 // DeepRequest describes an explicit on-demand exploration using the shared retrieval and traversal.
@@ -67,9 +69,10 @@ type DeepRequest struct {
 // ExpansionResult contains the explore view, the canonical references added to the registry, and
 // stable uncertainty codes. It carries no prompt text in Gap values.
 type ExpansionResult struct {
-	Explore  core.Result
-	Evidence []contract.EvidenceRef
-	Gaps     []contract.Gap
+	Explore   core.Result
+	Evidence  []contract.EvidenceRef
+	Gaps      []contract.Gap
+	CallPaths []string
 }
 
 // QuickExpand expands only current, verified registry anchors. Missing, disabled, stale, timed-out
@@ -99,6 +102,14 @@ func QuickExpand(ctx context.Context, st *store.Store, req QuickRequest, registr
 	anchors, rejectedStale, timedOut := verifiedAnchors(bounded, st, registry, req.Anchors, min(maxQuickAnchors, limits.MaxFiles))
 	if timedOut || bounded.Err() != nil {
 		return empty("timeout")
+	}
+	if len(anchors) == 0 && req.AllowCandidateAnchor {
+		var candStale bool
+		anchors, candStale, timedOut = selectAnchors(bounded, st, registry, req.Anchors, min(maxQuickAnchors, limits.MaxFiles), false)
+		rejectedStale = rejectedStale || candStale
+		if timedOut || bounded.Err() != nil {
+			return empty("timeout")
+		}
 	}
 	if len(anchors) == 0 {
 		if rejectedStale {
@@ -169,7 +180,7 @@ func DeepExplore(ctx context.Context, st *store.Store, req DeepRequest, registry
 	}
 	if len(strings.Fields(req.Query)) <= 3 {
 		for _, word := range strings.Fields(req.Query) {
-			word = strings.Trim(word, "`'\"(),;:?!")
+			word = core.TrimQueryToken(word)
 			if len(word) >= 3 && core.IsIdent(word) {
 				ro.ExtraExactKeys = append(ro.ExtraExactKeys, word)
 			}
@@ -240,6 +251,10 @@ func validRegistryRoot(root string, registry *contract.EvidenceRegistry[retrieve
 }
 
 func verifiedAnchors(ctx context.Context, st *store.Store, registry *contract.EvidenceRegistry[retrieve.Evidence], refs []contract.EvidenceRef, limit int) ([]retrieve.Evidence, bool, bool) {
+	return selectAnchors(ctx, st, registry, refs, limit, true)
+}
+
+func selectAnchors(ctx context.Context, st *store.Store, registry *contract.EvidenceRegistry[retrieve.Evidence], refs []contract.EvidenceRef, limit int, requireVerified bool) ([]retrieve.Evidence, bool, bool) {
 	anchors := make([]retrieve.Evidence, 0, min(limit, len(refs)))
 	rejectedStale := false
 	seen := map[string]bool{}
@@ -261,15 +276,37 @@ func verifiedAnchors(ctx context.Context, st *store.Store, registry *contract.Ev
 		if len(anchors) >= limit {
 			break
 		}
-		if ref.Key == "" || ref.Confidence != contract.ConfidenceVerified || !ref.Proof.Valid() || seen[ref.Key] {
+		if ref.Key == "" || seen[ref.Key] {
+			continue
+		}
+		if requireVerified {
+			if ref.Confidence != contract.ConfidenceVerified || !ref.Proof.Valid() {
+				continue
+			}
+		} else if ref.Confidence != contract.ConfidenceVerified && ref.Confidence != contract.ConfidenceCandidate {
 			continue
 		}
 		entry, ok := registry.Lookup(ref.Key)
-		if !ok || entry.Ref.Confidence != contract.ConfidenceVerified || !entry.Ref.Proof.Valid() || entry.Value.Verdict != "VERIFIED" {
+		if !ok {
 			continue
 		}
+		if requireVerified {
+			if entry.Ref.Confidence != contract.ConfidenceVerified || !entry.Ref.Proof.Valid() || entry.Value.Verdict != "VERIFIED" {
+				continue
+			}
+		} else {
+			if entry.Ref.Confidence != contract.ConfidenceVerified && entry.Ref.Confidence != contract.ConfidenceCandidate {
+				continue
+			}
+			if entry.Value.Verdict != "VERIFIED" && entry.Value.Verdict != "INFERRED" {
+				continue
+			}
+			if entry.Value.Hit.Kind == "file" || entry.Value.Hit.Kind == "section" {
+				continue
+			}
+		}
 		if ref.Path != entry.Ref.Path || ref.Path != entry.Value.Hit.Path || ref.LineStart != entry.Ref.LineStart ||
-			ref.LineEnd != entry.Ref.LineEnd || ref.Proof != entry.Ref.Proof {
+			ref.LineEnd != entry.Ref.LineEnd || (requireVerified && ref.Proof != entry.Ref.Proof) {
 			continue
 		}
 		if entry.Ref.Freshness != contract.FreshnessCurrent || ref.Freshness != contract.FreshnessCurrent {
@@ -337,7 +374,11 @@ func collect(ctx context.Context, st *store.Store, explored core.Result, seeds [
 	}
 	currentPaths := make(map[string]bool, len(explored.Files))
 	stalePaths := make(map[string]bool)
+	testPaths := make(map[string]bool)
 	for _, file := range explored.Files {
+		if file.Role == "test" {
+			testPaths[file.Path] = true
+		}
 		if file.Stale {
 			stalePaths[file.Path] = true
 			continue
@@ -346,6 +387,7 @@ func collect(ctx context.Context, st *store.Store, explored core.Result, seeds [
 			currentPaths[file.Path] = true
 		}
 	}
+	out.CallPaths = FormatCallPaths(explored.Relations, testPaths)
 
 	candidates := make([]retrieve.Evidence, 0, len(seeds)+len(explored.Relations))
 	seedIDs := make(map[int64]bool, len(seeds))
@@ -359,6 +401,8 @@ func collect(ctx context.Context, st *store.Store, explored core.Result, seeds [
 	}
 	symbolCache := map[string][]store.SymbolHit{}
 	loadedPaths := map[string]bool{}
+	var priorityCandidates, secondaryCandidates []retrieve.Evidence
+	coveredHits := map[int64]bool{}
 	for _, edge := range explored.Relations {
 		if ctx.Err() != nil {
 			return empty("timeout")
@@ -367,11 +411,43 @@ func collect(ctx context.Context, st *store.Store, explored core.Result, seeds [
 			if ctx.Err() != nil {
 				return empty("timeout")
 			}
-			if !seedIDs[ev.Hit.ID] {
-				candidates = append(candidates, ev)
+			if seedIDs[ev.Hit.ID] {
+				continue
+			}
+			if edge.Kind == "calls" && currentPaths[ev.Hit.Path] {
+				priorityCandidates = append(priorityCandidates, ev)
+				coveredHits[ev.Hit.ID] = true
+			} else {
+				secondaryCandidates = append(secondaryCandidates, ev)
 			}
 		}
 	}
+	for _, file := range explored.Files {
+		if file.Stale || len(file.Snippets) == 0 {
+			continue
+		}
+		for _, sym := range file.Symbols {
+			if sym.Source != "structural" {
+				continue
+			}
+			hit, ok := lookupSymbol(st, file.Path, sym.Name, sym.Line, symbolCache, loadedPaths)
+			if !ok || seedIDs[hit.ID] || coveredHits[hit.ID] {
+				continue
+			}
+			coveredHits[hit.ID] = true
+			priorityCandidates = append(priorityCandidates, retrieve.Evidence{
+				Hit:           hit,
+				Verdict:       "INFERRED",
+				Section:       "RELATIONS",
+				Source:        "structural",
+				Confidence:    0.55,
+				Relations:     []string{"member:" + sym.Reason},
+				TokenEstimate: max(1, ctxbuild.EstimateTokens(fmt.Sprintf("%s %s (%s:%d)", sym.Kind, sym.Name, file.Path, sym.Line))),
+			})
+		}
+	}
+	candidates = append(candidates, priorityCandidates...)
+	candidates = append(candidates, secondaryCandidates...)
 	used := 0
 	seenKeys := map[string]bool{}
 	for _, candidate := range candidates {
@@ -425,22 +501,9 @@ func relationEvidence(ctx context.Context, st *store.Store, edge core.Edge, symb
 		}
 		var hit store.SymbolHit
 		if ref.Name != "" {
-			if !loadedPaths[ref.Path] {
-				var err error
-				symbols, err := st.SymbolsInFile(ref.Path, 1000)
-				loadedPaths[ref.Path] = true
-				if err == nil {
-					symbolCache[ref.Path] = symbols
-				}
-			}
-			symbols := symbolCache[ref.Path]
-			for _, symbol := range symbols {
-				if symbol.Name == ref.Name && (ref.Line == 0 || symbol.Line == ref.Line) {
-					hit = symbol
-					break
-				}
-			}
-			if hit.ID == 0 {
+			var ok bool
+			hit, ok = lookupSymbol(st, ref.Path, ref.Name, ref.Line, symbolCache, loadedPaths)
+			if !ok {
 				continue
 			}
 		} else {
@@ -554,6 +617,132 @@ func appendGapOnce(gaps []contract.Gap, kind string) []contract.Gap {
 		}
 	}
 	return append(gaps, contract.Gap{Kind: kind})
+}
+
+func lookupSymbol(st *store.Store, path, name string, line int, symbolCache map[string][]store.SymbolHit, loadedPaths map[string]bool) (store.SymbolHit, bool) {
+	if !loadedPaths[path] {
+		symbols, err := st.SymbolsInFile(path, 1000)
+		loadedPaths[path] = true
+		if err == nil {
+			symbolCache[path] = symbols
+		}
+	}
+	for _, symbol := range symbolCache[path] {
+		if symbol.Name == name && (line == 0 || symbol.Line == line) {
+			return symbol, true
+		}
+	}
+	return store.SymbolHit{}, false
+}
+
+// FormatCallPaths builds compact, deterministic call chains formatted as "Calls: A -> B -> C"
+// from explore call relations, omitting test callers when production paths exist.
+func FormatCallPaths(edges []core.Edge, testPaths map[string]bool) []string {
+	type callLink struct {
+		fromID, toID string
+	}
+	var callEdges []core.Edge
+	var nonTestEdges []core.Edge
+	for _, e := range edges {
+		if e.Kind != "calls" || e.From.Name == "" || e.To.Name == "" {
+			continue
+		}
+		callEdges = append(callEdges, e)
+		if !isTestRef(e.From, testPaths) && !isTestRef(e.To, testPaths) {
+			nonTestEdges = append(nonTestEdges, e)
+		}
+	}
+	if len(nonTestEdges) > 0 {
+		callEdges = nonTestEdges
+	}
+	if len(callEdges) == 0 {
+		return nil
+	}
+	refID := func(r core.Ref) string {
+		return r.Path + "#" + r.Name + "#" + strconv.Itoa(r.Line)
+	}
+	adj := map[string][]string{}
+	inDegree := map[string]int{}
+	displayName := map[string]string{}
+	seenNode := map[string]bool{}
+	seenLink := map[callLink]bool{}
+	var order []string
+	addNode := func(r core.Ref) string {
+		id := refID(r)
+		if !seenNode[id] {
+			seenNode[id] = true
+			displayName[id] = r.Name
+			order = append(order, id)
+		}
+		return id
+	}
+	for _, e := range callEdges {
+		fromID := addNode(e.From)
+		toID := addNode(e.To)
+		if fromID == toID {
+			continue
+		}
+		link := callLink{fromID, toID}
+		if seenLink[link] {
+			continue
+		}
+		seenLink[link] = true
+		adj[fromID] = append(adj[fromID], toID)
+		inDegree[toID]++
+	}
+	const maxPaths = 6
+	const maxDepth = 5
+	var out []string
+	seenPath := map[string]bool{}
+	var dfs func(cur string, path []string, visiting map[string]bool)
+	dfs = func(cur string, path []string, visiting map[string]bool) {
+		if len(out) >= maxPaths {
+			return
+		}
+		nexts := adj[cur]
+		progressed := false
+		if len(path) < maxDepth {
+			for _, nxt := range nexts {
+				if visiting[nxt] {
+					continue
+				}
+				progressed = true
+				visiting[nxt] = true
+				dfs(nxt, append(path, displayName[nxt]), visiting)
+				delete(visiting, nxt)
+			}
+		}
+		if !progressed && len(path) >= 2 {
+			formatted := "Calls: " + strings.Join(path, " -> ")
+			if !seenPath[formatted] {
+				seenPath[formatted] = true
+				out = append(out, formatted)
+			}
+		}
+	}
+	for _, id := range order {
+		if inDegree[id] == 0 && len(adj[id]) > 0 {
+			visiting := map[string]bool{id: true}
+			dfs(id, []string{displayName[id]}, visiting)
+		}
+	}
+	if len(out) == 0 {
+		for _, id := range order {
+			if len(adj[id]) > 0 {
+				visiting := map[string]bool{id: true}
+				dfs(id, []string{displayName[id]}, visiting)
+			}
+		}
+	}
+	return out
+}
+
+func isTestRef(r core.Ref, testPaths map[string]bool) bool {
+	if testPaths[r.Path] {
+		return true
+	}
+	low := strings.ToLower(r.Path)
+	return strings.Contains(low, "_test.") || strings.Contains(low, "/test/") || strings.Contains(low, "/tests/")
 }
 
 func empty(kind string) ExpansionResult {

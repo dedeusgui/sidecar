@@ -229,3 +229,32 @@ func TestPackMaxItemsCountsEmittedItemsGloballyAndPerSection(t *testing.T) {
 		t.Fatalf("per-section MaxItems=1 emitted %d items across two sections, want 2: %+v", len(got.Items), got.Items)
 	}
 }
+
+func TestPackDeduplicatesProposalEvidenceKeysWhenEnabled(t *testing.T) {
+	scope, registry, key := packFixture(t, "Run")
+	plan := contract.OutputPlan{
+		Scope: scope, BudgetTokens: 300, MaxItems: 2,
+		Sections: []contract.SectionAllocation{
+			{Section: TaskBrief, BudgetTokens: 100, MaxItems: 1, EvidenceKeys: []string{key}},
+		},
+	}
+	proposal := GuidanceProposal{
+		Proposal: contract.GuidanceProposal{
+			Kind:           TaskBrief,
+			EvidenceKeys:   []string{key, key},
+			TokenEstimate:  40,
+			DeliveryReason: "duplicate-keys",
+		},
+		Items: []Item{{Section: TaskBrief, Key: "brief|run", Text: "brief summary"}},
+	}
+
+	legacy := PackWith(PackOptions{}, plan, registry, nil, []GuidanceProposal{proposal}, nil)
+	if len(legacy.Items) != 0 || len(legacy.NotDelivered) != 1 || legacy.NotDelivered[0].Code != "proposal_evidence_unavailable" {
+		t.Fatalf("default PackWith should preserve legacy behaviour on duplicate keys, got: %+v", legacy)
+	}
+
+	dedup := PackWith(PackOptions{Ranked: true, DeduplicateEvidenceKeys: true}, plan, registry, nil, []GuidanceProposal{proposal}, nil)
+	if len(dedup.Items) != 1 || !strings.Contains(dedup.Text, "brief summary") {
+		t.Fatalf("DeduplicateEvidenceKeys=true should deliver proposal, got: %+v", dedup)
+	}
+}

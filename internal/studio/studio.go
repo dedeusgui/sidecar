@@ -35,6 +35,14 @@ func Kind(v any) string {
 		if s, ok := m["schema"].(string); ok {
 			return s
 		}
+		if _, hasSummary := m["summary"]; hasSummary {
+			if _, hasRows := m["rows"]; hasRows {
+				if _, hasEngines := m["engines"]; hasEngines {
+					return "delivery/1"
+				}
+				return "e2-offline/1"
+			}
+		}
 		if _, ok := m["candidates"]; ok {
 			if _, ok := m["evidence"]; ok {
 				return "explain"

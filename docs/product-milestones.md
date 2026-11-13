@@ -61,4 +61,9 @@ Cada milestone atualiza `docs/v4/architecture-decision-log.md` (ou registro equi
 4. Congelar plano experimental V3.7, incluindo concorrentes em condições comparáveis (ex.: CodeGraph e Aider RepoMap com caveats), e iniciar slices curtas.
 5. Avaliar o resultado e manter V3.8–V4 ajustáveis às evidências. Não gastar limites do Codex/Claude em campanhas de qualificação.
 
+## Progresso implementado desta campanha (3.6 → 3.7 infra)
+
+- **Pipeline P0–P3 e Observatory HTML (`$0`):** `bench/fast_gate.py` executa P0 (`go test`, `unittest`, opcional `-race`) + P1 (`sidecar-eval --delivery`, E1/E2 opcionais e gate sem regressão), `internal/studio` renderiza os esquemas `delivery/1` e `e2-offline/1` em HTML único, `bench/v3/e2_offline.py` aceita `--engines` e `bench/lab/lab.py` suporta os braços `V3.6`/`V3.7` e detecção nvm do `@colbymchenry/codegraph`.
+- **Engine V3.7 opt-in (`SIDECAR_ENGINE=v3.7`):** implementada em `internal/app/v37.go`, `internal/engine`, `internal/retrieve`, `internal/extract`, `internal/index`, `internal/store/query.go` e `internal/explore`, passando nos portões offline P0 e P1 (ver [docs/v3.7/progress.md](v3.7/progress.md) e [docs/v3.7/architecture.md](v3.7/architecture.md)). **V1 continua default**; o encerramento do marco exige fechar os gaps de `explore` (`23/26` vs CodeGraph `24/26`), `E1` negativos (`16/40`), `voice_mode` top-3 (`6/10`), os 3 itens `staticcheck` do `golangci-lint` e executar a validação **P3** autorizada.
+
 Referências: [motores e diferenças](engines.md), [progresso 3.6](v3.6/progress.md), [pesquisa 3.7](v3.7/research-plan.md), [progresso e promoção](engine-progression.md), [metodologia](evaluation-plan.md).

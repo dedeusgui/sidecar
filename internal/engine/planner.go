@@ -137,6 +137,7 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 		return strings.Join(sortedCopy(proposals[i].EvidenceKeys), "\x00") < strings.Join(sortedCopy(proposals[j].EvidenceKeys), "\x00")
 	})
 	var guidanceSections []contract.SectionAllocation
+	guidanceSectionItems := make(map[string]int)
 	allocateProposal := func(proposal contract.GuidanceProposal) {
 		if strings.TrimSpace(proposal.Kind) == "" || proposal.TokenEstimate <= 0 {
 			plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "proposal_invalid", Kind: proposal.Kind})
@@ -188,6 +189,7 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 			MaxItems:     items,
 			EvidenceKeys: proposalKeys,
 		})
+		guidanceSectionItems[canonicalSection(proposal.Kind)] += items
 		remainingTokens -= proposal.TokenEstimate
 		remainingItems -= items
 	}
@@ -240,8 +242,9 @@ func (Planner) Plan(input PlanInput) contract.OutputPlan {
 			if allocation == nil {
 				allocation = &contract.SectionAllocation{Section: section}
 			}
-			cost := ref.Ref.CostEstimate + ctxbuild.SectionFrameTokens(section, allocation.MaxItems+1) -
-				ctxbuild.SectionFrameTokens(section, allocation.MaxItems)
+			priorItems := guidanceSectionItems[section]
+			cost := ref.Ref.CostEstimate + ctxbuild.SectionFrameTokens(section, priorItems+allocation.MaxItems+1) -
+				ctxbuild.SectionFrameTokens(section, priorItems+allocation.MaxItems)
 			// The first ranked item is never displaced by the guidance reserve.
 			if cost > remainingTokens || len(selected) > 0 && cost > remainingTokens-reserve {
 				plan.NotDelivered = append(plan.NotDelivered, contract.PlanReason{Code: "evidence_over_budget", Key: key})
@@ -307,6 +310,19 @@ func uniqueStrings(values []string) []string {
 		}
 	}
 	return unique
+}
+
+func canonicalSection(section string) string {
+	switch section {
+	case "CHANGE_IMPACT":
+		return ctxbuild.ChangeImpact
+	case "MEMORY_DECISION":
+		return ctxbuild.Memory
+	case "SESSION_GUIDANCE":
+		return ctxbuild.Session
+	default:
+		return section
+	}
 }
 
 func observationSatisfied(observability contract.Observability, required contract.ObservationEvent) bool {

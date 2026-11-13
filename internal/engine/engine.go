@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dedeusgui/sidecar/internal/repo"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 	"github.com/dedeusgui/sidecar/internal/store"
 )
@@ -22,8 +23,14 @@ const Version35 = "v3.5"
 // as the comparison baseline.
 const Version36 = "v3.6"
 
+// Version37 selects the V3.7 refinement of the unified transaction: rarity-aware gating,
+// matched-support-preserving ordering, flow budgets and planner/packer consistency.
+const Version37 = "v3.7"
+
 // Unified reports whether version runs the unified (V3.5-family) context transaction.
-func Unified(version string) bool { return version == Version35 || version == Version36 }
+func Unified(version string) bool {
+	return version == Version35 || version == Version36 || version == Version37
+}
 
 // Action is what the engine decided to deliver. They are distinct actions, not a bundle that is
 // always on: ABSTAIN emits zero bytes, EXPLORE_AVAILABLE only offers the on-demand tool.
@@ -81,6 +88,9 @@ type Options struct {
 	// V3.5 raised it to 12 because it then cut the selection to one anchor; V3.6 delivers the
 	// ranked selection, so the V3 limits per action apply again.
 	Refined bool
+	// V37 enables the V3.7 rarity-aware gating, matched-support tie-breaking and flow budgets.
+	// When true, RequireCodeAnchor and Refined are forced on.
+	V37 bool
 }
 
 // Budgets per action, in estimated tokens. Heuristics chosen before measurement; not fitted to the
@@ -88,6 +98,8 @@ type Options struct {
 const (
 	leanBudget      = 420
 	leanItems       = 5
+	flowBudget      = 850
+	flowItems       = 7
 	briefBudget     = 800
 	briefItems      = 6
 	deepBudget      = 1200
@@ -110,6 +122,11 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 	start := time.Now()
 	sig := readSignals(prompt)
 	d := Decision{Engine: Version, Signals: sig}
+	if opts.V37 {
+		opts.RequireCodeAnchor = true
+		opts.Refined = true
+		d.Engine = Version37
+	}
 	finish := func(res retrieve.Result) (retrieve.Result, Decision, error) {
 		d.ElapsedMS = float64(time.Since(start).Microseconds()) / 1000
 		return res, d, nil
@@ -124,7 +141,21 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 	ro := opts.Retrieve
 	ro.EngineVersion = "v2"
 	ro.Adaptive = true // contracts and docs only when the intent can use them (retrieve.PolicyFor)
-	if opts.RequireCodeAnchor && ro.MaxItems < 60 {
+	if opts.V37 {
+		if ro.MaxItems < 60 {
+			ro.MaxItems = 60
+		}
+		if ro.Tuning == nil {
+			tun := retrieve.V37Tuning()
+			ro.Tuning = &tun
+		}
+		ro.RaritySupport = true
+		ro.PreferImplTieBreak = true
+		ro.SplitMemberKeys = true
+		if ro.MaxAbsentTerms <= 0 {
+			ro.MaxAbsentTerms = 24
+		}
+	} else if opts.RequireCodeAnchor && ro.MaxItems < 60 {
 		// V3.5 may favor implementation files over nearby docs and tests after retrieval. Keep a
 		// full ranked window so that choice is made from evidence the V2 result limit hid.
 		ro.MaxItems = 60
@@ -141,10 +172,20 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 	measureSupport(&sig, res)
 	d.Signals = sig
 
-	rel, reasons := relevanceGate(sig, res)
-	if opts.RequireCodeAnchor && rel != Irrelevant && !hasCodeAnchor(sig, res, opts.Refined) {
-		rel = Irrelevant
-		reasons = append(reasons, "no explicit code anchor or matching symbol name")
+	var rel Relevance
+	var reasons []string
+	if opts.V37 {
+		rel, reasons = relevanceGateV37(sig, res)
+		if rel != Irrelevant && !hasCodeAnchorV37(sig, res) {
+			rel = Irrelevant
+			reasons = append(reasons, "no explicit code anchor or matching symbol name")
+		}
+	} else {
+		rel, reasons = relevanceGate(sig, res)
+		if opts.RequireCodeAnchor && rel != Irrelevant && !hasCodeAnchor(sig, res, opts.Refined) {
+			rel = Irrelevant
+			reasons = append(reasons, "no explicit code anchor or matching symbol name")
+		}
 	}
 	d.Relevance = rel
 	if rel == Irrelevant {
@@ -157,12 +198,18 @@ func Run(ctx context.Context, st *store.Store, prompt string, opts Options) (ret
 		res.Trace.Final = 0
 		return finish(res)
 	}
-	if opts.RequireCodeAnchor {
+	if opts.V37 {
+		preferImplementationEvidenceV37(res.Evidence)
+	} else if opts.RequireCodeAnchor {
 		preferImplementationEvidence(res.Evidence)
 	}
 
 	d.Class = classify(sig, res)
-	d.Action, d.Budget, d.MaxItems = route(d.Class, sig)
+	if opts.V37 {
+		d.Action, d.Budget, d.MaxItems = routeV37(d.Class, sig)
+	} else {
+		d.Action, d.Budget, d.MaxItems = route(d.Class, sig)
+	}
 	if opts.RequireCodeAnchor && !opts.Refined && d.MaxItems < 12 {
 		// The V3.5 output planner can choose among several independent source anchors under one
 		// global token budget; extra items remain subject to that budget.
@@ -197,6 +244,78 @@ func preferImplementationEvidence(evidence []retrieve.Evidence) {
 		return s
 	}
 	sort.SliceStable(evidence, func(i, j int) bool { return score(evidence[i]) > score(evidence[j]) })
+}
+
+// preferImplementationEvidenceV37 keeps high-matched tiers ahead of 1-term noise while
+// ensuring production source outranks tests and Markdown docs with similar or fewer matches,
+// and preserving retrieval score within the same tier so symbol-name/IDF hits win.
+func preferImplementationEvidenceV37(evidence []retrieve.Evidence) {
+	implScore := func(ev retrieve.Evidence) int {
+		path := strings.ToLower(filepath.ToSlash(ev.Hit.Path))
+		ext := filepath.Ext(path)
+		if !strings.Contains(" .go .py .js .jsx .ts .tsx .rs .java .kt .cs .php .rb .swift .c .cc .cpp .h .hpp .ex .exs .scala ", " "+ext+" ") {
+			return 0
+		}
+		if repo.Kind(ev.Hit.Path) == "test" || strings.HasPrefix(path, "bench/") || strings.HasPrefix(path, "test/") || strings.HasPrefix(path, "tests/") ||
+			strings.HasPrefix(path, "spec/") || strings.Contains(path, "/bench/") || strings.Contains(path, "/benchmarks/") ||
+			strings.Contains(path, "/test/") || strings.Contains(path, "/tests/") || strings.Contains(path, "/spec/") ||
+			strings.Contains(path, "_test.") || strings.Contains(path, ".test.") || strings.Contains(path, ".spec.") {
+			return 1
+		}
+		if strings.HasPrefix(path, "example/") || strings.HasPrefix(path, "examples/") ||
+			strings.HasPrefix(path, "demo/") || strings.HasPrefix(path, "demos/") ||
+			strings.Contains(path, "/example/") || strings.Contains(path, "/examples/") ||
+			strings.Contains(path, "/demo/") || strings.Contains(path, "/demos/") {
+			return 1
+		}
+		return 2
+	}
+	isNarrativeDoc := func(path string) bool {
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".md", ".mdx", ".rst", ".txt", ".adoc":
+			return true
+		}
+		return false
+	}
+	tierRank := func(ev retrieve.Evidence) int {
+		m := len(ev.Matched)
+		sc := implScore(ev)
+		if isNarrativeDoc(ev.Hit.Path) {
+			return m * 10
+		}
+		if ev.Source == "exact" && sc == 2 {
+			return m*10 + 30
+		}
+		if ev.Hit.Kind == "constant" && ev.Source != "exact" && sc == 2 {
+			return m*10 + 3
+		}
+		verBonus := 0
+		if ev.Verdict == "VERIFIED" && sc == 2 {
+			verBonus = 18
+		}
+		switch sc {
+		case 2:
+			if m >= 2 {
+				return m*10 + 12 + verBonus
+			}
+			return m*10 + 5 + verBonus
+		case 1:
+			return m*10 + 1
+		default:
+			// Schema/config files (.sql, .proto, .graphql, etc.) stay above 1-term code noise.
+			return m*10 + 5
+		}
+	}
+	sort.SliceStable(evidence, func(i, j int) bool {
+		ti, tj := tierRank(evidence[i]), tierRank(evidence[j])
+		if ti != tj {
+			return ti > tj
+		}
+		if si, sj := implScore(evidence[i]), implScore(evidence[j]); si != sj {
+			return si > sj
+		}
+		return evidence[i].Score > evidence[j].Score
+	})
 }
 
 // Relevance is the gate verdict.
@@ -234,6 +353,87 @@ func relevanceGate(s TaskSignals, res retrieve.Result) (Relevance, []string) {
 	case !software && !s.RepoCue && s.BestSupport <= 1 && s.PresentRatio < 0.5:
 		return Irrelevant, []string{"one generic term matches and most prompt terms are absent from the repository"}
 	case !software && !s.RepoCue && s.PresentRatio < 0.3:
+		return Irrelevant, []string{"most prompt terms are absent from the repository and nothing points at code"}
+	}
+	var reasons []string
+	if !software {
+		reasons = append(reasons, "no software vocabulary or verified code anchor")
+	}
+	if !s.RepoCue {
+		reasons = append(reasons, "no location or project cue")
+	}
+	if s.PresentRatio < domainPresentRatio {
+		reasons = append(reasons, "many prompt terms are absent from the repository")
+	}
+	if len(reasons) == 0 {
+		reasons = append(reasons, "weak lexical support")
+	}
+	return Ambiguous, reasons
+}
+
+func isTopRareDomainMatch(res retrieve.Result) bool {
+	if len(res.Evidence) == 0 {
+		return false
+	}
+	top := res.Evidence[0]
+	if top.Hit.Kind == "file" || top.MinSymbolDF <= 0 {
+		return false
+	}
+	rareCeiling := max(6, res.Trace.TotalSymbols/50)
+	if top.MinSymbolDF > rareCeiling {
+		return false
+	}
+	if res.Trace.TotalSymbols > 0 && top.MinSymbolDF > max(2, res.Trace.TotalSymbols/4) {
+		return false
+	}
+	if top.MaxSalience < 4.5 {
+		return false
+	}
+	for _, m := range top.Matched {
+		term := m
+		if idx := strings.Index(m, "→"); idx >= 0 {
+			term = m[idx+len("→"):]
+		}
+		if !isUbiquitousAnchorWord(term) {
+			return true
+		}
+	}
+	return false
+}
+
+func relevanceGateV37(s TaskSignals, res retrieve.Result) (Relevance, []string) {
+	if len(res.Evidence) == 0 {
+		return Irrelevant, []string{"no evidence passed the V2 gates"}
+	}
+	for _, l := range s.Locators {
+		if l.Verified {
+			return Relevant, nil
+		}
+	}
+	if s.BestSupport == 0 {
+		return Irrelevant, []string{"no evidence item matches a prompt concept by its own text"}
+	}
+	if res.Trace.HasAbsentAnchor && s.BestSupport <= 1 {
+		return Irrelevant, []string{"named anchor identifier or technology absent from repository and weak support"}
+	}
+	software := len(s.SoftwareTerms) > 0
+	topRare := isTopRareDomainMatch(res)
+	if !res.Trace.HasAbsentAnchor && s.BestSupport == 1 && topRare && s.PresentRatio >= 0.5 &&
+		(software || s.RepoCue || (s.PromptTerms <= 4 && s.Concepts >= 2)) {
+		return Relevant, nil
+	}
+	switch {
+	case software && (s.BestSupport >= 2 || s.TopSupport >= 2 || s.RepoCue || (s.PresentRatio >= minPresentRatio && topRare)):
+		return Relevant, nil
+	case !software && s.RepoCue && s.TopSupport >= minCueSupport && s.Coverage >= minCueCoverage:
+		return Relevant, nil
+	case !software && (s.BestSupport >= 3 && s.PresentRatio >= domainPresentRatio || s.BestSupport >= 2 && s.PresentRatio >= strictPresentRatio):
+		return Relevant, nil
+	case !software && !s.RepoCue && s.BestSupport <= 1 && s.PresentRatio < 0.6:
+		return Irrelevant, []string{"one generic term matches without software terms, repo cue, or majority prompt coverage"}
+	case s.BestSupport <= 1 && (!topRare || !software && !s.RepoCue) && (!s.RepoCue || s.PresentRatio < 0.5):
+		return Irrelevant, []string{"one generic term matches without a rare domain match or verified locator"}
+	case !software && !s.RepoCue && s.PresentRatio < 0.4:
 		return Irrelevant, []string{"most prompt terms are absent from the repository and nothing points at code"}
 	}
 	var reasons []string
@@ -298,6 +498,13 @@ func route(c TaskClass, s TaskSignals) (Action, int, int) {
 		return ActionExploreAvailable, deepBudget, deepItems
 	}
 	return ActionLean, leanBudget, leanItems
+}
+
+func routeV37(c TaskClass, s TaskSignals) (Action, int, int) {
+	if c == ClassSimpleQuery && hasKind(s, "explain") {
+		return ActionExploreAvailable, flowBudget, flowItems
+	}
+	return route(c, s)
 }
 
 // pack keeps the strongest items under the decision budget, preserving the V2 order (already packed

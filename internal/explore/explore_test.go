@@ -204,8 +204,9 @@ func TestBudgetScalesWithRepositorySize(t *testing.T) {
 }
 
 func TestMemberKeys(t *testing.T) {
-	got := strings.Join(memberKeys("how does res.send() and `Router.prototype.handle` work? e.g. example.com"), ",")
-	if got != "send,handle,com" && got != "send,handle" {
-		t.Fatalf("memberKeys = %s", got)
+	got := strings.Join(memberKeys("how does res.send() and `Router.prototype.handle` and Logger::info work with route! and filter!? e.g. example.com"), ",")
+	want := "res,send,Router,prototype,handle,Logger,info,route!,filter!,example,com"
+	if got != want {
+		t.Fatalf("memberKeys = %s, want %s", got, want)
 	}
 }

@@ -1,6 +1,6 @@
 # V3.7 — plano de pesquisa e marcos
 
-**Estado: proposta; nenhuma engine V3.7 implementada, resultado medido ou promoção aprovada.** Objetivo: descobrir qual combinação de recuperação automática, contexto inicial e aprofundamento opcional ajuda um agente a concluir tarefas reais corretamente, em repositórios que a política e os autores dos testes não usaram para ajuste. A unificação é uma hipótese arquitetural plausível; não é o resultado presumido. O [mapa das engines](../engines.md) separa o estado atual e as evidências.
+**Estado: checkpoint opt-in implementado (`SIDECAR_ENGINE=v3.7`, V1 continua padrão) com P0+P1 validados e P3 agentic pendente — ver [arquitetura V3.7](architecture.md) e [progresso V3.7](progress.md).** Objetivo: descobrir qual combinação de recuperação automática, contexto inicial e aprofundamento opcional ajuda um agente a concluir tarefas reais corretamente, em repositórios que a política e os autores dos testes não usaram para ajuste. A unificação é uma hipótese arquitetural plausível; não é o resultado presumido. O [mapa das engines](../engines.md) separa o estado atual e as evidências.
 
 ## Perguntas e hipóteses
 

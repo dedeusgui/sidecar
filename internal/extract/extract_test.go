@@ -205,3 +205,163 @@ func TestPythonTripleQuotedDocstringIsExtracted(t *testing.T) {
 		t.Fatalf("docstring not extracted for echo: got %q", s.Doc)
 	}
 }
+
+func TestPHPCallsConstantsImportsAndTypeRefs(t *testing.T) {
+	src := []byte(`<?php
+namespace Monolog;
+use Monolog\Handler\HandlerInterface;
+use Monolog\Handler\AbstractProcessingHandler as BaseHandler;
+use Psr\Log\{LoggerInterface, LogLevel};
+
+const VERSION = 2;
+const SECRET_TOKEN = "sk_live_secret";
+
+class Logger extends \Monolog\BaseLogger implements LoggerInterface, ResettableInterface {
+    const DEBUG = 100;
+    public function addRecord($level, $message) {
+        $this->handle($record);
+        $handler?->write($record);
+        self::format($message);
+        \Monolog\Formatter::build($message);
+        helper_fn($level);
+        return new \Monolog\LogRecord($message);
+    }
+}
+`)
+	res, err := New().File("php", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imp := range []string{
+		`Monolog\Handler\HandlerInterface`,
+		`Monolog\Handler\AbstractProcessingHandler`,
+		`Psr\Log\LoggerInterface`,
+		`Psr\Log\LogLevel`,
+	} {
+		if !hasImport(res, imp) {
+			t.Errorf("missing PHP import %q in %v", imp, res.Imports)
+		}
+	}
+	if c, _, ok := find(res, "constant", "VERSION"); !ok || c.Value != "2" {
+		t.Errorf("VERSION constant = %+v (ok=%v)", c, ok)
+	}
+	if c, _, ok := find(res, "constant", "SECRET_TOKEN"); !ok || c.Value != "" {
+		t.Errorf("SECRET_TOKEN constant = %+v (ok=%v), string value must not be stored", c, ok)
+	}
+	if c, _, ok := find(res, "constant", "DEBUG"); !ok || c.Value != "100" || c.Parent < 0 || res.Symbols[c.Parent].Name != "Logger" {
+		t.Errorf("DEBUG class constant = %+v (ok=%v)", c, ok)
+	}
+	for _, callee := range []string{"handle", "write", "format", "build", "helper_fn", "LogRecord"} {
+		if !hasRef(res, "addRecord", callee) {
+			t.Errorf("missing PHP call ref from addRecord -> %s: %+v", callee, res.Refs)
+		}
+	}
+	for _, typ := range []string{"BaseLogger", "LoggerInterface", "ResettableInterface"} {
+		found := false
+		for _, r := range res.Refs {
+			if r.Kind == "type" && r.Name == typ && r.From >= 0 && res.Symbols[r.From].Name == "Logger" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("missing PHP type ref Logger -> %s: %+v", typ, res.Refs)
+		}
+	}
+}
+
+func TestRubyCallsImportsAndSinatraRoutes(t *testing.T) {
+	src := []byte(`require 'rack'
+require_relative 'sinatra/base'
+
+class Base
+  before '/admin/*' do
+    filter!(:before)
+  end
+
+  get '/hello' do
+    dispatch!
+  end
+
+  def dispatch!
+    route!
+    filter!(:dispatch)
+    valid?(@env)
+    self.process_route
+  end
+
+  def self.configure
+    setup_routes
+  end
+end
+`)
+	res, err := New().File("ruby", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasImport(res, "rack") || !hasImport(res, "./sinatra/base") {
+		t.Errorf("ruby imports = %v", res.Imports)
+	}
+	for _, route := range []string{"BEFORE /admin/*", "GET /hello"} {
+		if _, _, ok := find(res, "route", route); !ok {
+			t.Errorf("missing ruby route %q in %+v", route, res.Symbols)
+		}
+	}
+	for _, callee := range []string{"route!", "filter!", "valid?", "process_route"} {
+		if !hasRef(res, "dispatch!", callee) {
+			t.Errorf("missing ruby call ref dispatch! -> %s: %+v", callee, res.Refs)
+		}
+	}
+	for _, r := range res.Refs {
+		if (r.Name == "require" || r.Name == "require_relative") && r.Kind == "call" {
+			t.Errorf("require must not be emitted as call ref: %+v", r)
+		}
+		if r.From >= 0 && res.Symbols[r.From].Name == r.Name {
+			t.Errorf("self-declaration emitted as call ref: %+v", r)
+		}
+	}
+}
+
+func TestCommonJSRequireAndPythonDecoratorCalls(t *testing.T) {
+	js := []byte(`const utils = require('./utils');
+var app = module.exports = function(req, res) { return utils.normalize(req); };
+`)
+	jsRes, err := New().File("javascript", js)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasImport(jsRes, "./utils") {
+		t.Errorf("CommonJS require('./utils') missing: %v", jsRes.Imports)
+	}
+	if _, _, ok := find(jsRes, "function", "app"); !ok {
+		t.Errorf("chained CommonJS var app = module.exports = function missing: %+v", jsRes.Symbols)
+	}
+
+	py := []byte(`import click
+
+@click.group()
+def main():
+    pass
+
+@main.command()
+@click.option('--count', default=1)
+@simple_dec
+def hello(count):
+    helper()
+
+@app.get('/items')
+def get_items():
+    pass
+`)
+	pyRes, err := New().File("python", py)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"main", "command", "simple_dec", "helper"} {
+		if !hasRef(pyRes, "hello", name) {
+			t.Errorf("missing Python decorator/body call ref hello -> %s: %+v", name, pyRes.Refs)
+		}
+	}
+	if hasRef(pyRes, "get_items", "get") {
+		t.Errorf("route decorator @app.get should not emit noisy 'get' call ref: %+v", pyRes.Refs)
+	}
+}

@@ -1,6 +1,7 @@
 package retrieve
 
 import (
+	"math"
 	"sort"
 	"strings"
 
@@ -30,6 +31,7 @@ type PackOptions struct {
 	Seen                 ctxbuild.Seen // evidence already delivered in this session; nil when none
 	Tuning               *Tuning       // nil = DefaultTuning
 	PreferImplementation bool          // prefer production source to docs and test helpers
+	PreferImplTieBreak   bool          // weight implementation within the same matched-support tier
 }
 
 // PackTrace explains the packing decision for `sidecar explain`.
@@ -90,7 +92,12 @@ func Pack(cands []Evidence, o PackOptions) ([]Evidence, map[string]string, PackT
 		return nil, excluded, pt
 	}
 
-	st := &packState{covered: map[string]bool{}, perFile: map[string]int{}, preferImplementation: o.PreferImplementation}
+	st := &packState{
+		covered:              map[string]bool{},
+		perFile:              map[string]int{},
+		preferImplementation: o.PreferImplementation,
+		preferImplTieBreak:   o.PreferImplTieBreak,
+	}
 	for _, e := range cands {
 		st.top = max(st.top, e.Score)
 	}
@@ -99,7 +106,11 @@ func Pack(cands []Evidence, o PackOptions) ([]Evidence, map[string]string, PackT
 		pick, pickU := -1, 0.0
 		for k, e := range open {
 			v, c, uc := st.value(e), costOf(e), utilityCostOf(e)
-			if v/float64(uc) < minWorth || pt.Used+c > o.Budget {
+			worthV := v
+			if o.PreferImplTieBreak {
+				worthV = st.baseValue(e)
+			}
+			if worthV/float64(uc) < minWorth || pt.Used+c > o.Budget {
 				continue
 			}
 			if u := v / float64(uc); u > pickU {
@@ -116,7 +127,11 @@ func Pack(cands []Evidence, o PackOptions) ([]Evidence, map[string]string, PackT
 		pt.Used += costOf(e)
 	}
 	for _, e := range open {
-		if st.value(e)/float64(utilityCostOf(e)) < minWorth {
+		worthV := st.value(e)
+		if o.PreferImplTieBreak {
+			worthV = st.baseValue(e)
+		}
+		if worthV/float64(utilityCostOf(e)) < minWorth {
 			excluded[e.ID] = "not worth its tokens: marginal utility per token below threshold"
 		} else {
 			excluded[e.ID] = "dropped: token budget"
@@ -135,26 +150,95 @@ type packState struct {
 	top                  float64         // best fused score among the candidates
 	covered              map[string]bool // query concepts matched by a selected item
 	perFile              map[string]int  // selected items per file
+	testsChosen          int             // selected test items
 	chosen               []Evidence
 	preferImplementation bool
+	preferImplTieBreak   bool
+}
+
+func (s *packState) baseValue(e Evidence) float64 {
+	return e.Confidence * s.expected(e) * trustOf(e) * s.novelty(e) * s.diversity(e) * s.complement(e)
+}
+
+func (s *packState) freshCount(e Evidence) int {
+	fresh := 0
+	for _, m := range e.Matched {
+		if !s.covered[m] {
+			fresh++
+		}
+	}
+	return fresh
 }
 
 // value is the item's marginal utility: confidence × expected usefulness × trust × novelty ×
 // diversity × complement. Each factor is a heuristic named where it is defined.
 func (s *packState) value(e Evidence) float64 {
-	v := e.Confidence * s.expected(e) * trustOf(e) * s.novelty(e) * s.diversity(e) * s.complement(e)
+	v := s.baseValue(e)
+	if s.preferImplTieBreak {
+		tier := min(s.freshCount(e), 4)
+		// Preserve multi-concept tier advantage (2.2^tier > 2.0x impl multiplier) while keeping
+		// exact symbol matches first and preventing constants/examples from crowding real code.
+		v *= math.Pow(2.2, float64(tier))
+		isExact := e.Source == "exact"
+		if isExact {
+			v *= 8.0
+		}
+		if e.Hit.Kind == "constant" && !isExact {
+			v *= 0.35
+		}
+		switch {
+		case repo.Kind(e.Hit.Path) == "test" || isTestFilePath(e.Hit.Path):
+			v *= 0.45
+		case isNarrativeDocPath(e.Hit.Path):
+			v *= 0.25
+		case isExamplePath(e.Hit.Path):
+			v *= 0.40
+		case implementationSource(e.Hit.Path):
+			v *= 2.0
+		}
+		return v
+	}
 	if s.preferImplementation && implementationSource(e.Hit.Path) {
 		v *= 2
 	}
 	return v
 }
 
-func implementationSource(path string) bool {
-	path = strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
-	if strings.Contains(path, "/bench/") || strings.Contains(path, "/test/") || strings.Contains(path, "/tests/") ||
-		strings.Contains(path, "_test.") || strings.Contains(path, ".test.") || strings.Contains(path, ".spec.") {
+func isTestFilePath(path string) bool {
+	p := strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
+	return strings.HasPrefix(p, "test/") || strings.HasPrefix(p, "tests/") || strings.HasPrefix(p, "spec/") || strings.HasPrefix(p, "bench/") ||
+		strings.Contains(p, "/bench/") || strings.Contains(p, "/test/") || strings.Contains(p, "/tests/") || strings.Contains(p, "/spec/") ||
+		strings.Contains(p, "_test.") || strings.Contains(p, ".test.") || strings.Contains(p, ".spec.")
+}
+
+func isExamplePath(path string) bool {
+	p := strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
+	return strings.HasPrefix(p, "example/") || strings.HasPrefix(p, "examples/") ||
+		strings.HasPrefix(p, "sample/") || strings.HasPrefix(p, "samples/") ||
+		strings.HasPrefix(p, "demo/") || strings.HasPrefix(p, "demos/") ||
+		strings.Contains(p, "/example/") || strings.Contains(p, "/examples/") ||
+		strings.Contains(p, "/sample/") || strings.Contains(p, "/samples/") ||
+		strings.Contains(p, "/demo/") || strings.Contains(p, "/demos/")
+}
+
+func isNarrativeDocPath(path string) bool {
+	p := strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
+	i := strings.LastIndexByte(p, '.')
+	if i < 0 {
 		return false
 	}
+	switch p[i:] {
+	case ".md", ".mdx", ".rst", ".txt", ".adoc":
+		return true
+	}
+	return false
+}
+
+func implementationSource(path string) bool {
+	if isTestFilePath(path) || isExamplePath(path) {
+		return false
+	}
+	path = strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
 	i := strings.LastIndexByte(path, '.')
 	if i < 0 {
 		return false
@@ -177,6 +261,9 @@ func (s *packState) take(e Evidence) {
 		s.covered[m] = true
 	}
 	s.perFile[e.Hit.Path]++
+	if repo.Kind(e.Hit.Path) == "test" || isTestFilePath(e.Hit.Path) {
+		s.testsChosen++
+	}
 	s.chosen = append(s.chosen, e)
 }
 
@@ -197,7 +284,16 @@ func (s *packState) novelty(e Evidence) float64 {
 
 // diversity penalises a file that already has selected items, and generated files.
 func (s *packState) diversity(e Evidence) float64 {
-	d := 1 / float64(1+s.perFile[e.Hit.Path])
+	n := s.perFile[e.Hit.Path]
+	d := 1 / float64(1+n)
+	if s.preferImplTieBreak {
+		if n >= 1 {
+			d = 1 / float64(1+3*n)
+		}
+		if (repo.Kind(e.Hit.Path) == "test" || isTestFilePath(e.Hit.Path)) && s.testsChosen >= 1 {
+			d *= 0.35
+		}
+	}
 	if repo.IsGenerated(e.Hit.Path, nil) {
 		d *= 0.5
 	}

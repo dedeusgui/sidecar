@@ -1,6 +1,6 @@
 # Benchmarks do Sidecar: índice, nível de evidência e pistas de melhoria
 
-Gerado de `bench/registry.json` (2026-11-09) por `python3 bench/consolidate.py`. **Não edite à mão**: edite o registro e regenere.
+Gerado de `bench/registry.json` (2026-11-12) por `python3 bench/consolidate.py`. **Não edite à mão**: edite o registro e regenere.
 
 ## Níveis de evidência
 
@@ -32,11 +32,14 @@ Gerado de `bench/registry.json` (2026-11-09) por `python3 bench/consolidate.py`.
 | B18-explore-fact-coverage | offline | Os fatos exigidos por um oráculo de navegação chegam ao agente pelo hook V2/V3, pelo sidecar explore ou pelo codegraph explore (mesmas tarefas), e a que custo? | fatos presentes: hook V2 14/26 (12,4k chars), hook V3 13/26 (8,1k), sidecar explore 22/26 com 4/7 tarefas completas (38,9k), codegraph explore 1.6.2 24/26 com 6/7 (114,3k) | referência offline; nenhuma economia agentic demonstrada | fato presente não é resposta correta; N=7; perguntas escritas pelo autor do Sidecar; CodeGraph via CLI (mesma saída da ferramenta MCP), telemetria desligada; nenhum resultado agentic |
 | B19-aider-repomap-baseline | offline | Como o RepoMap do Aider (prompt como identificadores mencionados, sem arquivos no chat) se compara à V3 nos mesmos casos? | RepoMap Hit@5 30%/37,5%/20% (ten/longos/independente) vs V3 97,5%/87,5%/83,3%; RepoMap não se abstém (FP 100%) e entrega ~1000 tokens por prompt | baseline de referência | RepoMap foi desenhado como mapa com arquivos no chat, não como recuperação por prompt; uso aqui é o modo sem chat |
 | B20-ranking-determinism | infra | O ranking é idêntico entre construções independentes do índice? | antes: 10 listas de resultado diferiam (caso R05-1, empates entre homônimos desempatados por ID de linha); depois: 0 | corrigido | o teste sintético não reproduz o caso real; a prova é a comparação das 3 construções |
+| B21-v37-fast-gate | offline | A V3.7 opt-in (SIDECAR_ENGINE=v3.7) supera ou iguala V3 e V3.6 na entrega offline P1 sem aumentar falsos positivos nem conflitos de rótulos? | cases.json pos V3.7 30/40 vs V3 29/40 e V3.6 27/40 (0/10 neg); ten-repos 39/40 (10/10 messy_pt) vs V3 35/40 e V3.6 36/40 com hard_neg 12/180 (0 conflitos); E1 pos 23/30 e neg 16/40; nenhum resultado agentic P3 medido | checkpoint offline opt-in (V1 continua default; P3 pendente) | ten-repos, hard_negatives e E1 são splits inspecionados (não holdout cego); holdout interno omitido; voice_mode top-3 caiu 10/10→6/10 por snippets multi-linha; 40% de saída em negativos E1; sem prova agentic |
+| B22-v37-e2-offline | offline | Como hooks V2/V3/V3.6/V3.7, sidecar explore e @colbymchenry/codegraph@1.6.0 se comparam na cobertura offline do corpus-nav? | hooks v2/v3/v3.6/v3.7 cobrem 11/10/8/13 de 26 fatos (0/7 completas); sidecar explore 23/26 (5/7 completas, 84,3k chars) vs codegraph 1.6.0 24/26 (5/7 completas, 114,2k chars) | referência offline; gap residual de 1 fato vs codegraph (NAV-CLK-01, NAV-SER-01) | N=7 tarefas escritas internamente para navegação; presença textual do fato no output não comprova acerto nem redução de custo em agente |
 
 ### Dados e comandos
 
 **B01-retrieval-internal** — dados: bench/cases.json (71 casos, 3 fixtures); escrito pelo autor do código  
-comando histórico de três splits: `go run ./cmd/sidecar-eval --cases bench/cases.json --include-holdout` (holdout já inspecionado; não usar para tuning); artefato: `bench/cases.json`
+comando: `go run ./cmd/sidecar-eval --cases bench/cases.json`  
+artefatos: `bench/cases.json`
 
 **B02-retrieval-external** — dados: bench/ten_repos_cases.json (40 positivos, commits fixados)  
 comando: `bash bench/agentic/setup_10_repos.sh /tmp/sidecar-real-bench && go run ./cmd/sidecar-eval --external-cases /tmp/sidecar-real-bench/ten-repos-manifest.json`  
@@ -113,6 +116,14 @@ artefatos: `bench/results/v3-e1-2026-11-09/e1-repomap-vs-v3.md`, `bench/results/
 **B20-ranking-determinism** — dados: ten-repos, todos os métodos do sidecar-eval, 3 construções do índice antes e depois da correção  
 comando: `go run ./cmd/sidecar-eval --external-cases OUT --out det-N.json (3x) e comparar listas top`  
 artefatos: `internal/retrieve/determinism_test.go`
+
+**B21-v37-fast-gate** — dados: bench/cases.json (40 pos/10 neg, 21 holdout omitidos); ten-repos (40 pos) + hard_negatives (180 neg) + 10 neg; coortes E1 (30 pos EN/PT, 40 neg)  
+comando: `python3 bench/fast_gate.py --checkout <DIR> --engines v1,v2,v3,v3.5,v3.6,v3.7 --candidate v3.7 --baseline v3`  
+artefatos: `bench/fast_gate.py`, `docs/v3.7/progress.md`, `docs/v3.7/architecture.md`, `internal/app/v37.go`
+
+**B22-v37-e2-offline** — dados: bench/lab/corpus-nav (7 tarefas, 26 fatos-oráculo) com @colbymchenry/codegraph@1.6.0  
+comando: `python3 bench/v3/e2_offline.py --checkout <DIR> --engines v2,v3,v3.6,v3.7 --codegraph <CODEGRAPH_BIN> --out OUT.json`  
+artefatos: `bench/v3/e2_offline.py`, `bench/lab/corpus-nav/manifest.json`, `docs/v3.7/progress.md`
 
 ## Pistas de melhoria (insumos do V3)
 

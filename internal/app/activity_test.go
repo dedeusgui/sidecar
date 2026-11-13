@@ -23,14 +23,15 @@ func TestActivityStatesLatencyAndNoLeaks(t *testing.T) {
 		`{"at":"2026-11-06T10:00:00Z","agent":"claude","repo":"r","status":"ok","injected_chars":120,"evidence":4,"total_ms":18,"session":"abc"}`,
 		`{"at":"2026-11-06T10:00:01Z","agent":"claude","status":"no_evidence","evidence":0,"total_ms":5,"session":"abc"}`,
 		`{"at":"2026-11-06T10:00:02Z","agent":"codex","status":"skipped","total_ms":1}`,
+		`{"at":"2026-11-06T10:00:02Z","agent":"antigravity","status":"skipped_invocation","total_ms":0.1}`,
 		`{"at":"2026-11-06T10:00:03Z","agent":"codex","status":"error","error":"boom: /secret/path","total_ms":2}`,
 		`{"at":"2026-11-06T10:00:04Z","agent":"claude","status":"partial","injected_chars":10,"evidence":2,"total_ms":40}`,
 	)
 	rep := ReadActivity(path, 10)
-	if rep.Runs != 5 {
+	if rep.Runs != 6 {
 		t.Fatalf("runs = %d", rep.Runs)
 	}
-	want := []string{"partial", "failed", "skipped", "no_evidence", "injected"}
+	want := []string{"partial", "failed", "skipped", "skipped", "no_evidence", "injected"}
 	for i, e := range rep.Entries {
 		if e.State != want[i] {
 			t.Errorf("entry %d state = %s, want %s", i, e.State, want[i])

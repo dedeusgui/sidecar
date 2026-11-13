@@ -35,11 +35,13 @@ def main(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument("--sidecar", required=True)
     p.add_argument("--checkout", required=True)
+    p.add_argument("--engines", default="v2,v3", help="comma-separated hook engines (e.g. v1,v2,v3,v3.5,v3.6)")
     p.add_argument("--codegraph", help="codegraph CLI (ex.: node_modules/.bin/codegraph @1.6.2); adds its explore as an arm")
     p.add_argument("--json")
     p.add_argument("--md")
     a = p.parse_args(argv)
-    arms = ("v2", "v3", "explore") + (("codegraph",) if a.codegraph else ())
+    hook_engines = tuple(e.strip() for e in a.engines.split(",") if e.strip())
+    arms = hook_engines + ("explore",) + (("codegraph",) if a.codegraph else ())
     rows = []
     with tempfile.TemporaryDirectory(prefix="e2-offline-") as home:
         env = dict(os.environ, SIDECAR_HOME=home, SIDECAR_FEATURES="")
@@ -50,7 +52,7 @@ def main(argv=None):
             root = str(pathlib.Path(a.checkout) / task["repo"])
             facts = task["oracle"]["answer_must_mention"]
             row = {"task": task["id"], "split": task["split"], "repo": task["repo"], "facts": len(facts)}
-            for arm in ("v2", "v3"):
+            for arm in hook_engines:
                 rep = json.loads(run([a.sidecar, "explain", "--engine", arm, "--root", root, "--json"], task["prompt"], env))
                 ctx = rep.get("context") or ""
                 row[arm] = {"facts": len(covered(ctx, facts)), "chars": len(ctx),
@@ -96,7 +98,7 @@ def main(argv=None):
     if a.md:
         pathlib.Path(a.md).write_text(text)
     if a.json:
-        pathlib.Path(a.json).write_text(json.dumps({"rows": rows, "summary": summary}, indent=2) + "\n")
+        pathlib.Path(a.json).write_text(json.dumps({"schema": "e2-offline/1", "arms": list(arms), "rows": rows, "summary": summary}, indent=2) + "\n")
 
 
 if __name__ == "__main__":

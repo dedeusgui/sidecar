@@ -165,3 +165,40 @@ func TestProfileBudgets(t *testing.T) {
 		t.Errorf("unknown profile accepted")
 	}
 }
+
+func TestPackPreferImplTieBreakPreservesMatchedTier(t *testing.T) {
+	sqlItem := item("weighing_records", "sql/schema.sql", 0.9, "weighing", "records")
+	sqlItem.ID = "sql"
+	sqlItem.Hit.Kind = "table"
+	sqlItem.Confidence = 0.6
+
+	goNoise := item("GetRecords", "pkg/noise.go", 0.9, "records")
+	goNoise.ID = "noise"
+	goNoise.Confidence = 0.45
+
+	budget := costOf(sqlItem)
+	if b := costOf(goNoise); b > budget {
+		budget = b
+	}
+
+	// Legacy PreferImplementation without PreferImplTieBreak multiplies goNoise by 2x, beating 2-concept SQL.
+	legacy, _, _ := Pack([]Evidence{sqlItem, goNoise}, PackOptions{Budget: budget, PreferImplementation: true})
+	if len(legacy) != 1 || legacy[0].ID != "noise" {
+		t.Fatalf("legacy PreferImplementation changed: %v", selectedIDs(legacy))
+	}
+
+	// With PreferImplTieBreak, 2-concept SQL beats 1-concept Go noise.
+	tieBreak, _, _ := Pack([]Evidence{sqlItem, goNoise}, PackOptions{Budget: budget, PreferImplementation: true, PreferImplTieBreak: true})
+	if len(tieBreak) != 1 || tieBreak[0].ID != "sql" {
+		t.Fatalf("PreferImplTieBreak should prefer 2-concept SQL over 1-concept Go noise, got: %v", selectedIDs(tieBreak))
+	}
+
+	// Within the same 2-concept tier, implementation Go beats SQL.
+	goMatch := item("SaveWeighing", "pkg/save.go", 0.85, "weighing", "records")
+	goMatch.ID = "impl"
+	goMatch.Confidence = 0.6
+	sameTier, _, _ := Pack([]Evidence{sqlItem, goMatch}, PackOptions{Budget: max(costOf(sqlItem), costOf(goMatch)), PreferImplementation: true, PreferImplTieBreak: true})
+	if len(sameTier) != 1 || sameTier[0].ID != "impl" {
+		t.Fatalf("PreferImplTieBreak should prefer impl within same matched tier, got: %v", selectedIDs(sameTier))
+	}
+}

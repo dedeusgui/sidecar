@@ -1,6 +1,6 @@
 {
   "schema": "bench-registry/1",
-  "updated": "2026-11-09",
+  "updated": "2026-11-12",
   "evidence_levels": {
     "infra": "prova que uma peça funciona (teste, E2E de instalação); não mede ganho",
     "offline": "recuperação/política medida sem agente; não é resultado de desenvolvimento",
@@ -273,6 +273,37 @@
       "headline": "antes: 10 listas de resultado diferiam (caso R05-1, empates entre homônimos desempatados por ID de linha); depois: 0",
       "status": "corrigido",
       "caveat": "o teste sintético não reproduz o caso real; a prova é a comparação das 3 construções"
+    },
+    {
+      "id": "B21-v37-fast-gate",
+      "level": "offline",
+      "question": "A V3.7 opt-in (SIDECAR_ENGINE=v3.7) supera ou iguala V3 e V3.6 na entrega offline P1 sem aumentar falsos positivos nem conflitos de rótulos?",
+      "data": "bench/cases.json (40 pos/10 neg, 21 holdout omitidos); ten-repos (40 pos) + hard_negatives (180 neg) + 10 neg; coortes E1 (30 pos EN/PT, 40 neg)",
+      "command": "python3 bench/fast_gate.py --checkout <DIR> --engines v1,v2,v3,v3.5,v3.6,v3.7 --candidate v3.7 --baseline v3",
+      "artifacts": [
+        "bench/fast_gate.py",
+        "docs/v3.7/progress.md",
+        "docs/v3.7/architecture.md",
+        "internal/app/v37.go"
+      ],
+      "headline": "cases.json pos V3.7 30/40 vs V3 29/40 e V3.6 27/40 (0/10 neg); ten-repos 39/40 (10/10 messy_pt) vs V3 35/40 e V3.6 36/40 com hard_neg 12/180 (0 conflitos); E1 pos 23/30 e neg 16/40; nenhum resultado agentic P3 medido",
+      "status": "checkpoint offline opt-in (V1 continua default; P3 pendente)",
+      "caveat": "ten-repos, hard_negatives e E1 são splits inspecionados (não holdout cego); holdout interno omitido; voice_mode top-3 caiu 10/10→6/10 por snippets multi-linha; 40% de saída em negativos E1; sem prova agentic"
+    },
+    {
+      "id": "B22-v37-e2-offline",
+      "level": "offline",
+      "question": "Como hooks V2/V3/V3.6/V3.7, sidecar explore e @colbymchenry/codegraph@1.6.0 se comparam na cobertura offline do corpus-nav?",
+      "data": "bench/lab/corpus-nav (7 tarefas, 26 fatos-oráculo) com @colbymchenry/codegraph@1.6.0",
+      "command": "python3 bench/v3/e2_offline.py --checkout <DIR> --engines v2,v3,v3.6,v3.7 --codegraph <CODEGRAPH_BIN> --out OUT.json",
+      "artifacts": [
+        "bench/v3/e2_offline.py",
+        "bench/lab/corpus-nav/manifest.json",
+        "docs/v3.7/progress.md"
+      ],
+      "headline": "hooks v2/v3/v3.6/v3.7 cobrem 11/10/8/13 de 26 fatos (0/7 completas); sidecar explore 23/26 (5/7 completas, 84,3k chars) vs codegraph 1.6.0 24/26 (5/7 completas, 114,2k chars)",
+      "status": "referência offline; gap residual de 1 fato vs codegraph (NAV-CLK-01, NAV-SER-01)",
+      "caveat": "N=7 tarefas escritas internamente para navegação; presença textual do fato no output não comprova acerto nem redução de custo em agente"
     }
   ],
   "improvement_leads": [

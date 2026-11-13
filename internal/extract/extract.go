@@ -51,6 +51,7 @@ type Extractor struct {
 }
 
 type grammar struct {
+	name   string
 	lang   *gts.Language
 	parser *gts.Parser
 	tagger *gts.Tagger
@@ -81,7 +82,7 @@ func (e *Extractor) File(lang string, src []byte) (Result, error) {
 			}
 			res = g.extract(src)
 		}
-		res.Symbols = append(res.Symbols, routes(src)...)
+		res.Symbols = append(res.Symbols, routes(lang, src)...)
 	}
 	return finalize(res), nil
 }
@@ -95,7 +96,7 @@ func (e *Extractor) grammar(name string) (*grammar, error) {
 		return nil, fmt.Errorf("no grammar for %q", name)
 	}
 	lang := entry.Language()
-	g := &grammar{lang: lang, parser: gts.NewParser(lang)}
+	g := &grammar{name: name, lang: lang, parser: gts.NewParser(lang)}
 	if q := grammars.ResolveTagsQuery(*entry); q != "" {
 		tg, err := gts.NewTagger(lang, q)
 		if err != nil {
@@ -182,6 +183,15 @@ func (g *grammar) extract(src []byte) Result {
 		}
 		defined[sym.Line][sym.Name] = true
 	}
+	type refKey struct {
+		name, kind string
+		line       int
+		start      uint32
+	}
+	seenRefs := map[refKey]bool{}
+	for _, r := range res.Refs {
+		seenRefs[refKey{name: r.Name, kind: r.Kind, line: r.Line}] = true
+	}
 	walk(tree.RootNode(), func(n *gts.Node) {
 		if sym, ok := g.assignedFunction(n, src); ok && !defined[sym.Line][sym.Name] {
 			sym.Doc = lines.docAbove(sym.Line - 1)
@@ -191,8 +201,17 @@ func (g *grammar) extract(src []byte) Result {
 			sym.Doc = lines.docAbove(sym.Line - 1)
 			res.Symbols = append(res.Symbols, sym)
 		}
-		if mod, ok := g.importModule(n, src); ok {
+		for _, mod := range g.importModules(n, src) {
 			res.Imports = append(res.Imports, mod)
+		}
+		for _, r := range g.extraRefs(n, src) {
+			k := refKey{name: r.name, kind: r.kind, line: r.line, start: r.start}
+			if r.name == "" || seenRefs[k] {
+				continue
+			}
+			seenRefs[k] = true
+			res.Refs = append(res.Refs, Ref{From: -1, Name: r.name, Kind: r.kind, Line: r.line})
+			res.refStarts = append(res.refStarts, r.start)
 		}
 	})
 	return res
@@ -282,6 +301,29 @@ var jsFunctionValues = map[string]bool{"function_expression": true, "function": 
 // `Foo.prototype.bar = function () {…}`. The tags query does not report these (gap L03), so the
 // definitions of Express-style APIs were missing from the index.
 func (g *grammar) assignedFunction(n *gts.Node, src []byte) (Symbol, bool) {
+	if n.Type(g.lang) == "variable_declarator" && (g.name == "javascript" || g.name == "typescript" || g.name == "tsx") {
+		nameNode := n.ChildByFieldName("name", g.lang)
+		val := n.ChildByFieldName("value", g.lang)
+		if nameNode == nil || val == nil || nameNode.Type(g.lang) != "identifier" || val.Type(g.lang) != "assignment_expression" {
+			return Symbol{}, false
+		}
+		for val != nil && val.Type(g.lang) == "assignment_expression" {
+			val = val.ChildByFieldName("right", g.lang)
+		}
+		if val == nil || !jsFunctionValues[val.Type(g.lang)] {
+			return Symbol{}, false
+		}
+		name := strings.TrimSpace(nameNode.Text(src))
+		if name == "" || name == "exports" || name == "module" {
+			return Symbol{}, false
+		}
+		return Symbol{
+			Kind: "function", Name: name,
+			Signature: signature(src, n.StartByte(), n.EndByte()),
+			Line:      int(n.StartPoint().Row) + 1, EndLine: int(n.EndPoint().Row) + 1,
+			Parent: -1, startByte: n.StartByte(), endByte: n.EndByte(),
+		}, true
+	}
 	if n.Type(g.lang) != "assignment_expression" {
 		return Symbol{}, false
 	}
@@ -361,6 +403,13 @@ func (g *grammar) constant(n *gts.Node, src []byte) (Symbol, bool) {
 		if vd := childOfType(decl, g.lang, "variable_declarator"); vd != nil && vd.NamedChildCount() == 2 {
 			name, value = vd.NamedChild(0).Text(src), vd.NamedChild(1).Text(src)
 		}
+	case "const_declaration": // PHP
+		if g.name != "php" {
+			return Symbol{}, false
+		}
+		if elem := childOfType(n, g.lang, "const_element"); elem != nil && elem.NamedChildCount() >= 2 {
+			name, value = elem.NamedChild(0).Text(src), elem.NamedChild(1).Text(src)
+		}
 	default:
 		return Symbol{}, false
 	}
@@ -401,6 +450,55 @@ func isConstField(n *gts.Node, lang *gts.Language, src []byte) bool {
 	return false
 }
 
+// importModules returns zero or more module names referenced by an import-like node.
+func (g *grammar) importModules(n *gts.Node, src []byte) []string {
+	if g.name == "php" && n.Type(g.lang) == "namespace_use_declaration" {
+		return g.phpUseModules(n, src)
+	}
+	if mod, ok := g.importModule(n, src); ok {
+		return []string{mod}
+	}
+	return nil
+}
+
+func (g *grammar) phpUseModules(n *gts.Node, src []byte) []string {
+	var out []string
+	prefix := ""
+	if ns := childOfType(n, g.lang, "namespace_name"); ns != nil {
+		prefix = strings.TrimPrefix(strings.TrimSpace(ns.Text(src)), `\`)
+	}
+	appendClause := func(clause *gts.Node, base string) {
+		var target string
+		if q := childOfType(clause, g.lang, "qualified_name"); q != nil {
+			target = q.Text(src)
+		} else if nm := childOfType(clause, g.lang, "name"); nm != nil {
+			target = nm.Text(src)
+		}
+		target = strings.TrimPrefix(strings.TrimSpace(target), `\`)
+		if target == "" {
+			return
+		}
+		if base != "" {
+			target = base + `\` + target
+		}
+		out = append(out, target)
+	}
+	if grp := childOfType(n, g.lang, "namespace_use_group"); grp != nil {
+		for i := 0; i < grp.NamedChildCount(); i++ {
+			if c := grp.NamedChild(i); c.Type(g.lang) == "namespace_use_clause" {
+				appendClause(c, prefix)
+			}
+		}
+		return out
+	}
+	for i := 0; i < n.NamedChildCount(); i++ {
+		if c := n.NamedChild(i); c.Type(g.lang) == "namespace_use_clause" {
+			appendClause(c, "")
+		}
+	}
+	return out
+}
+
 // importModule returns the module named by an import-like node.
 func (g *grammar) importModule(n *gts.Node, src []byte) (string, bool) {
 	switch n.Type(g.lang) {
@@ -433,8 +531,214 @@ func (g *grammar) importModule(n *gts.Node, src []byte) (string, bool) {
 				return c.Text(src), true
 			}
 		}
+	case "call_expression": // JS/TS CommonJS require('...')
+		if g.name == "javascript" || g.name == "typescript" || g.name == "tsx" {
+			fn := n.ChildByFieldName("function", g.lang)
+			args := n.ChildByFieldName("arguments", g.lang)
+			if fn != nil && fn.Type(g.lang) == "identifier" && fn.Text(src) == "require" && args != nil && args.NamedChildCount() >= 1 {
+				if arg := args.NamedChild(0); arg.Type(g.lang) == "string" {
+					if mod := strings.Trim(arg.Text(src), "'\""); mod != "" {
+						return mod, true
+					}
+				}
+			}
+		}
+	case "call", "method_call": // Ruby require / require_relative
+		if g.name == "ruby" {
+			mn := n.ChildByFieldName("method", g.lang)
+			if mn == nil {
+				return "", false
+			}
+			mname := mn.Text(src)
+			if mname != "require" && mname != "require_relative" {
+				return "", false
+			}
+			args := n.ChildByFieldName("arguments", g.lang)
+			if args != nil && args.NamedChildCount() >= 1 {
+				arg := args.NamedChild(0)
+				if arg.Type(g.lang) == "string" && childOfType(arg, g.lang, "interpolation") == nil {
+					if mod := strings.Trim(arg.Text(src), "'\""); mod != "" {
+						if mname == "require_relative" && !strings.HasPrefix(mod, ".") {
+							mod = "./" + mod
+						}
+						return mod, true
+					}
+				}
+			}
+		}
 	}
 	return "", false
+}
+
+// extraRefs supplements tree-sitter tags queries where a grammar omits @reference.call
+// or places decorator callables outside the decorated definition span.
+func (g *grammar) extraRefs(n *gts.Node, src []byte) []rawRef {
+	switch g.name {
+	case "php":
+		return g.phpRefs(n, src)
+	case "ruby":
+		return g.rubyRefs(n, src)
+	case "python":
+		return g.pythonDecoratorRefs(n, src)
+	}
+	return nil
+}
+
+func (g *grammar) phpRefs(n *gts.Node, src []byte) []rawRef {
+	line := int(n.StartPoint().Row) + 1
+	start := n.StartByte()
+	switch n.Type(g.lang) {
+	case "function_call_expression":
+		fn := n.ChildByFieldName("function", g.lang)
+		if name := phpSymbolName(fn, g.lang, src); name != "" {
+			return []rawRef{{name: name, kind: "call", start: start, line: line}}
+		}
+	case "member_call_expression", "nullsafe_member_call_expression", "scoped_call_expression":
+		mn := n.ChildByFieldName("name", g.lang)
+		if mn != nil && mn.Type(g.lang) == "name" {
+			return []rawRef{{name: strings.TrimSpace(mn.Text(src)), kind: "call", start: start, line: line}}
+		}
+	case "object_creation_expression":
+		for i := 0; i < n.NamedChildCount(); i++ {
+			c := n.NamedChild(i)
+			if name := phpSymbolName(c, g.lang, src); name != "" {
+				return []rawRef{{name: name, kind: "call", start: start, line: line}}
+			}
+		}
+	case "base_clause", "class_interface_clause":
+		var out []rawRef
+		for i := 0; i < n.NamedChildCount(); i++ {
+			c := n.NamedChild(i)
+			if name := phpSymbolName(c, g.lang, src); name != "" {
+				out = append(out, rawRef{name: name, kind: "type", start: start, line: line})
+			}
+		}
+		return out
+	}
+	return nil
+}
+
+func phpSymbolName(n *gts.Node, lang *gts.Language, src []byte) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Type(lang) {
+	case "name":
+		return strings.TrimSpace(n.Text(src))
+	case "qualified_name":
+		var last string
+		for i := 0; i < n.NamedChildCount(); i++ {
+			c := n.NamedChild(i)
+			if c.Type(lang) == "name" {
+				last = strings.TrimSpace(c.Text(src))
+			}
+		}
+		return last
+	}
+	return ""
+}
+
+func (g *grammar) rubyRefs(n *gts.Node, src []byte) []rawRef {
+	typ := n.Type(g.lang)
+	if typ == "identifier" {
+		p := n.Parent()
+		if p == nil {
+			return nil
+		}
+		pt := p.Type(g.lang)
+		if pt != "body_statement" && pt != "then" && pt != "else" && pt != "return" {
+			return nil
+		}
+		name := strings.TrimSpace(n.Text(src))
+		if len(name) < 3 || name == "self" || name == "nil" || name == "true" || name == "false" || name == "super" || name == "yield" {
+			return nil
+		}
+		return []rawRef{{name: name, kind: "call", start: n.StartByte(), line: int(n.StartPoint().Row) + 1}}
+	}
+	if typ != "call" && typ != "method_call" {
+		return nil
+	}
+	if p := n.Parent(); p != nil && (p.Type(g.lang) == "method" || p.Type(g.lang) == "singleton_method") {
+		if declName := p.ChildByFieldName("name", g.lang); declName != nil && declName == n {
+			return nil
+		}
+	}
+	mn := n.ChildByFieldName("method", g.lang)
+	if mn == nil {
+		mn = childOfType(n, g.lang, "identifier")
+	}
+	if mn == nil {
+		return nil
+	}
+	name := strings.TrimSpace(mn.Text(src))
+	if name == "" || name == "require" || name == "require_relative" {
+		return nil
+	}
+	return []rawRef{{name: name, kind: "call", start: n.StartByte(), line: int(n.StartPoint().Row) + 1}}
+}
+
+func (g *grammar) pythonDecoratorRefs(n *gts.Node, src []byte) []rawRef {
+	if n.Type(g.lang) != "decorated_definition" {
+		return nil
+	}
+	def := n.ChildByFieldName("definition", g.lang)
+	if def == nil || def.EndByte() <= def.StartByte() {
+		return nil
+	}
+	refStart := def.StartByte()
+	var out []rawRef
+	for i := 0; i < n.NamedChildCount(); i++ {
+		dec := n.NamedChild(i)
+		if dec.Type(g.lang) != "decorator" || dec.NamedChildCount() == 0 {
+			continue
+		}
+		line := int(dec.StartPoint().Row) + 1
+		expr := dec.NamedChild(0)
+		if expr.Type(g.lang) == "call" {
+			if isPythonRouteDecorator(expr, g.lang, src) {
+				continue
+			}
+			expr = expr.ChildByFieldName("function", g.lang)
+			if expr == nil {
+				continue
+			}
+		}
+		switch expr.Type(g.lang) {
+		case "identifier":
+			if name := strings.TrimSpace(expr.Text(src)); name != "" {
+				out = append(out, rawRef{name: name, kind: "call", start: refStart, line: line})
+			}
+		case "attribute":
+			if obj := expr.ChildByFieldName("object", g.lang); obj != nil && obj.Type(g.lang) == "identifier" {
+				if name := strings.TrimSpace(obj.Text(src)); name != "" && name != "self" && name != "cls" {
+					out = append(out, rawRef{name: name, kind: "call", start: refStart, line: line})
+				}
+			}
+			if attr := expr.ChildByFieldName("attribute", g.lang); attr != nil {
+				if name := strings.TrimSpace(attr.Text(src)); name != "" {
+					out = append(out, rawRef{name: name, kind: "call", start: refStart, line: line})
+				}
+			}
+		}
+	}
+	return out
+}
+
+func isPythonRouteDecorator(callNode *gts.Node, lang *gts.Language, src []byte) bool {
+	fn := callNode.ChildByFieldName("function", lang)
+	args := callNode.ChildByFieldName("arguments", lang)
+	if fn == nil || fn.Type(lang) != "attribute" || args == nil || childOfType(args, lang, "string") == nil {
+		return false
+	}
+	attr := fn.ChildByFieldName("attribute", lang)
+	if attr == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(attr.Text(src))) {
+	case "get", "post", "put", "delete", "patch", "route":
+		return true
+	}
+	return false
 }
 
 func childOfType(n *gts.Node, lang *gts.Language, typ string) *gts.Node {
@@ -586,10 +890,19 @@ var routePatterns = []routePattern{
 		}},
 }
 
+var rubyRoutePattern = routePattern{
+	re:     regexp.MustCompile(`(?m)^\s*(get|post|put|delete|patch|before|after)\s*(?:\(\s*|\s+)['"](/[^'"]*)['"]`),
+	method: func(m []string) string { return strings.ToUpper(m[1]) },
+}
+
 // routes finds HTTP endpoints declared with common framework idioms.
-func routes(src []byte) []Symbol {
+func routes(lang string, src []byte) []Symbol {
+	patterns := routePatterns
+	if lang == "ruby" {
+		patterns = append(append([]routePattern(nil), routePatterns...), rubyRoutePattern)
+	}
 	var out []Symbol
-	for _, p := range routePatterns {
+	for _, p := range patterns {
 		for _, loc := range p.re.FindAllSubmatchIndex(src, -1) {
 			m := make([]string, len(loc)/2)
 			for i := range m {

@@ -261,7 +261,7 @@ func writeDeliveryTable(w io.Writer, summaries []deliverySummary) {
 func runDelivery(cases []caseSpec, indexes map[string]*index.Index, engines []string, tmp, outPath, reportMD string, keepContexts bool) error {
 	for _, name := range engines {
 		switch name {
-		case "v1", "v2", "v3", "v3.5", "v3.6":
+		case "v1", "v2", "v3", "v3.5", "v3.6", "v3.7":
 		default:
 			return fmt.Errorf("unknown delivery engine %q", name)
 		}
@@ -310,7 +310,7 @@ func runDelivery(cases []caseSpec, indexes map[string]*index.Index, engines []st
 		}
 	}
 	if outPath != "" {
-		data, _ := json.MarshalIndent(map[string]any{"hardware": hardware(), "engines": engines, "summary": summaries, "rows": rows}, "", "  ")
+		data, _ := json.MarshalIndent(map[string]any{"schema": "delivery/1", "hardware": hardware(), "engines": engines, "summary": summaries, "rows": rows}, "", "  ")
 		if err := os.WriteFile(outPath, data, 0o644); err != nil {
 			return err
 		}

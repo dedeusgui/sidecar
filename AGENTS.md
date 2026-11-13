@@ -58,15 +58,40 @@ Separar adaptadores de agentes, recuperação, persistência e aplicação. Mant
 6. **Documentar no mesmo PR:** atualizar README, docs de arquitetura/benchmark/instalação/roadmap que mudaram; anexar comandos, resultados reais, limitações e próximos experimentos. Se nenhuma doc mudar, justificar por quê na descrição.
 7. **Entregar:** PR pequeno com hipótese, mudança, evidências, risco, rollback e pendências. Não fazer merge por conta própria sem solicitação.
 
-## Comandos oficiais
+## Comandos oficiais e pipeline único (P0 → P3)
 
-```bash
-go test -count=1 ./...
-go test -race -count=1 ./internal/store/ ./internal/index/ ./internal/app/ ./internal/gitx/
-go run ./cmd/sidecar-eval --cases bench/cases.json --out /tmp/sidecar-eval.json
-go run ./cmd/sidecar explain --root . --json  # lê prompt de stdin
-go run ./cmd/sidecar doctor
-```
+Para evitar ciclos lentos (30–40 min) ou gasto pago sem retorno, todo trabalho de engine e produto segue o funil **P0 → P1 → P2 → P3** (ver [Benchmark Observatory](docs/benchmark-observatory.md) e [Milestones 3.6–4.0](docs/product-milestones.md)):
+
+- **P0 — Portão imediato (segundos, custo \$0, bloqueia merge):**
+  ```bash
+  go test -count=1 ./...
+  go test -race -count=1 ./internal/store/ ./internal/index/ ./internal/app/ ./internal/gitx/
+  python3 -m unittest discover -s bench -p 'test_*.py'
+  python3 bench/consolidate.py --check
+  python3 bench/v3.5/freeze.py verify
+  ```
+- **P1 — Loop iterativo rápido de entrega e concorrentes (`< 1 min`, custo \$0):**
+  ```bash
+  python3 bench/fast_gate.py --engines v1,v2,v3,v3.5,v3.6 --candidate v3.6 --baseline v3
+  # Com checkouts pinados e CodeGraph local (E1/E2 + Observatory HTML em /tmp/sidecar-fast-gate/observatory.html):
+  python3 bench/fast_gate.py --checkout <DIR> --codegraph "$(command -v codegraph)" --engines v1,v2,v3,v3.5,v3.6
+  ```
+  Todo ajuste de retrieval, gate, planner ou packer deve rodar P0 + P1 e inspecionar os casos que regrediram no HTML gerado pelo `sidecar studio` antes de abrir nova frente.
+- **P2 — Contrato real de hooks/clientes (custo \$0):**
+  ```bash
+  go run ./cmd/sidecar doctor
+  go run ./cmd/sidecar explain --root . --json  # lê prompt de stdin
+  ```
+  Validar `UserPromptSubmit`/`PreInvocation`, `skipped_invocation` e observação (`PreToolUse`/`PostToolUse`) sem erro em `hook.jsonl` antes de atribuir comportamento a cliente real.
+- **P3 — Piloto Agentic pago (`bench/lab/lab.py`, 30–40 min, custo real):**
+  - **Proibido** durante iteração de código ou antes de vencer P0 + P1 sem regressão crítica.
+  - Suporta `OFF`, `V1`, `V2`, `V3`, `V3.5`, `V3.6`, `V3.7` (e variantes `-hook`), além de `CG`/`CG-mcp` (CodeGraph). Sempre validar o harness antes com `--agent scripted` (custo \$0) e usar `--max-total-usd` explícito em execuções pagas.
+
+### Regra dura de encerramento e progressão (V3.7 → V4.0)
+
+1. **Não encerrar milestone com regressão escondida:** uma entrega (`3.7`, `3.8`, `3.9`, `4.0`) só pode ser marcada concluída ou candidata a promoção quando igualar ou superar a versão anterior e o alvo comparável (ex.: `V3` e `CodeGraph` offline no P1) sem regredir em entrega positiva, falsos positivos em negativos difíceis ou consistência de rótulos ([progressão](docs/engine-progression.md)).
+2. **Não pular para benchmark pago para "descobrir" bug de entrega:** se a candidata perde caminho/símbolo gold offline ou vaza negativos no P1 (`fast_gate.py` / `sidecar-eval --delivery`), corrigir e revalidar no loop rápido antes de rodar Claude/Codex.
+3. **Reuso externo com disciplina:** consultar até 2 referências principais por módulo em [catálogo](docs/reference-implementations.md) / [upstream V3](docs/v3/upstream-references.md), fixar SHA e licença (nunca copiar GPL/BUSL), e provar o ganho no mesmo P1 comparativo.
 
 `sidecar-eval` omite casos `holdout` por padrão e informa a contagem omitida em stderr; use `--include-holdout` somente para um relatório final após o freeze explícito.
 
@@ -86,6 +111,11 @@ Hooks são contratos versionados de terceiros: não presumir que Codex, Claude C
 
 ## Navegação
 
+- `docs/product-milestones.md`: entregas e critérios de encerramento de Sidecar 3.6 a 4.0.
+- `docs/benchmark-observatory.md`: especificação do painel HTML, contrato de runs e pipeline P0–P3.
+- `docs/engines.md` e `docs/engine-progression.md`: capacidades por engine, evidências medidas e critérios de promoção.
+- `docs/v3.7/research-plan.md`: plano experimental e hipóteses de V3.7 antes de implementar.
+- `bench/fast_gate.py` e `bench/lab/lab.py`: portão rápido P0+P1+Studio (`$0`) e harness agentic pareado (`OFF/V1..V3.7/CG/CG-mcp`).
 - `docs/context-engine-v2.md`: ADR de intenção, estratégia de candidatos e packing sob budget; **proposto**.
 - `docs/lsp-strategy.md`: LSP opcional, integração com plugins oficiais e consentimento de instalação.
 - `docs/agent-feedback.md`: observação de ferramentas e autorrelato como sinal auxiliar, nunca gold.

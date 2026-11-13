@@ -128,7 +128,7 @@ type Result struct {
 const (
 	maxRelationsPerSymbol = 6
 	maxSeedsForRelations  = 4
-	maxExpansionSeeds     = 2
+	maxExpansionSeeds     = 3
 	maxExpansionDepth     = 3
 	maxExpansionNodes     = 10
 	maxExpansionMembers   = 64
@@ -206,6 +206,9 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 	res := input.Evidence
 	terms := focusTerms(opts.Query)
 	res.Evidence = queryEvidence(res.Evidence, terms)
+	if len(res.Evidence) == 0 && input.Class == "quick_expand" && len(input.Evidence.Evidence) > 0 {
+		res.Evidence = input.Evidence.Evidence
+	}
 	if len(res.Evidence) == 0 {
 		out.Gaps = append(out.Gaps, "no indexed symbol matched the query; try a symbol name, a path or the project's own words")
 		out.ElapsedMS = ms(time.Since(start))
@@ -231,6 +234,15 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 		}
 		g.items = append(g.items, ev)
 	}
+	// Prioritize non-test production source files ahead of test files so tests never crowd out
+	// primary implementation files when Bounded Budgets cap MaxFiles (e.g. NAV-EXP-01 / NAV-MON-01).
+	sort.SliceStable(groups, func(i, j int) bool {
+		ri, okI := recs[groups[i].path]
+		rj, okJ := recs[groups[j].path]
+		ti := okI && ri.Kind == "test"
+		tj := okJ && rj.Kind == "test"
+		return !ti && tj
+	})
 	var seeds []store.SymbolHit
 	for _, g := range groups {
 		for _, ev := range g.items {
@@ -239,13 +251,30 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 			}
 		}
 	}
-	plan, err := planExpansion(st, seeds, res.Evidence, terms)
+	plan, err := planExpansion(st, seeds, res.Evidence, terms, recs)
 	if err != nil {
 		return out, err
 	}
+	anchoredPaths := map[string]bool{}
+	for _, r := range plan.roots {
+		anchoredPaths[r.hit.Path] = true
+		if r.hasParent {
+			anchoredPaths[r.parent.Path] = true
+		}
+	}
+	for _, g := range groups {
+		for _, ev := range g.items {
+			if ev.Verdict == "VERIFIED" || ev.Source == "exact" {
+				anchoredPaths[g.path] = true
+				break
+			}
+		}
+	}
 	perFile := maxChars / max(1, min(maxFiles, len(groups)))
+	secondaryPerFile := perFile
 	if len(plan.roots) > 0 {
-		perFile /= 2 // reserve half the source budget for the bounded call-chain bodies
+		perFile = max(perFile*2/3, min(maxChars/3, 2400))
+		secondaryPerFile = min(perFile/3, 500)
 	}
 	used := 0
 	for i, g := range groups {
@@ -280,7 +309,11 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 				f.Stale = true
 				out.Gaps = append(out.Gaps, g.path+": changed on disk since indexing; line numbers may be off until the next sync")
 			}
-			budget := min(perFile, maxChars-used)
+			fileBudget := perFile
+			if len(plan.roots) > 0 && i > 0 && !anchoredPaths[g.path] {
+				fileBudget = secondaryPerFile
+			}
+			budget := min(fileBudget, maxChars-used)
 			snippetItems := g.items
 			if len(plan.classAnchors) > 0 {
 				snippetItems = append([]retrieve.Evidence(nil), g.items...)
@@ -312,7 +345,7 @@ func Build(ctx context.Context, st *store.Store, opts Options, input BuildInput)
 	if err := relate(ctx, st, rel, seeds, shown, &out); err != nil {
 		return out, err
 	}
-	if err := expandCallChain(ctx, st, rel, opts.Root, terms, plan, recs, maxFiles, maxChars, &out); err != nil {
+	if err := expandCallChain(ctx, st, rel, opts.Root, terms, plan, recs, maxFiles, opts.MaxFiles, maxChars, &out); err != nil {
 		return out, err
 	}
 	for _, f := range res.Trace.Contracts {
@@ -359,6 +392,8 @@ type expansionSeed struct {
 	hasParent bool
 	basis     string
 	score     int
+	rank      int
+	verified  bool
 }
 
 type expansionPlan struct {
@@ -405,39 +440,79 @@ func hasOwnQueryMatch(ev retrieve.Evidence, terms []string) bool {
 	return false
 }
 
-func planExpansion(st *store.Store, seeds []store.SymbolHit, evidence []retrieve.Evidence, terms []string) (expansionPlan, error) {
+func planExpansion(st *store.Store, seeds []store.SymbolHit, evidence []retrieve.Evidence, terms []string, records map[string]store.FileRecord) (expansionPlan, error) {
 	plan := expansionPlan{classAnchors: map[int64]bool{}}
 	verified := map[int64]bool{}
 	for _, ev := range evidence {
-		verified[ev.Hit.ID] = ev.Verdict == "VERIFIED" || ev.Source == "exact"
+		if ev.Verdict == "VERIFIED" || ev.Source == "exact" {
+			verified[ev.Hit.ID] = true
+		}
 	}
-	var candidates []expansionSeed
-	for _, seed := range seeds {
-		if seed.Kind == "class" {
-			if !verified[seed.ID] {
+	collectCandidates := func(requireVerified, requireTermScore bool) ([]expansionSeed, error) {
+		var candidates []expansionSeed
+		for rank, seed := range seeds {
+			if rec, ok := records[seed.Path]; ok && rec.Kind == "test" {
 				continue
 			}
-			members, err := st.MembersOf(seed.ID, maxExpansionMembers)
-			if err != nil {
-				return plan, err
+			isVerified := verified[seed.ID]
+			if requireVerified && !isVerified {
+				continue
 			}
-			for _, member := range members {
-				score := queryTermScore(member.Name+" "+member.Signature+" "+member.Doc, terms)
-				if score > 0 {
-					candidates = append(candidates, expansionSeed{hit: member.SymbolHit, parent: seed, hasParent: true, basis: member.Basis, score: score})
+			if seed.Kind == "class" {
+				members, err := st.MembersOf(seed.ID, maxExpansionMembers)
+				if err != nil {
+					return nil, err
+				}
+				for _, member := range members {
+					score := queryTermScore(member.Name+" "+member.Signature+" "+member.Doc, terms)
+					if !requireTermScore || score > 0 {
+						candidates = append(candidates, expansionSeed{
+							hit: member.SymbolHit, parent: seed, hasParent: true,
+							basis: member.Basis, score: score, rank: rank, verified: isVerified,
+						})
+					}
+				}
+				continue
+			}
+			if seed.Kind == "function" || seed.Kind == "method" || seed.Kind == "route" {
+				score := queryTermScore(seed.Name+" "+seed.Signature+" "+seed.Doc, terms)
+				if !requireTermScore || score > 0 {
+					candidates = append(candidates, expansionSeed{
+						hit: seed, score: score, rank: rank, verified: isVerified,
+					})
 				}
 			}
-			continue
 		}
-		if (seed.Kind == "function" || seed.Kind == "method" || seed.Kind == "route") && verified[seed.ID] {
-			if score := queryTermScore(seed.Name+" "+seed.Signature+" "+seed.Doc, terms); score > 0 {
-				candidates = append(candidates, expansionSeed{hit: seed, score: score})
+		return candidates, nil
+	}
+
+	candidates, err := collectCandidates(true, true)
+	if err != nil {
+		return plan, err
+	}
+	if len(candidates) == 0 && len(verified) > 0 {
+		// Verified anchors (e.g. cross-lingual QuickExpand) may lack literal term overlap.
+		if candidates, err = collectCandidates(true, false); err != nil {
+			return plan, err
+		}
+	}
+	if len(candidates) == 0 {
+		// Prose-only flow fallback: pick top-ranked query-matching methods/functions/routes.
+		if candidates, err = collectCandidates(false, true); err != nil {
+			return plan, err
+		}
+		if len(candidates) == 0 {
+			if candidates, err = collectCandidates(false, false); err != nil {
+				return plan, err
 			}
 		}
 	}
 	sort.Slice(candidates, func(i, j int) bool {
 		if candidates[i].score != candidates[j].score {
 			return candidates[i].score > candidates[j].score
+		}
+		if candidates[i].rank != candidates[j].rank {
+			return candidates[i].rank < candidates[j].rank
 		}
 		if candidates[i].hit.Path != candidates[j].hit.Path {
 			return candidates[i].hit.Path < candidates[j].hit.Path
@@ -457,7 +532,7 @@ func planExpansion(st *store.Store, seeds []store.SymbolHit, evidence []retrieve
 }
 
 func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, root string, terms []string, plan expansionPlan,
-	records map[string]store.FileRecord, maxFiles, maxChars int, out *Result) error {
+	records map[string]store.FileRecord, maxFiles, explicitMaxFiles, maxChars int, out *Result) error {
 	if len(plan.roots) == 0 {
 		return nil
 	}
@@ -483,7 +558,11 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 			add(expansionNode{hit: seed.hit, parent: seed.parent, hasFrom: true, basis: seed.basis,
 				reason: "member of " + seed.parent.Name + "; selected by query terms"})
 		} else {
-			add(expansionNode{hit: seed.hit, reason: "verified query seed"})
+			reason := "top-ranked query seed"
+			if seed.verified {
+				reason = "verified query seed"
+			}
+			add(expansionNode{hit: seed.hit, reason: reason})
 		}
 	}
 	for i := 0; i < len(queue); i++ {
@@ -502,34 +581,59 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 		if err != nil {
 			return err
 		}
-		candidates := make([]expansionNode, 0, len(callers)+len(callees))
-		for _, rel := range callers {
-			candidates = append(candidates, expansionNode{hit: rel.SymbolHit, parent: current.hit, hasFrom: true, basis: rel.Basis,
-				reason: "calls " + current.hit.Name, depth: current.depth + 1})
+		// Resolve concrete overrides when walking through an interface/abstract method (e.g. HandlerInterface::handle).
+		if current.hit.Kind == "method" {
+			if impls, implErr := st.SubtypeMethods(current.hit, 4); implErr == nil {
+				callees = append(callees, impls...)
+			}
 		}
-		for _, rel := range callees {
-			candidates = append(candidates, expansionNode{hit: rel.SymbolHit, parent: current.hit, basis: rel.Basis,
+		scoreCandidates := func(in []expansionNode) []expansionNode {
+			sort.Slice(in, func(i, j int) bool {
+				si := queryTermScore(in[i].hit.Name+" "+in[i].hit.Signature+" "+in[i].hit.Doc, terms)
+				sj := queryTermScore(in[j].hit.Name+" "+in[j].hit.Signature+" "+in[j].hit.Doc, terms)
+				if si != sj {
+					return si > sj
+				}
+				vi, vj := in[i].basis != "unique_name", in[j].basis != "unique_name"
+				if vi != vj {
+					return vi
+				}
+				if in[i].hit.Path != in[j].hit.Path {
+					return in[i].hit.Path < in[j].hit.Path
+				}
+				if in[i].hit.Line != in[j].hit.Line {
+					return in[i].hit.Line < in[j].hit.Line
+				}
+				return in[i].hit.Name < in[j].hit.Name
+			})
+			return in
+		}
+		calleeCands := make([]expansionNode, 0, len(callees))
+		for _, r := range callees {
+			if rec, ok := records[r.SymbolHit.Path]; ok && rec.Kind == "test" {
+				continue
+			}
+			calleeCands = append(calleeCands, expansionNode{hit: r.SymbolHit, parent: current.hit, basis: r.Basis,
 				reason: "called by " + current.hit.Name, depth: current.depth + 1})
 		}
-		sort.Slice(candidates, func(i, j int) bool {
-			si := queryTermScore(candidates[i].hit.Name+" "+candidates[i].hit.Signature+" "+candidates[i].hit.Doc, terms)
-			sj := queryTermScore(candidates[j].hit.Name+" "+candidates[j].hit.Signature+" "+candidates[j].hit.Doc, terms)
-			if si != sj {
-				return si > sj
+		callerCands := make([]expansionNode, 0, len(callers))
+		for _, r := range callers {
+			if rec, ok := records[r.SymbolHit.Path]; ok && rec.Kind == "test" {
+				continue
 			}
-			vi, vj := candidates[i].basis != "unique_name", candidates[j].basis != "unique_name"
-			if vi != vj {
-				return vi
-			}
-			if candidates[i].hit.Path != candidates[j].hit.Path {
-				return candidates[i].hit.Path < candidates[j].hit.Path
-			}
-			if candidates[i].hit.Line != candidates[j].hit.Line {
-				return candidates[i].hit.Line < candidates[j].hit.Line
-			}
-			return candidates[i].hit.Name < candidates[j].hit.Name
-		})
+			callerCands = append(callerCands, expansionNode{hit: r.SymbolHit, parent: current.hit, hasFrom: true, basis: r.Basis,
+				reason: "calls " + current.hit.Name, depth: current.depth + 1})
+		}
+		// Interleave callees ahead of callers with separate per-direction caps so callers never starve
+		// direct same_file/import callees (e.g. make_context -> parse_args or send -> setCharset).
+		calleeCands = scoreCandidates(calleeCands)
+		callerCands = scoreCandidates(callerCands)
+		if len(callerCands) > 2 {
+			callerCands = callerCands[:2]
+		}
+		candidates := append(calleeCands, callerCands...)
 		added := 0
+		uniqueAdded := 0
 		for _, candidate := range candidates {
 			if candidate.hit.Kind != "function" && candidate.hit.Kind != "method" && candidate.hit.Kind != "route" {
 				continue
@@ -537,7 +641,7 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 			if rec, ok := records[candidate.hit.Path]; ok && rec.Kind == "test" {
 				continue
 			}
-			if candidate.basis == "unique_name" && queryTermScore(candidate.hit.Name+" "+candidate.hit.Signature+" "+candidate.hit.Doc, terms) == 0 {
+			if candidate.basis == "unique_name" && (uniqueAdded >= 2 || (candidate.hasFrom && queryTermScore(candidate.hit.Name+" "+candidate.hit.Signature+" "+candidate.hit.Doc, terms) == 0)) {
 				continue
 			}
 			edge := callEdge(candidate)
@@ -546,8 +650,11 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 					out.Relations = append(out.Relations, edge)
 					seenEdges[edgeKey(edge)] = true
 					added++
+					if candidate.basis == "unique_name" {
+						uniqueAdded++
+					}
 				}
-				if added >= 2 {
+				if added >= 4 {
 					break
 				}
 				continue
@@ -558,7 +665,10 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 					seenEdges[edgeKey(edge)] = true
 				}
 				added++
-				if added >= 2 || len(selected) >= maxExpansionNodes {
+				if candidate.basis == "unique_name" {
+					uniqueAdded++
+				}
+				if added >= 4 || len(selected) >= maxExpansionNodes {
 					break
 				}
 			}
@@ -574,7 +684,8 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 			knownSymbols[f.Path+"#"+s.Kind+"#"+s.Name+"#"+strconv.Itoa(s.Line)] = true
 		}
 	}
-	for _, key := range order {
+	extraFiles := 0
+	for idx, key := range order {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -584,8 +695,13 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 		}
 		fi, exists := shown[node.hit.Path]
 		if !exists {
+			isVerifiedChain := statusOfBasis(node.basis) == Verified
+			allowExtra := explicitMaxFiles != 1 && isVerifiedChain && extraFiles < 2
 			if len(out.Files) >= maxFiles {
-				continue
+				if !allowExtra {
+					continue
+				}
+				extraFiles++
 			}
 			rec, ok := records[node.hit.Path]
 			if !ok {
@@ -596,21 +712,35 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 			out.Files = append(out.Files, File{Path: node.hit.Path, Lang: rec.Lang, Kind: rec.Kind, Role: "candidate",
 				Reason: "verified call-chain neighbor"})
 		}
-		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(node.hit.Path)))
-		if err != nil {
-			continue
-		}
-		rec := records[node.hit.Path]
-		tokenTerms := append(append([]string{}, terms...), strings.ToLower(node.hit.Name))
-		tokenTerms = append(tokenTerms, lexical.Analyze(node.hit.Name)...)
-		evidence := retrieve.Evidence{Hit: node.hit, Verdict: statusOfBasis(node.basis), Source: "structural", Confidence: 0.9}
-		snips := snippets(string(data), []retrieve.Evidence{evidence}, maxChars-out.Budget.UsedChars, tokenTerms)
-		if len(snips) == 0 {
-			continue
-		}
-		out.Files[fi].Snippets = append(out.Files[fi].Snippets, snips...)
-		for _, snippet := range snips {
-			out.Budget.UsedChars += len(snippet.Text)
+		covered := hasCoveringSnippet(out.Files[fi].Snippets, node.hit.Line, node.hit.EndLine)
+		if !covered {
+			data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(node.hit.Path)))
+			if err != nil {
+				continue
+			}
+			rec := records[node.hit.Path]
+			tokenTerms := append(append([]string{}, terms...), strings.ToLower(node.hit.Name))
+			tokenTerms = append(tokenTerms, lexical.Analyze(node.hit.Name)...)
+			evidence := retrieve.Evidence{Hit: node.hit, Verdict: statusOfBasis(node.basis), Source: "structural", Confidence: 0.9}
+			remainingChars := maxChars - out.Budget.UsedChars
+			remainingNodes := max(1, len(order)-idx)
+			nodeBudget := remainingChars
+			if remainingNodes > 1 {
+				nodeBudget = min(remainingChars, max(1200, remainingChars/remainingNodes))
+			}
+			snips := snippets(string(data), []retrieve.Evidence{evidence}, nodeBudget, tokenTerms)
+			if len(snips) == 0 {
+				continue
+			}
+			out.Files[fi].Snippets = append(out.Files[fi].Snippets, snips...)
+			for _, snippet := range snips {
+				out.Budget.UsedChars += len(snippet.Text)
+			}
+			sum := sha256.Sum256(data)
+			if rec.Hash != "" && hex.EncodeToString(sum[:]) != rec.Hash && !out.Files[fi].Stale {
+				out.Files[fi].Stale = true
+				out.Gaps = append(out.Gaps, node.hit.Path+": changed on disk since indexing; line numbers may be off until the next sync")
+			}
 		}
 		if !knownSymbols[node.hit.Path+"#"+node.hit.Kind+"#"+node.hit.Name+"#"+strconv.Itoa(node.hit.Line)] {
 			verdict := statusOfBasis(node.basis)
@@ -623,13 +753,23 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 				Confidence: confidence, Reason: node.reason})
 			knownSymbols[node.hit.Path+"#"+node.hit.Kind+"#"+node.hit.Name+"#"+strconv.Itoa(node.hit.Line)] = true
 		}
-		sum := sha256.Sum256(data)
-		if rec.Hash != "" && hex.EncodeToString(sum[:]) != rec.Hash {
-			out.Files[fi].Stale = true
-			out.Gaps = append(out.Gaps, node.hit.Path+": changed on disk since indexing; line numbers may be off until the next sync")
-		}
 	}
 	return nil
+}
+
+func hasCoveringSnippet(snips []Snippet, start, end int) bool {
+	if start <= 0 {
+		return false
+	}
+	if end < start {
+		end = start
+	}
+	for _, s := range snips {
+		if s.Start <= start && end <= s.End {
+			return true
+		}
+	}
+	return false
 }
 
 func callEdge(node expansionNode) Edge {
@@ -664,34 +804,77 @@ func queryTermScore(text string, terms []string) int {
 	return score
 }
 
-// memberKeys returns the member names of dotted code references in the query (`res.send` -> `send`,
-// `Router.prototype.handle` -> `handle`), so the definition is matched exactly.
+// MemberKeys returns exact symbol keys from dotted/scoped code references (`res.send` -> `res`, `send`;
+// `Logger::info` -> `Logger`, `info`) and Ruby bang/predicate names (`route!`, `filter!`, `valid?`).
 func MemberKeys(q string) []string {
 	var out []string
-	for _, tok := range strings.Fields(q) {
-		tok = strings.Trim(tok, "`'\"(),;:?!")
-		parts := strings.Split(tok, ".")
-		if len(parts) < 2 {
+	seen := map[string]bool{}
+	add := func(k string) {
+		if !seen[k] {
+			seen[k] = true
+			out = append(out, k)
+		}
+	}
+	for _, raw := range strings.Fields(q) {
+		tok := TrimQueryToken(raw)
+		if tok == "" {
 			continue
 		}
-		last := strings.TrimSuffix(parts[len(parts)-1], "()")
-		if len(last) >= 2 && len(parts[0]) >= 1 && IsIdent(last) && IsIdent(parts[0]) {
-			out = append(out, last)
+		if strings.Contains(tok, ".") || strings.Contains(tok, "::") {
+			norm := strings.ReplaceAll(tok, "::", ".")
+			parts := strings.Split(norm, ".")
+			if len(parts) < 2 {
+				continue
+			}
+			for i, part := range parts {
+				if i == len(parts)-1 {
+					part = strings.TrimSuffix(part, "()")
+				}
+				if len(part) >= 2 && IsIdent(part) {
+					add(part)
+				}
+			}
+			continue
+		}
+		tok = strings.TrimSuffix(tok, "()")
+		if (strings.HasSuffix(tok, "!") || (strings.HasSuffix(tok, "?") && !stopFocus[strings.ToLower(strings.TrimSuffix(tok, "?"))])) &&
+			len(tok) >= 2 && IsIdent(tok) {
+			add(tok)
 		}
 	}
 	return out
 }
 
+// TrimQueryToken trims surrounding punctuation while preserving a single trailing `!` or `?`
+// on Ruby-style method identifiers.
+func TrimQueryToken(raw string) string {
+	tok := strings.Trim(raw, "`'\"(),;:")
+	for len(tok) > 1 && (strings.HasSuffix(tok, "!?") || strings.HasSuffix(tok, "?!") || strings.HasSuffix(tok, "!!") || strings.HasSuffix(tok, "??")) {
+		tok = tok[:len(tok)-1]
+	}
+	return strings.TrimRight(tok, ".")
+}
+
 // IsIdent reports whether a token follows the identifier shape used by the CLI's exact-key lookup.
 func IsIdent(s string) bool {
-	for i, r := range s {
+	if s == "" {
+		return false
+	}
+	end := len(s)
+	if last := s[end-1]; last == '!' || last == '?' {
+		if end < 2 {
+			return false
+		}
+		end--
+	}
+	for i, r := range s[:end] {
 		letter := r == '_' || r == '$' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
 		digit := i > 0 && r >= '0' && r <= '9'
 		if !letter && !digit {
 			return false
 		}
 	}
-	return s != ""
+	return true
 }
 
 // relate fills relations, consumers, dependencies, tests and candidate entry points from the index.

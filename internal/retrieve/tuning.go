@@ -34,6 +34,16 @@ func DefaultTuning() Tuning {
 		MinBlockConfidence: minBlockConfidence, LongPromptTerms: 0, LongPromptMinSupport: 0, LongPromptExemptCoverage: 0}
 }
 
+// V37Tuning returns the deterministic V3.7 ranking and length-aware specificity parameters.
+// DefaultTuning remains unchanged for V2/V3/V3.5/V3.6 compatibility.
+func V37Tuning() Tuning {
+	t := DefaultTuning()
+	t.LongPromptTerms = 7
+	t.LongPromptMinSupport = 2
+	t.LongPromptExemptCoverage = 0.35
+	return t
+}
+
 // Valid reports whether the parameters are usable; replay rejects invalid variants instead of running them.
 func (t Tuning) Valid() bool {
 	ok := func(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 }

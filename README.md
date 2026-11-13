@@ -56,7 +56,7 @@ estruturais, o orçamento de tokens, os tempos por fase e o contexto final. Use 
 | `sidecar status [--root DIR] [--json]` | resumo do índice do repositório |
 | `sidecar doctor` | instalação, binário, SQLite/FTS5, integridade do índice, falhas recentes |
 | `sidecar feedback record\|list\|purge [--root DIR] [--json]` | feedback pós-tarefa sobre evidências, opt-in; afeta o ranking só com `SIDECAR_ENGINE=v2`. `record --helpful ID --misleading ID` ou JSON no stdin; `purge` remove os obsoletos (`--all`: todos). Ver [agent-feedback.md](docs/agent-feedback.md) |
-| `sidecar explain [--root DIR] [--json] [--engine v1\|v2\|v3]` | rastro completo de um prompt (lê stdin); com `v3` inclui a decisão do RelevanceGate/EffortRouter |
+| `sidecar explain [--root DIR] [--json] [--engine v1\|v2\|v3\|v3.5\|v3.6\|v3.7]` | rastro completo de um prompt (lê stdin); com `v3`–`v3.7` inclui a decisão do gate/roteador/planner |
 | `sidecar explore --query TEXTO [--root DIR] [--json]` | **experimental**: exploração estrutural sob demanda (trechos numerados, chamadas/imports verificados, testes, impacto, lacunas) sob orçamento. Ver [explore.md](docs/explore.md) |
 | `sidecar activity [--json] [--limit N]` | últimas execuções do hook: `injected`, `no_evidence`, `skipped`, `partial`, `failed`, com latência p50/p95; nunca mostra o prompt |
 | `sidecar statusline` | uma linha para a status line, p. ex. `Sidecar: injected · 4 refs · 18ms` ou `Sidecar: no match` |
@@ -147,6 +147,8 @@ A V3.5 unifica as capacidades existentes sob um único motor determinístico: **
 
 A V3.6 é uma revisão experimental de seleção e entrega da V3.5, ativada por `SIDECAR_ENGINE=v3.6`. Seus resultados mostram ganhos e regressões, sem comprovar superioridade geral; a V1 permanece padrão. Veja [resultados e limitações](docs/v3.6/progress.md) e [critérios de progressão das engines](docs/engine-progression.md).
 
+A V3.7 (`SIDECAR_ENGINE=v3.7`, opt-in) consolida o pipeline unificado com recuperação, resolução, grafo (`internal/store`) e `explore` ampliados e o portão rápido P0–P1 (`bench/fast_gate.py` + Observatory HTML em `internal/studio`). Passou nos portões offline P0 e P1 sem regressões frente à V3 e à V3.6; **V1 continua default** e a validação agentic **P3** permanece pendente. Veja [arquitetura V3.7](docs/v3.7/architecture.md) e [progresso V3.7](docs/v3.7/progress.md).
+
 ## Engenharia, benchmarks e roadmap
 
 - [AGENTS.md](AGENTS.md): contrato dos agentes que desenvolvem o Sidecar (não exige regras no repositório do usuário).
@@ -155,7 +157,7 @@ A V3.6 é uma revisão experimental de seleção e entrega da V3.5, ativada por 
 - [docs/engines.md](docs/engines.md): histórico, diferenças entre engines, evidências e marcos futuros.
 - [docs/product-milestones.md](docs/product-milestones.md): milestones de produto Sidecar 3.6–4.0, entregas, gates e objetivo competitivo de superar alternativas em benchmarks justos e econômicos.
 - [docs/benchmark-observatory.md](docs/benchmark-observatory.md): plano para um painel HTML offline, comparativos reproduzíveis e inspeção dos dados por engine, concorrente e execução.
-- [docs/v3.7/research-plan.md](docs/v3.7/research-plan.md): estudo proposto de generalização, uso pelo agente e arquitetura unificada.
+- [docs/v3.7/research-plan.md](docs/v3.7/research-plan.md), [docs/v3.7/architecture.md](docs/v3.7/architecture.md) e [docs/v3.7/progress.md](docs/v3.7/progress.md): plano, arquitetura e checkpoint offline P0+P1 da engine V3.7 (opt-in).
 - [docs/context-engine-v2.md](docs/context-engine-v2.md): arquitetura proposta de recuperação por intenção e contexto por token.
 - [docs/lsp-strategy.md](docs/lsp-strategy.md): suporte LSP, coexistência com plugins e instalação segura.
 - [docs/agent-feedback.md](docs/agent-feedback.md): observabilidade do loop e feedback parametrizado sem autoaprendizado.

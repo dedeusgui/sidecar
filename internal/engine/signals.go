@@ -254,6 +254,91 @@ func hasCodeAnchor(s TaskSignals, res retrieve.Result, translated bool) bool {
 	return false
 }
 
+var ubiquitousAnchorWords = buildLexicon(`
+route order record entry log list map set key port time date name line row path open show get error item type data code file test
+`)
+
+func isUbiquitousAnchorWord(w string) bool {
+	return ubiquitousAnchorWords[w] || ubiquitousAnchorWords[lexical.Stem(w)]
+}
+
+// hasCodeAnchorV37 is the V3.7 delivery anchor gate: it inspects only the top 8 evidence items,
+// allows section hits with >= 2 matched terms and >= 0.4 present ratio, and prevents 1-term
+// translation-only anchoring onto ubiquitous polysemous symbol words without software/repo cues.
+func hasCodeAnchorV37(s TaskSignals, res retrieve.Result) bool {
+	limit := min(len(res.Evidence), 8)
+	hasSoftwareOrCue := len(s.SoftwareTerms) > 0 || s.RepoCue
+	var cands []retrieve.Evidence
+	for _, ev := range res.Evidence[:limit] {
+		if ev.Hit.Name == "" || ev.Hit.Kind == "file" {
+			continue
+		}
+		if ev.Hit.Kind == "section" && !(len(ev.Matched) >= 2 && s.PresentRatio >= 0.4) {
+			continue
+		}
+		if !hasSoftwareOrCue && isTestOrBenchPath(ev.Hit.Path) && len(ev.Matched) < 2 {
+			continue
+		}
+		cands = append(cands, ev)
+	}
+	if len(cands) == 0 {
+		return false
+	}
+	for _, locator := range s.Locators {
+		if locator.Verified {
+			return true
+		}
+	}
+	if s.RepoCue {
+		return true
+	}
+	literalTerms := make(map[string]bool, len(res.Trace.Terms))
+	for _, term := range res.Trace.Terms {
+		if len(term) >= 3 && !genericAnchorTerms[term] {
+			literalTerms[term] = true
+		}
+	}
+	for _, ev := range cands {
+		if !hasSoftwareOrCue && s.PresentRatio < 0.4 && len(ev.Matched) < 2 {
+			continue
+		}
+		for _, w := range symbolWords(ev.Hit.Name) {
+			if literalTerms[w] || literalTerms[lexical.Stem(w)] {
+				return true
+			}
+		}
+	}
+	translatedTerms := make(map[string]bool)
+	for term, translations := range res.Trace.Translations {
+		if genericAnchorTerms[term] {
+			continue
+		}
+		for _, translation := range translations {
+			if len(translation) >= 3 && !genericAnchorTerms[translation] {
+				translatedTerms[translation] = true
+			}
+		}
+	}
+	hasSoftware := len(s.SoftwareTerms) > 0
+	rareCeiling := max(6, res.Trace.TotalSymbols/50)
+	for _, ev := range cands {
+		for _, w := range symbolWords(ev.Hit.Name) {
+			if !translatedTerms[w] && !translatedTerms[lexical.Stem(w)] {
+				continue
+			}
+			if hasSoftware || len(ev.Matched) >= 2 {
+				return true
+			}
+			if ev.MinSymbolDF > 0 && ev.MinSymbolDF <= rareCeiling &&
+				(res.Trace.TotalSymbols == 0 || ev.MinSymbolDF <= max(2, res.Trace.TotalSymbols/4)) &&
+				!isUbiquitousAnchorWord(w) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 var genericAnchorTerms = buildLexicon(`
 a an and are as at be by can could do does for from had has have he her here hers him his how i if in into is it its may me might my of on or our ours she should so than that the their them then there these they this those through to too up us was we were what when where which who why will with would you your
 ainda algum alguma alguns algumas assim bem cada coisa como da das de dela delas dele deles depois do dos e ela elas ele eles em enquanto entre era essa esse essas esses esta este estas estes eu faz fazer fez fica ficar foi foram fosse garantia hoje isso isto já la mais mas me meu minha meus minhas muito nada nele nela nem no nos nossa nossas nosso nossos novo o os outra outras outro outros para pela pelas pelo pelos pequeno pode por porque qual quando que quem será seu seus sem sempre sua suas também tanto toda todas todo todos tu um uma umas uns vai vais vão voce voces você vocês
@@ -273,4 +358,12 @@ func contains(xs []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func isTestOrBenchPath(path string) bool {
+	p := strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
+	return strings.Contains(p, "/bench/") || strings.Contains(p, "/benchmarks/") ||
+		strings.Contains(p, "/test/") || strings.Contains(p, "/tests/") ||
+		strings.Contains(p, "/spec/") || strings.Contains(p, "_test.") ||
+		strings.Contains(p, ".test.") || strings.Contains(p, ".spec.")
 }

@@ -118,7 +118,7 @@ func main() {
 	v3Decisions := flag.String("v3-decisions", "", "write the V3 router decision (signals, action, reasons) of every case to this JSON file")
 	reportMD := flag.String("report-md", "", "write a Markdown report to this path (includes the comparison when --compare is set)")
 	delivery := flag.Bool("delivery", false, "delivery scorecard: score what the real hook entry point hands the agent, per engine (no model, no network)")
-	deliveryEngines := flag.String("delivery-engines", "v3,v3.5,v3.6", "comma-separated engines for --delivery")
+	deliveryEngines := flag.String("delivery-engines", "v3,v3.5,v3.6,v3.7", "comma-separated engines for --delivery")
 	deliveryContexts := flag.Bool("delivery-contexts", false, "keep the delivered text in --out (local diagnosis only; it contains repository source)")
 	deliveryNegatives := flag.String("delivery-negatives", "", "hard negatives file; its dev and validation splits (never holdout) are run against every repository")
 	flag.Parse()

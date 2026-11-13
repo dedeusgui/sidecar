@@ -45,6 +45,11 @@ func TestParseToolRejectsWrongEventAndUnknownEvent(t *testing.T) {
 	if _, err := ParseTool(Claude, "PreToolUse", strings.NewReader(payload)); err == nil {
 		t.Fatal("mismatched hook event accepted")
 	}
+	// Some client builds emit camelCase event names (e.g. "preToolUse") in hook_event_name.
+	camel := `{"hook_event_name":"preToolUse","tool_name":"Read","tool_input":{"file_path":"a.go"}}`
+	if got, err := ParseTool(Claude, "PreToolUse", strings.NewReader(camel)); err != nil || got.Phase != "pre" || got.Path != "a.go" {
+		t.Fatalf("camelCase hook_event_name failed: got=%+v err=%v", got, err)
+	}
 	if _, err := ParseTool(Claude, "Stop", strings.NewReader(payload)); err == nil {
 		t.Fatal("unsupported event accepted")
 	}

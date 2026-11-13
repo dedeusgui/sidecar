@@ -417,3 +417,62 @@ func TestFullGitRescanRemovesFilesMissingFromCleanWorktree(t *testing.T) {
 		t.Fatalf("deleted symbol remains searchable: %+v", hits)
 	}
 }
+
+func TestPHPRubyAndCommonJSImportResolution(t *testing.T) {
+	root := mkRepo(t)
+	put(t, root, "src/Monolog/Logger.php", `<?php
+namespace Monolog;
+use Monolog\Handler\HandlerInterface;
+use Monolog\Handler\AbstractProcessingHandler;
+class Logger {
+    public function addRecord($msg) { return $this->handle($msg); }
+}
+`)
+	put(t, root, "src/Monolog/Handler/HandlerInterface.php", `<?php
+namespace Monolog\Handler;
+interface HandlerInterface {
+    public function handle($record);
+}
+`)
+	put(t, root, "src/Monolog/Handler/AbstractProcessingHandler.php", `<?php
+namespace Monolog\Handler;
+abstract class AbstractProcessingHandler implements HandlerInterface {
+    public function handle($record) { return $this->write($record); }
+    abstract protected function write($record);
+}
+`)
+	put(t, root, "lib/sinatra.rb", "require_relative 'sinatra/base'\n")
+	put(t, root, "lib/sinatra/base.rb", "class Base\n  def dispatch!\n    route!\n  end\n  def route!\n    1\n  end\nend\n")
+	put(t, root, "test/app_spec.rb", "require 'sinatra/base'\n")
+	put(t, root, "lib/response.js", "var utils = require('./utils');\nexports.send = function send(x) { return utils.norm(x); };\n")
+	put(t, root, "lib/utils.js", "exports.norm = function norm(x) { return x; };\n")
+	git(t, root, "add", ".")
+	git(t, root, "commit", "-q", "-m", "init")
+
+	ix := openIndex(t, root)
+	mustSync(t, ix, Options{})
+
+	checkImports := func(from string, want ...string) {
+		t.Helper()
+		got, err := ix.Store().ResolvedImportPaths(from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gotSet := map[string]bool{}
+		for _, p := range got {
+			gotSet[p] = true
+		}
+		for _, w := range want {
+			if !gotSet[w] {
+				t.Errorf("ResolvedImportPaths(%q) = %v, missing %q", from, got, w)
+			}
+		}
+	}
+	checkImports("src/Monolog/Logger.php",
+		"src/Monolog/Handler/HandlerInterface.php",
+		"src/Monolog/Handler/AbstractProcessingHandler.php",
+	)
+	checkImports("lib/sinatra.rb", "lib/sinatra/base.rb")
+	checkImports("test/app_spec.rb", "lib/sinatra/base.rb")
+	checkImports("lib/response.js", "lib/utils.js")
+}

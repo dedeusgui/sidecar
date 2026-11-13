@@ -90,7 +90,7 @@ func stateOf(rec logRecord) string {
 		return "partial"
 	case "no_evidence":
 		return "no_evidence"
-	case "skipped", "skipped_unsafe_root":
+	case "skipped", "skipped_unsafe_root", "skipped_invocation":
 		return "skipped"
 	case "error", "panic", "bad_input", "write_error":
 		return "failed"

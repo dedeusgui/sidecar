@@ -268,3 +268,127 @@ func hasGap(gaps []contract.Gap, kind string) bool {
 	}
 	return false
 }
+
+func TestQuickExpandAllowCandidateAnchorAndCallPaths(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"dispatch.rb": `class Router
+  def dispatch!
+    route!
+  end
+
+  def route!
+    process_route
+  end
+
+  def process_route
+    200
+  end
+end
+`,
+	}
+	for rel, body := range files {
+		if err := os.WriteFile(filepath.Join(root, rel), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ix, _, err := index.Open(root, filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ix.Close() })
+	if _, err := ix.Sync(context.Background(), index.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	st := ix.Store()
+	syms, err := st.SymbolsInFile("dispatch.rb", 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dispatchSym store.SymbolHit
+	for _, s := range syms {
+		if s.Name == "dispatch!" {
+			dispatchSym = s
+		}
+	}
+	fileSym, ok, err := st.FileSymbol("dispatch.rb")
+	if err != nil || !ok || dispatchSym.ID == 0 {
+		t.Fatalf("missing symbols: ok=%v err=%v syms=%+v", ok, err, syms)
+	}
+	registry := contract.NewEvidenceRegistry[retrieve.Evidence](contract.Scope{RepoRoot: root})
+	fileRef, _, err := registry.Add(contract.EvidenceRef{
+		Path: fileSym.Path, LineStart: fileSym.Line, LineEnd: fileSym.EndLine,
+		Fingerprint: fileSym.FileHash, Origin: "retrieve:lexical",
+		Confidence: contract.ConfidenceCandidate, Freshness: contract.FreshnessCurrent, CostEstimate: 5,
+	}, retrieve.Evidence{Hit: fileSym, Verdict: "INFERRED", Source: "lexical"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	candRef, _, err := registry.Add(contract.EvidenceRef{
+		Path: dispatchSym.Path, LineStart: dispatchSym.Line, LineEnd: dispatchSym.EndLine,
+		Fingerprint: dispatchSym.FileHash, Origin: "retrieve:lexical",
+		Confidence: contract.ConfidenceCandidate, Freshness: contract.FreshnessCurrent, CostEstimate: 10,
+	}, retrieve.Evidence{Hit: dispatchSym, Verdict: "INFERRED", Source: "lexical", Matched: []string{"dispatch"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Default AllowCandidateAnchor=false preserves V3.5/V3.6 contract.
+	disallowed := QuickExpand(context.Background(), st, QuickRequest{
+		Enabled: true, Root: root, Query: "como funciona o roteamento?",
+		Anchors: []contract.EvidenceRef{fileRef, candRef},
+	}, registry)
+	if !hasGap(disallowed.Gaps, "no_verified_anchor") || len(disallowed.Evidence) != 0 {
+		t.Fatalf("AllowCandidateAnchor=false should reject candidate anchors: %+v", disallowed.Gaps)
+	}
+
+	// AllowCandidateAnchor=true skips file anchor and falls back to non-file INFERRED anchor.
+	expanded := QuickExpand(context.Background(), st, QuickRequest{
+		Enabled: true, Root: root, Query: "como funciona o roteamento?",
+		Anchors:              []contract.EvidenceRef{fileRef, candRef},
+		AllowCandidateAnchor: true,
+		Limits:               Limits{Timeout: time.Second, MaxFiles: 2, MaxTokens: 512},
+	}, registry)
+	if len(expanded.Evidence) == 0 {
+		t.Fatalf("AllowCandidateAnchor=true did not expand candidate anchor: gaps=%+v", expanded.Gaps)
+	}
+	var gotRoute, gotProcess bool
+	for _, ref := range expanded.Evidence {
+		entry, ok := registry.Lookup(ref.Key)
+		if !ok {
+			t.Fatalf("expanded ref missing from registry: %+v", ref)
+		}
+		if ref.Confidence == contract.ConfidenceVerified && !ref.Proof.Valid() {
+			t.Fatalf("verified ref without proof: %+v", ref)
+		}
+		if entry.Value.Hit.Name == "route!" {
+			gotRoute = true
+		}
+		if entry.Value.Hit.Name == "process_route" {
+			gotProcess = true
+		}
+	}
+	if !gotRoute || !gotProcess {
+		t.Fatalf("call-chain neighbors missing from QuickExpand evidence: route!=%v process_route=%v ev=%+v", gotRoute, gotProcess, expanded.Evidence)
+	}
+	var hasCallPath bool
+	for _, p := range expanded.CallPaths {
+		if p == "Calls: dispatch! -> route! -> process_route" {
+			hasCallPath = true
+		}
+	}
+	if !hasCallPath {
+		t.Fatalf("CallPaths missing expected chain: %v", expanded.CallPaths)
+	}
+
+	// Stale candidate anchor must still fail open as stale_anchor.
+	staleCand := candRef
+	staleCand.Freshness = contract.FreshnessStale
+	staleRes := QuickExpand(context.Background(), st, QuickRequest{
+		Enabled: true, Root: root, Query: "dispatch!",
+		Anchors: []contract.EvidenceRef{staleCand}, AllowCandidateAnchor: true,
+	}, registry)
+	if !hasGap(staleRes.Gaps, "stale_anchor") {
+		t.Fatalf("stale candidate anchor should fail open with stale_anchor: %+v", staleRes.Gaps)
+	}
+}

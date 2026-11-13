@@ -92,7 +92,7 @@ func ParseTool(agent Agent, event string, r io.Reader) (ToolCall, error) {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return ToolCall{}, fmt.Errorf("%s payload: %w", agent, err)
 	}
-	if raw.HookEventName != "" && raw.HookEventName != event {
+	if raw.HookEventName != "" && !strings.EqualFold(raw.HookEventName, event) {
 		return ToolCall{}, fmt.Errorf("hook event %q does not match %q", raw.HookEventName, event)
 	}
 	c := ToolCall{

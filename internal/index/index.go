@@ -29,7 +29,7 @@ import (
 // extractVersion identifies the extraction and row layout. Each file records the version
 // that produced its rows; bumping this makes every file stale, and syncs re-parse stale
 // files a bounded batch at a time, so the rebuild completes across several prompts.
-const extractVersion = 3 // 2: .rs, .php, .rb and .kt files now get symbols; 3: JS/TS functions assigned to members (L03)
+const extractVersion = 4 // 2: .rs, .php, .rb and .kt files now get symbols; 3: JS/TS functions assigned to members (L03); 4: PHP/Ruby/CommonJS call/import extraction and Python decorator calls
 
 const (
 	maxSymbolsPerFile = 5000

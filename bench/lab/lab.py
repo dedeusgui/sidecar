@@ -1058,18 +1058,31 @@ def merge_turns(turns):
             **optional_metrics}
 
 
-def codegraph_shim(package_dir):
-    """Path of the codegraph entry point inside an installed package dir (npm --prefix DIR), relative to it."""
+def _codegraph_pkg_dir(package_dir):
     root = pathlib.Path(package_dir)
-    for rel in ("node_modules/@colbymchenry/codegraph/npm-shim.js", "node_modules/@colbymchenry/codegraph/dist/bin/codegraph.js"):
-        if (root / rel).is_file():
-            return rel
-    raise LabError(f"codegraph não encontrado em {root} (instale com npm install --prefix DIR @colbymchenry/codegraph@VERSÃO)")
+    for rel in ("node_modules/@colbymchenry/codegraph", "lib/node_modules/@colbymchenry/codegraph"):
+        cand = root / rel
+        if cand.is_dir():
+            return rel, cand
+    return None, None
+
+
+def codegraph_shim(package_dir):
+    """Path of the codegraph entry point inside an installed package dir (npm --prefix or nvm prefix), relative to it."""
+    rel_pkg, pkg_dir = _codegraph_pkg_dir(package_dir)
+    if pkg_dir is not None:
+        for entry in ("npm-shim.js", "dist/bin/codegraph.js"):
+            if (pkg_dir / entry).is_file():
+                return f"{rel_pkg}/{entry}"
+    raise LabError(f"codegraph não encontrado em {package_dir} (instale com npm install --prefix DIR @colbymchenry/codegraph@VERSÃO)")
 
 
 def codegraph_version(package_dir):
     try:
-        return load_json(pathlib.Path(package_dir) / "node_modules/@colbymchenry/codegraph/package.json").get("version")
+        _, pkg_dir = _codegraph_pkg_dir(package_dir)
+        if pkg_dir is None:
+            return None
+        return load_json(pkg_dir / "package.json").get("version")
     except (OSError, ValueError, LabError):
         return None
 
@@ -1447,30 +1460,36 @@ def progress_report(sidecar, events):
 KNOWN_FEATURES = {"adaptive", "brief", "groom", "impact"}  # nomes aceitos em SIDECAR_FEATURES
 
 
+EXPLORE_ENGINES = {"V3", "V3.5", "V3.6", "V3.7"}
+
+
 def parse_arms(spec):
-    """OFF | V1 | V2 | NAME=engine[,ENV=val...]; engine None = sem hook (OFF)."""
+    """OFF | V1 | V2 | V3 | V3.5 | V3.6 | V3.7 | *-hook | *+<feat> | CG | CG-mcp; engine None = sem hook (OFF)."""
     arms = []
     for item in spec.split(","):
         if item == "OFF":
             arms.append({"name": "OFF", "engine": None, "env": {}})
         elif item in ("V1", "V2"):
             arms.append({"name": item, "engine": item.lower(), "env": {}})
-        elif item == "V3":
-            # Hook V3 + `sidecar explore` on PATH: exploration is the intervention, recorded in meta.
-            arms.append({"name": item, "engine": "v3", "env": {}, "explore": True})
-        elif item == "V3-hook":
-            arms.append({"name": item, "engine": "v3", "env": {}, "explore": False})
+        elif item in EXPLORE_ENGINES:
+            # Hook + `sidecar explore` on PATH: exploration is the intervention, recorded in meta.
+            arms.append({"name": item, "engine": item.lower(), "env": {}, "explore": True})
+        elif item.endswith("-hook") and item[:-5] in EXPLORE_ENGINES:
+            arms.append({"name": item, "engine": item[:-5].lower(), "env": {}, "explore": False})
         elif item in ("CG", "CG-mcp"):
             # Competitor arm: no Sidecar hook; CodeGraph indexed in setup and reachable only by this arm.
             arms.append({"name": item, "engine": None, "env": {}, "codegraph": "mcp" if item == "CG-mcp" else "cli"})
-        elif item.startswith(("V2+", "V3+")):
-            feats = item[3:].split("+")
+        elif "+" in item:
+            base, feat_spec = item.split("+", 1)
+            if base not in ({"V2"} | EXPLORE_ENGINES):
+                raise LabError(f"braço desconhecido: {item} (use OFF, V1, V2, V3, V3.5, V3.6, V3.7, *-hook, <base>+<feature>, CG, CG-mcp)")
+            feats = feat_spec.split("+")
             if not feats or any(f not in KNOWN_FEATURES for f in feats):
                 raise LabError(f"feature desconhecida em {item}: use {sorted(KNOWN_FEATURES)}")
-            engine = item[:2].lower()
-            arms.append({"name": item, "engine": engine, "env": {"SIDECAR_FEATURES": ",".join(feats)}, "explore": engine == "v3"})
+            engine = base.lower()
+            arms.append({"name": item, "engine": engine, "env": {"SIDECAR_FEATURES": ",".join(feats)}, "explore": base in EXPLORE_ENGINES})
         else:
-            raise LabError(f"braço desconhecido: {item} (use OFF, V1, V2, V3, V3-hook, V2+<feature>, V3+<feature>, CG, CG-mcp)")
+            raise LabError(f"braço desconhecido: {item} (use OFF, V1, V2, V3, V3.5, V3.6, V3.7, *-hook, <base>+<feature>, CG, CG-mcp)")
     return arms
 
 

@@ -49,13 +49,17 @@ func runV35Safe(ctx context.Context, st *store.Store, root, prompt string, opts 
 func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retrieve.Options,
 	agent adapter.Agent, sessionID, statePath string, now time.Time, deep bool) (v35Output, error) {
 	v36 := opts.EngineVersion == engine.Version36
-	result, decision, err := engine.Run(ctx, st, prompt, engine.Options{Retrieve: opts, RequireCodeAnchor: true, Refined: v36})
+	v37 := opts.EngineVersion == engine.Version37
+	refined := v36 || v37
+	result, decision, err := engine.Run(ctx, st, prompt, engine.Options{Retrieve: opts, RequireCodeAnchor: true, Refined: refined, V37: v37})
 	if err != nil {
 		return v35Output{}, err
 	}
 	decision.Engine = engine.Version35
 	if v36 {
 		decision.Engine = engine.Version36
+	} else if v37 {
+		decision.Engine = engine.Version37
 	}
 	if decision.Action == engine.ActionAbstain || ctx.Err() != nil {
 		return v35Output{Result: result, Decision: decision}, nil
@@ -76,7 +80,7 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 		RepoRoot: root, WorktreeID: root, SessionID: sessionID, WorktreeRevision: revision,
 	})
 	registry := contract.NewEvidenceRegistry[retrieve.Evidence](scope)
-	baseRefs, err := registerV35Evidence(st, root, result, registry, v36)
+	baseRefs, err := registerV35Evidence(st, root, result, registry, refined)
 	if err != nil {
 		return v35Output{}, err
 	}
@@ -107,11 +111,14 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 				Enabled: true, Root: root, Query: prompt, Anchors: v35QuickAnchors(baseRefs, registry),
 				Limits: service.Limits{Timeout: service.QuickMaxDuration, MaxFiles: service.QuickMaxFiles,
 					MaxTokens: min(service.QuickMaxTokens, max(1, decision.Budget*2/3))},
+				AllowCandidateAnchor: v37,
 			}, registry)
 		}
 		task.Uncertainties = append(task.Uncertainties, expansion.Gaps...)
 		items, keys := expansionItems(expansion, registry)
-		if v36 {
+		if v37 {
+			items, keys = v37ExpansionItems(expansion, registry, max(1, (decision.Budget-ctxbuild.PackFrameTokens())*2/3))
+		} else if v36 {
 			items, keys = v36ExpansionItems(expansion, registry, max(1, (decision.Budget-ctxbuild.PackFrameTokens())*2/3))
 		}
 		if len(items) > 0 && len(keys) > 0 {
@@ -123,7 +130,7 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 	}
 
 	briefItems, hasBrief := brief.MicroBriefProposal(result)
-	if v36 {
+	if refined {
 		// The goal line only echoes the prompt classifier; it carries no repository evidence.
 		kept := briefItems[:0:0]
 		for _, item := range briefItems {
@@ -225,7 +232,11 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 	}
 	snippetKeys := snippetKeysAndFingerprints(proposals)
 	seen := v35Seen(opts.Seen, root, registry, proposals)
-	if v36 {
+	if v37 {
+		planDecision.Included = preferNamedFiles(planDecision.Included, prompt)
+		proposals, task.Guidance = v37PrepareProposals(proposals, planDecision.Included, snippetKeys, seen)
+		snippetKeys = snippetKeysAndFingerprints(proposals)
+	} else if v36 {
 		// V3.5 cut the ranked selection to one anchor (three with expansion) and left most of the
 		// budget unused. V3.6 lets the planner fill the budget by rank, skipping what a snippet
 		// already shows or the session already received, and prices every proposal as rendered.
@@ -245,36 +256,41 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 		planDecision.Included = planDecision.Included[:baseEvidence]
 	}
 	planInput := engine.PlanInput{Task: task, Decision: planDecision,
-		Evidence: registry, BudgetTokens: decision.Budget, PriorityAware: v36}
+		Evidence: registry, BudgetTokens: decision.Budget, PriorityAware: refined}
 	var plan contract.OutputPlan
-	if v36 {
+	if refined {
 		plan, snippetKeys = v36Plan(planInput, planDecision.Included, proposals, seen)
 	} else {
 		plan = (engine.Planner{}).Plan(planInput)
 	}
-	for i := range proposals {
-		if proposals[i].Proposal.Kind != ctxbuild.TaskBrief {
-			continue
-		}
-		for j := range proposals[i].Items {
-			if fingerprint, ok := snippetKeys[proposals[i].Items[j].Key]; ok {
-				proposals[i].Items[j].Fingerprint = fingerprint
+	if !v37 {
+		for i := range proposals {
+			if proposals[i].Proposal.Kind != ctxbuild.TaskBrief {
+				continue
+			}
+			for j := range proposals[i].Items {
+				if fingerprint, ok := snippetKeys[proposals[i].Items[j].Key]; ok {
+					proposals[i].Items[j].Fingerprint = fingerprint
+				}
 			}
 		}
 	}
-	packed := ctxbuild.PackWith(ctxbuild.PackOptions{Ranked: v36}, plan, registry, func(entry contract.EvidenceEntry[retrieve.Evidence]) []ctxbuild.Item {
+	packed := ctxbuild.PackWith(ctxbuild.PackOptions{Ranked: refined, DeduplicateEvidenceKeys: v37}, plan, registry, func(entry contract.EvidenceEntry[retrieve.Evidence]) []ctxbuild.Item {
 		value := entry.Value
 		if _, hasSnippet := snippetKeys[value.Key()]; hasSnippet {
 			return nil
 		}
-		if v36 {
+		if v37 {
+			return []ctxbuild.Item{v37EvidenceItem(entry)}
+		}
+		if refined {
 			return []ctxbuild.Item{v36EvidenceItem(entry)}
 		}
 		return []ctxbuild.Item{{Section: value.Section, Key: value.Key(), Fingerprint: value.Fingerprint(),
 			Text: retrieve.Describe(value), Source: value.Source, Role: value.Hit.Kind,
 			Qualifier: evidenceQualifier(entry.Ref), Provenance: evidenceProvenance(entry.Ref)}}
 	}, proposals, seen)
-	if v36 && len(packedSourceEvidenceKeys(packed.Items)) == 0 && !containsSource(packed.Items, "groom") {
+	if refined && len(packedSourceEvidenceKeys(packed.Items)) == 0 && !containsSource(packed.Items, "groom") {
 		// Orientation, memory or session notes without one piece of repository evidence give the
 		// agent nothing to act on: deliver nothing and say why in the trace.
 		packed = ctxbuild.PackResult{NotDelivered: append(packed.NotDelivered, contract.PlanReason{Code: "no_source_evidence_delivered"})}

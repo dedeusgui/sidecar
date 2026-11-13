@@ -23,10 +23,11 @@ type externalManifest struct {
 }
 
 type pinnedRepo struct {
-	Path    string `json:"path"`    // local checkout, absolute or relative to the working directory
-	Commit  string `json:"commit"`  // full 40-character SHA the checkout must be at
-	Source  string `json:"source"`  // where the corpus came from: URL or dataset identifier
-	License string `json:"license"` // licence noted at pin time; required so redistribution stays a conscious choice
+	Path     string `json:"path"`               // local checkout, absolute or relative to the working directory
+	Commit   string `json:"commit"`             // full 40-character SHA the checkout must be at
+	Source   string `json:"source"`             // where the corpus came from: URL or dataset identifier
+	License  string `json:"license"`            // licence noted at pin time; required so redistribution stays a conscious choice
+	Language string `json:"language,omitempty"` // primary language declared by external cohort manifests
 }
 
 // externalCase is a caseSpec plus the no-gold flag used by abstention strata.

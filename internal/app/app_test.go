@@ -496,6 +496,32 @@ func TestSmokeInstallDoctorHookReinstallUninstall(t *testing.T) {
 	}
 }
 
+func TestDoctorChecksAntigravityHookFile(t *testing.T) {
+	setupHome(t)
+	dir := t.TempDir()
+	env := installEnv(t, dir)
+	env.AntigravityHooks = filepath.Join(dir, "gemini", "config", "hooks.json")
+	if err := os.MkdirAll(filepath.Dir(env.AntigravityHooks), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if s := doctorStatus(t, env, "antigravity"); s != "info" {
+		t.Fatalf("without antigravity hook = %s, want info", s)
+	}
+	opts := install.Options{Env: env, Yes: true, Out: &bytes.Buffer{}, Agents: []string{"antigravity"}}
+	if _, err := install.Install(opts); err != nil {
+		t.Fatalf("install antigravity: %v", err)
+	}
+	if s := doctorStatus(t, env, "antigravity"); s != "ok" {
+		t.Fatalf("after antigravity install = %s, want ok", s)
+	}
+	if err := os.Remove(filepath.Join(env.InstallDir, install.BinaryName)); err != nil {
+		t.Fatal(err)
+	}
+	if s := doctorStatus(t, env, "antigravity"); s != "fail" {
+		t.Fatalf("with missing binary = %s, want fail", s)
+	}
+}
+
 // TestRepositoryWithSpacesAndUnicodeIsIndexedAndAnswered covers a Git worktree whose path and
 // file names carry spaces and accents, which the hook must index and answer like any other.
 func TestRepositoryWithSpacesAndUnicodeIsIndexedAndAnswered(t *testing.T) {

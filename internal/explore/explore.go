@@ -53,9 +53,9 @@ func Run(ctx context.Context, st *store.Store, opts Options) (Result, error) {
 	ro.NoExactDominance = true
 	ro.ExtraExactKeys = core.MemberKeys(opts.Query)
 	if words := strings.Fields(opts.Query); len(words) <= 3 {
-		// A bare name ("Settle", "OpenGate handler") asked of explore is a symbol lookup.
+		// A bare name ("Settle", "OpenGate handler", "route!") asked of explore is a symbol lookup.
 		for _, w := range words {
-			if w = strings.Trim(w, "`'\"(),;:?!"); len(w) >= 3 && core.IsIdent(w) {
+			if w = core.TrimQueryToken(w); len(w) >= 3 && core.IsIdent(w) {
 				ro.ExtraExactKeys = append(ro.ExtraExactKeys, w)
 			}
 		}
@@ -71,16 +71,18 @@ func Run(ctx context.Context, st *store.Store, opts Options) (Result, error) {
 		relevance = string(engine.Irrelevant)
 		gaps = append(gaps, "the relevance gate found no repository evidence for this query: "+strings.Join(dec.AbstainReasons, "; "))
 		// The tool was asked explicitly, so rerun without the gate and report candidates as such.
-		r2, searchErr := retrieve.Search(ctx, st, opts.Query, withV2(ro))
+		r2, searchErr := retrieve.Search(ctx, st, opts.Query, withExplorePool(ro))
 		if searchErr != nil {
 			out.Relevance = relevance
 			out.Gaps = append(out.Gaps, gaps...)
 			return out, searchErr
 		}
 		res = r2
-	} else if len(res.Evidence) < 4 {
-		if r2, searchErr := retrieve.Search(ctx, st, opts.Query, withV2(ro)); searchErr == nil && len(r2.Evidence) > len(res.Evidence) {
-			res = r2 // explore wants the wider V2 pool; the router budget applies to the hook, not here
+	} else {
+		// explore answers with a richer source-traversal budget than the hook block: pull a wider,
+		// implementation-weighted V3.7 candidate pool instead of stopping at hook pack limits.
+		if r2, searchErr := retrieve.Search(ctx, st, opts.Query, withExplorePool(ro)); searchErr == nil && len(r2.Evidence) > 0 {
+			res = r2
 		}
 	}
 	return core.Build(ctx, st, opts, core.BuildInput{
@@ -94,5 +96,24 @@ func memberKeys(q string) []string { return core.MemberKeys(q) }
 func withV2(o retrieve.Options) retrieve.Options {
 	o.EngineVersion = "v2"
 	o.Adaptive = false
+	return o
+}
+
+func withExplorePool(o retrieve.Options) retrieve.Options {
+	o = withV2(o)
+	o.Adaptive = true
+	o.MaxItems = 60
+	o.MaxPerFile = 4
+	o.PreferImplementation = true
+	o.PreferImplTieBreak = true
+	o.RaritySupport = true
+	o.SplitMemberKeys = true
+	if o.Tuning == nil {
+		tun := retrieve.V37Tuning()
+		o.Tuning = &tun
+	}
+	if o.MaxAbsentTerms <= 0 {
+		o.MaxAbsentTerms = 24
+	}
 	return o
 }

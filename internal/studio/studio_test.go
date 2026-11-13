@@ -44,11 +44,15 @@ func TestPageHasNoExternalResourcesAndAStrictCSP(t *testing.T) {
 
 func TestKindIsDecidedByContentNotName(t *testing.T) {
 	cases := map[string]string{
-		`{"schema":"replay/1"}`:               "replay/1",
-		`{"candidates":[],"evidence":[]}`:     "explain",
-		`[{"schema":"lab-run/1","task":"T"}]`: "lab-run/1[]",
-		`{"anything":1}`:                      "unknown",
-		`[1,2]`:                               "list",
+		`{"schema":"replay/1"}`:                        "replay/1",
+		`{"schema":"delivery/1"}`:                      "delivery/1",
+		`{"engines":["v3"],"summary":[],"rows":[]}`:    "delivery/1",
+		`{"schema":"e2-offline/1"}`:                    "e2-offline/1",
+		`{"summary":{},"rows":[]}`:                     "e2-offline/1",
+		`{"candidates":[],"evidence":[]}`:              "explain",
+		`[{"schema":"lab-run/1","task":"T"}]`:          "lab-run/1[]",
+		`{"anything":1}`:                               "unknown",
+		`[1,2]`:                                        "list",
 	}
 	for raw, want := range cases {
 		page, err := Build([]Input{{Name: "lab-run.json", Raw: []byte(raw)}})

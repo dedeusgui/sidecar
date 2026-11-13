@@ -150,10 +150,56 @@ function viewImpact(d) {
     table(["signal", "named the next edited file", "rate"], [{ signal: "structural", "named the next edited file": x.structural, rate: n ? pct(x.structural / n) : "–" }, { signal: "co-change", "named the next edited file": x.cochange, rate: n ? pct(x.cochange / n) : "–" },
       { signal: "structural + co-change", "named the next edited file": x.both, rate: n ? pct(x.both / n) : "–" }, { signal: "baseline: same directory", "named the next edited file": x.baseline_same_dir, rate: n ? pct(x.baseline_same_dir / n) : "–" }]))];
 }
+function viewDelivery(d) {
+  const x = d.data, out = [];
+  out.push(el("p", { class: "note" }, "Offline hook delivery scorecard (", asList(x.engines).join(", "), "). Measures bytes delivered by the hook, not agent task completion."));
+  out.push(sec("Summary by stratum and engine", table(
+    ["stratum", "engine", "cases", "gold path", "gold symbol", "top 3", "non empty", "guidance only", "conflicts", "mean tokens", "tokens/gold", "p50 ms", "p95 ms"],
+    asList(x.summary).map((s) => ({
+      stratum: s.stratum, engine: s.engine, cases: s.cases, "gold path": s.gold_path_delivered, "gold symbol": s.gold_symbol_delivered,
+      "top 3": s.gold_in_first_3_lines, "non empty": s.non_empty, "guidance only": s.orientation_only,
+      conflicts: s.trust_label_conflicts, "mean tokens": Math.round(s.mean_tokens || 0), "tokens/gold": Math.round(s.tokens_per_gold_delivered || 0),
+      "p50 ms": s.p50_ms, "p95 ms": s.p95_ms
+    })),
+    ["cases", "gold path", "gold symbol", "top 3", "non empty", "guidance only", "conflicts", "mean tokens", "tokens/gold", "p50 ms", "p95 ms"]
+  )));
+  const issues = asList(x.rows).filter((r) => (!r.negative && !r.gold_path_delivered) || (r.negative && r.context_tokens > 0) || r.trust_label_conflicts > 0 || !r.deterministic);
+  if (issues.length) {
+    out.push(sec("Misses, negative leaks and issues (" + issues.length + ")", table(
+      ["engine", "case", "split", "type", "gold", "tokens", "guidance", "conflicts", "det"],
+      issues.slice(0, 400).map((r) => ({
+        engine: r.engine, case: r.case, split: r.split, type: r.negative ? "negative" : "positive",
+        gold: el("span", { class: r.negative ? (r.context_tokens > 0 ? "fail" : "pass") : (r.gold_path_delivered ? "pass" : "fail") }, r.negative ? (r.context_tokens > 0 ? "leaked" : "abstained") : (r.gold_path_delivered ? "hit" : "miss")),
+        tokens: r.context_tokens, guidance: String(Boolean(r.orientation_only)), conflicts: r.trust_label_conflicts, det: String(Boolean(r.deterministic))
+      })),
+      ["tokens", "conflicts"]
+    )));
+  }
+  return out;
+}
+function viewE2Offline(d) {
+  const x = d.data, sum = x.summary || {}, out = [];
+  out.push(el("p", { class: "note" }, "Offline fact coverage in delivered context/explore output (no LLM). Compares Sidecar arms against CodeGraph where present."));
+  out.push(sec("Summary by arm", table(
+    ["arm", "facts covered", "facts total", "tasks all facts", "chars total"],
+    Object.entries(sum).map(([arm, v]) => ({ arm, "facts covered": v.facts_covered, "facts total": v.facts_total, "tasks all facts": v.tasks_all_facts, "chars total": v.chars_total })),
+    ["facts covered", "facts total", "tasks all facts", "chars total"]
+  )));
+  const rows = asList(x.rows);
+  if (rows.length) {
+    const arms = Object.keys(sum);
+    out.push(sec("Per task", table(["task", "split", "repo", "facts", ...arms, "missing explore", "missing codegraph"], rows.map((r) => {
+      const row = { task: r.task, split: r.split, repo: r.repo, facts: r.facts, "missing explore": asList(r.explore && r.explore.missing).join(", ") || "–", "missing codegraph": asList(r.codegraph && r.codegraph.missing).join(", ") || "–" };
+      for (const a of arms) { const v = r[a]; row[a] = v ? (v.facts + "/" + r.facts + " (" + v.chars + "c)") : "–"; }
+      return row;
+    }))));
+  }
+  return out;
+}
 function viewRaw(d) { return [sec(d.name + " (" + d.kind + ")", el("pre", {}, JSON.stringify(d.data, null, 1).slice(0, 20000)))]; }
 
-const VIEWS = { explain: viewExplain, "lab-run/1[]": viewRuns, "lab-scorecard/1": viewScorecard, "replay/1": viewReplay, "perf/1": viewPerf, "groom-eval/1": viewGroom, "impact-history/1": viewImpact };
-const LABEL = { explain: "Explain", "lab-run/1[]": "Runs", "lab-scorecard/1": "Scorecard", "replay/1": "Variants", "perf/1": "Perf", "groom-eval/1": "Clarification", "impact-history/1": "Impact" };
+const VIEWS = { explain: viewExplain, "lab-run/1[]": viewRuns, "lab-scorecard/1": viewScorecard, "replay/1": viewReplay, "perf/1": viewPerf, "groom-eval/1": viewGroom, "impact-history/1": viewImpact, "delivery/1": viewDelivery, "e2-offline/1": viewE2Offline };
+const LABEL = { explain: "Explain", "lab-run/1[]": "Runs", "lab-scorecard/1": "Scorecard", "replay/1": "Variants", "perf/1": "Perf", "groom-eval/1": "Clarification", "impact-history/1": "Impact", "delivery/1": "Delivery", "e2-offline/1": "E2 vs CodeGraph" };
 
 function show(i) {
   const d = DOCS[i];

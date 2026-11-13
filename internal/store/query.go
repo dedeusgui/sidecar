@@ -113,7 +113,9 @@ func (s *Store) CalleesOf(id int64, limit int) ([]Related, error) {
 			OR EXISTS (SELECT 1 FROM imports i WHERE i.file_id = src.file_id AND i.resolved_file_id = t.file_id)
 			OR (SELECT COUNT(*) FROM symbols x WHERE x.name = r.to_name AND x.kind NOT IN ('file', 'section', 'route')) = 1)
 		GROUP BY t.id
-		ORDER BY basis, f.path, t.line, t.name, t.kind, t.id
+		ORDER BY (CASE WHEN f.kind = 'test' THEN 1 ELSE 0 END),
+			(CASE WHEN t.file_id = src.file_id THEN 0 WHEN EXISTS (SELECT 1 FROM imports i WHERE i.file_id = src.file_id AND i.resolved_file_id = t.file_id) THEN 1 ELSE 2 END),
+			f.path, t.line, t.name, t.kind, t.id
 		LIMIT ?`, id, limit)
 	if err != nil {
 		return nil, err
@@ -148,7 +150,9 @@ func (s *Store) CallersOf(id int64, limit int) ([]Related, error) {
 			OR EXISTS (SELECT 1 FROM imports i WHERE i.file_id = src.file_id AND i.resolved_file_id = t.file_id)
 			OR (SELECT COUNT(*) FROM symbols x WHERE x.name = t.name AND x.kind NOT IN ('file', 'section', 'route')) = 1)
 		GROUP BY src.id
-		ORDER BY basis, f.path, src.line, src.name, src.kind, src.id
+		ORDER BY (CASE WHEN f.kind = 'test' THEN 1 ELSE 0 END),
+			(CASE WHEN src.file_id = t.file_id THEN 0 WHEN EXISTS (SELECT 1 FROM imports i WHERE i.file_id = src.file_id AND i.resolved_file_id = t.file_id) THEN 1 ELSE 2 END),
+			f.path, src.line, src.name, src.kind, src.id
 		LIMIT ?`, id, limit)
 	if err != nil {
 		return nil, err
@@ -179,6 +183,54 @@ func (s *Store) TestFilesReferencing(name string, limit int) ([]SymbolHit, error
 		return nil, err
 	}
 	return collectHits(rows)
+}
+
+// SubtypesOf returns non-test type/class/struct definitions that reference baseName as a parent or interface.
+func (s *Store) SubtypesOf(baseName string, limit int) ([]SymbolHit, error) {
+	if baseName == "" || limit <= 0 {
+		return nil, nil
+	}
+	rows, err := s.queryCached(`SELECT DISTINCT `+symbolColumns("t")+`
+		FROM refs r
+		JOIN symbols t ON t.id = r.from_symbol_id
+		JOIN files f ON f.id = t.file_id AND f.kind <> 'test'
+		WHERE r.kind = 'type' AND r.to_name = ? AND t.kind IN ('class', 'struct', 'type', 'interface')
+		ORDER BY f.path, t.line, t.name, t.id LIMIT ?`, baseName, limit)
+	if err != nil {
+		return nil, err
+	}
+	return collectHits(rows)
+}
+
+// SubtypeMethods resolves concrete or abstract overrides of method (up to two inheritance hops)
+// using indexed type references in non-test files.
+func (s *Store) SubtypeMethods(method SymbolHit, limit int) ([]Related, error) {
+	if method.Name == "" || method.FileID <= 0 || limit <= 0 {
+		return nil, nil
+	}
+	rows, err := s.queryCached(`SELECT DISTINCT `+symbolColumns("m")+`
+		FROM symbols base
+		JOIN refs r1 ON r1.kind = 'type' AND r1.to_name = base.name
+		JOIN symbols sub1 ON sub1.id = r1.from_symbol_id
+		LEFT JOIN refs r2 ON r2.kind = 'type' AND r2.to_name = sub1.name
+		LEFT JOIN symbols sub2 ON sub2.id = r2.from_symbol_id
+		JOIN symbols m ON m.name = ? AND m.kind IN ('method', 'function')
+			AND ((m.file_id = sub1.file_id AND m.line BETWEEN sub1.line AND CASE WHEN sub1.end_line > sub1.line THEN sub1.end_line ELSE sub1.line + 100000 END)
+			  OR (sub2.id IS NOT NULL AND m.file_id = sub2.file_id AND m.line BETWEEN sub2.line AND CASE WHEN sub2.end_line > sub2.line THEN sub2.end_line ELSE sub2.line + 100000 END))
+		JOIN files f ON f.id = m.file_id AND f.kind <> 'test'
+		WHERE base.file_id = ? AND base.kind IN ('interface', 'class', 'struct', 'type')
+		  AND base.line <= ? AND (base.end_line >= ? OR base.end_line <= base.line)
+		  AND m.id <> ?
+		ORDER BY CASE WHEN f.path LIKE '%Abstract%' THEN 0 ELSE 1 END, f.path, m.line, m.id
+		LIMIT ?`, method.Name, method.FileID, method.Line, method.Line, method.ID, limit)
+	if err != nil {
+		return nil, err
+	}
+	hits, err := collectHits(rows)
+	if err != nil {
+		return nil, err
+	}
+	return toRelated(hits, "implements", "import"), nil
 }
 
 func collectHits(rows interface {

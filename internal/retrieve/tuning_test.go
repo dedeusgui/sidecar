@@ -35,3 +35,17 @@ func TestTuningValidRejectsNonsense(t *testing.T) {
 		}
 	}
 }
+
+func TestV37TuningIsValidAndLeavesDefaultUnchanged(t *testing.T) {
+	d := DefaultTuning()
+	v := V37Tuning()
+	if !v.Valid() {
+		t.Fatalf("V37Tuning must be valid: %+v", v)
+	}
+	if d.LongPromptTerms != 0 || d.LongPromptMinSupport != 0 || d.LongPromptExemptCoverage != 0 {
+		t.Fatalf("DefaultTuning drifted: %+v", d)
+	}
+	if v.LongPromptTerms != 7 || v.LongPromptMinSupport != 2 || v.LongPromptExemptCoverage <= 0 {
+		t.Fatalf("unexpected V37Tuning: %+v", v)
+	}
+}

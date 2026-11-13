@@ -427,8 +427,27 @@ class RunnerTests(LabCase):
         self.assertEqual(arms[3]["env"], {"SIDECAR_FEATURES": "adaptive,brief"})
         self.assertEqual(arms[3]["engine"], "v2")
         self.assertEqual(lab.parse_arms("V2+groom+impact")[0]["env"], {"SIDECAR_FEATURES": "groom,impact"})
+        arms_v3 = lab.parse_arms("V3.5,V3.5-hook,V3.6,V3.6-hook,V3.7,V3.7+brief")
+        self.assertEqual([(a["name"], a["engine"], a.get("explore")) for a in arms_v3], [
+            ("V3.5", "v3.5", True),
+            ("V3.5-hook", "v3.5", False),
+            ("V3.6", "v3.6", True),
+            ("V3.6-hook", "v3.6", False),
+            ("V3.7", "v3.7", True),
+            ("V3.7+brief", "v3.7", True),
+        ])
+        self.assertEqual(arms_v3[-1]["env"], {"SIDECAR_FEATURES": "brief"})
         with self.assertRaises(lab.LabError):
             lab.parse_arms("V2+nope")
+
+    def test_codegraph_shim_supports_global_lib_prefix(self):
+        with tempfile.TemporaryDirectory() as td:
+            pkg = pathlib.Path(td) / "lib" / "node_modules" / "@colbymchenry" / "codegraph"
+            pkg.mkdir(parents=True)
+            (pkg / "npm-shim.js").write_text("// shim\n")
+            (pkg / "package.json").write_text('{"version":"1.6.0"}')
+            self.assertEqual(lab.codegraph_shim(td), "lib/node_modules/@colbymchenry/codegraph/npm-shim.js")
+            self.assertEqual(lab.codegraph_version(td), "1.6.0")
 
     def test_unknown_arm_and_alias_model_rejected(self):
         with self.assertRaises(lab.LabError):

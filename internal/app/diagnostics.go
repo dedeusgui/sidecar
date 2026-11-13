@@ -57,7 +57,7 @@ type ExplainReport struct {
 // engineOf names the pipeline that produced a result. Unknown values keep the v1 compatibility default.
 func engineOf(opts retrieve.Options) string {
 	switch opts.EngineVersion {
-	case "v2", engine.Version, engine.Version35, engine.Version36:
+	case "v2", engine.Version, engine.Version35, engine.Version36, engine.Version37:
 		return opts.EngineVersion
 	}
 	return "v1"
@@ -283,7 +283,7 @@ func engineReadiness() map[string]any {
 	active := engine.Unified(selected)
 	activation := "export SIDECAR_ENGINE=v3.5"
 	deactivation := "unset SIDECAR_ENGINE (default: v1; applies on the next hook)"
-	detail := "motor atual: " + selected + "; V3.5 inativa (opt-in); ativar: " + activation + " (ou v3.6, a revisão de entrega)" + "; desativar: " + deactivation
+	detail := "motor atual: " + selected + "; V3.5 inativa (opt-in); ativar: " + activation + " (ou v3.6/v3.7)" + "; desativar: " + deactivation
 	if active {
 		detail = "motor atual: " + selected + "; rollback imediato: " + deactivation
 	}
@@ -302,7 +302,7 @@ func engineReadiness() map[string]any {
 
 func configuredEngine() string {
 	switch os.Getenv("SIDECAR_ENGINE") {
-	case "v2", engine.Version, engine.Version35, engine.Version36:
+	case "v2", engine.Version, engine.Version35, engine.Version36, engine.Version37:
 		return os.Getenv("SIDECAR_ENGINE")
 	default:
 		return "v1"
@@ -375,6 +375,8 @@ func Doctor(env install.Env, cwd string) []Check {
 	for _, c := range codex {
 		add(c.Name, c.Status, c.Detail)
 	}
+	antigravity := antigravityHookCheck(env.AntigravityHooks)
+	add(antigravity.Name, antigravity.Status, antigravity.Detail)
 
 	if root, isGit := repo.FindRoot(cwd); root != "" {
 		db := paths.IndexDB(root)
@@ -484,10 +486,40 @@ func hookCommandIn(file, agent string) (string, bool) {
 }
 
 func binaryExists(command string) bool {
-	bin := strings.Trim(strings.TrimSuffix(command, " hook --agent claude"), `"`)
-	bin = strings.Trim(strings.TrimSuffix(bin, " hook --agent codex"), `"`)
+	bin := strings.TrimSpace(command)
+	for _, agent := range []string{"claude", "codex", "antigravity"} {
+		bin = strings.TrimSuffix(bin, " hook --agent "+agent)
+	}
+	bin = strings.Trim(bin, `"`)
 	_, err := os.Stat(bin)
 	return err == nil
+}
+
+func antigravityHookCheck(file string) Check {
+	if file == "" {
+		return Check{"antigravity", "info", "hook não instalado (ou Antigravity não detectado)"}
+	}
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return Check{"antigravity", "info", "hook não instalado (ou Antigravity não detectado)"}
+	}
+	var doc map[string]struct {
+		PreInvocation []struct {
+			Command string `json:"command"`
+		} `json:"PreInvocation"`
+	}
+	if json.Unmarshal(raw, &doc) != nil {
+		return Check{"antigravity", "info", "hook não instalado (ou Antigravity não detectado)"}
+	}
+	for _, h := range doc["sidecar"].PreInvocation {
+		if install.IsOurs(h.Command, "antigravity") {
+			if !binaryExists(h.Command) {
+				return Check{"antigravity", "fail", "o hook aponta para um binário inexistente — execute `sidecar install` de novo"}
+			}
+			return Check{"antigravity", "ok", "hook PreInvocation instalado em " + file}
+		}
+	}
+	return Check{"antigravity", "info", "hook não instalado (ou Antigravity não detectado)"}
 }
 
 // hookLogSummary reads recent hook runs: failures and latency percentiles.

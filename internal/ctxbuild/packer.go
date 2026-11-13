@@ -43,6 +43,9 @@ type PackOptions struct {
 	// proposal's item order) instead of by item key, so retrieval rank decides both what
 	// survives a tight budget and the order the agent reads.
 	Ranked bool
+	// DeduplicateEvidenceKeys deduplicates GuidanceProposal.EvidenceKeys before matching
+	// against SectionAllocation.EvidenceKeys, matching Planner.Plan's uniqueStrings behaviour.
+	DeduplicateEvidenceKeys bool
 }
 
 // Pack is PackWith under the V3.5 options.
@@ -164,6 +167,9 @@ func PackWith[T any](
 		}
 		valid := false
 		keys := sortedKeys(metadata.EvidenceKeys)
+		if options.DeduplicateEvidenceKeys {
+			keys = uniqueSortedStrings(keys)
+		}
 		for _, group := range section.groups {
 			if len(group) != len(keys) {
 				continue
@@ -512,5 +518,18 @@ func cloneSelected(in map[string][]Item) map[string][]Item {
 func sortedKeys(keys []string) []string {
 	out := append([]string(nil), keys...)
 	sort.Strings(out)
+	return out
+}
+
+func uniqueSortedStrings(values []string) []string {
+	if len(values) < 2 {
+		return values
+	}
+	out := values[:1]
+	for _, value := range values[1:] {
+		if value != out[len(out)-1] {
+			out = append(out, value)
+		}
+	}
 	return out
 }

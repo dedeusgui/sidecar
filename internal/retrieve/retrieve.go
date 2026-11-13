@@ -59,6 +59,16 @@ type Options struct {
 	// PreferImplementation gives production source a stronger packing preference. V3.5 uses it
 	// when a code anchor is required so nearby docs and tests do not crowd out the implementation.
 	PreferImplementation bool
+	// MaxAbsentTerms widens absentAnchorTerms checks to prompts up to this term count (0 keeps 10).
+	MaxAbsentTerms int
+	// RaritySupport enables V3.7 rarity-backed support: symbol Kind matching in hitTerms and
+	// rare domain concept support in ownTextConfidence for terse prompts without absent anchors.
+	RaritySupport bool
+	// PreferImplTieBreak enables matched-support-tier-preserving implementation tie-breaking in Pack.
+	PreferImplTieBreak bool
+	// SplitMemberKeys extracts member/scoped/bang/predicate identifier keys (e.g. res.send,
+	// Logger::info, route!) in addition to standard codeLike identifiers.
+	SplitMemberKeys bool
 	// feedbackMults holds the post-task feedback multipliers of Root, keyed "path#symbol" or "path".
 	feedbackMults   map[string]float64
 	hasAbsentAnchor bool
@@ -92,7 +102,10 @@ type Evidence struct {
 	Confidence    float64  // heuristic in [0, 1]; not fitted to labelled data
 	TokenEstimate int      // estimate of the item's rendered metadata line
 	// Note replaces the rendered line; set only for contract conflicts, which have no symbol of their own.
-	Note string
+	Note        string
+	MinSymbolDF int            `json:"min_symbol_df,omitempty"`
+	MaxSalience float64        `json:"max_salience,omitempty"`
+	MatchedDF   map[string]int `json:"matched_df,omitempty"`
 }
 
 // CandidateTrace explains one candidate for diagnostics.
@@ -131,9 +144,11 @@ type Trace struct {
 	Routed        bool              `json:"intent_routed"` // the intent changed the structural expansion
 	TokenEstimate int               `json:"token_estimate"`
 	Fingerprint   *repo.Fingerprint `json:"repo_fingerprint,omitempty"` // set by the caller that has the root
-	Contracts     []Finding         `json:"contracts,omitempty"`        // v2: every checked contract link
-	Packing       *PackTrace        `json:"packing,omitempty"`          // v2: why the final set was chosen
-	PolicySkipped []string          `json:"policy_skipped,omitempty"`   // adaptive: analyses the context policy skipped
+	Contracts       []Finding         `json:"contracts,omitempty"`        // v2: every checked contract link
+	Packing         *PackTrace        `json:"packing,omitempty"`          // v2: why the final set was chosen
+	PolicySkipped   []string          `json:"policy_skipped,omitempty"`   // adaptive: analyses the context policy skipped
+	TotalSymbols    int               `json:"total_symbols,omitempty"`
+	HasAbsentAnchor bool              `json:"has_absent_anchor,omitempty"`
 }
 
 // Result is the outcome of Search.
@@ -149,6 +164,11 @@ type concept struct {
 	termPresent bool
 	alts        []string
 	weight      float64 // inverse document frequency: rare terms discriminate more
+	symDF       int
+	docDF       int
+	salience    float64
+	altSymDF    map[string]int
+	altDocDF    map[string]int
 }
 
 type candidate struct {
@@ -162,20 +182,52 @@ type candidate struct {
 	// directMatches and altMatches count the prompt terms matched by the symbol's own text, as the
 	// prompt's own word and through a translation. promptTerms is the number of distinct prompt
 	// terms, known or not; v2Own selects the coverage-based confidence (see ownTextConfidence).
-	directMatches int
-	altMatches    int
-	promptTerms   int
-	v2Own         bool
-	tun           *Tuning // nil = DefaultTuning; set from Options.Tuning for V2 candidates
-	rels          []string
-	neighbor      bool
-	seedCoverage  float64
-	relBasis      []string
-	git           bool
-	reason        string
-	feedback      string // feedback_boost | feedback_penalty when post-task feedback moved its score
-	suppressed    bool   // dropped before fusion; never shown or ranked
-	score         float64
+	directMatches   int
+	altMatches      int
+	promptTerms     int
+	presentConcepts int
+	v2Own           bool
+	tun             *Tuning // nil = DefaultTuning; set from Options.Tuning for V2 candidates
+	minSymbolDF     int
+	maxSalience     float64
+	matchedDF       map[string]int
+	rareDomainMatch bool
+	raritySupport   bool
+	hasAbsentAnchor bool
+	rels            []string
+	neighbor        bool
+	seedCoverage    float64
+	relBasis        []string
+	git             bool
+	reason          string
+	feedback        string // feedback_boost | feedback_penalty when post-task feedback moved its score
+	suppressed      bool   // dropped before fusion; never shown or ranked
+	score           float64
+}
+
+var v37FillerTerms = map[string]bool{
+	"which": true, "there": true, "their": true, "these": true, "those": true, "they": true, "them": true,
+	"were": true, "was": true, "been": true, "have": true, "has": true, "had": true,
+	"could": true, "might": true, "must": true, "shall": true, "will": true,
+	"into": true, "onto": true, "upon": true, "about": true, "above": true, "below": true,
+	"under": true, "over": true, "after": true, "before": true, "during": true, "while": true,
+	"through": true, "between": true, "against": true, "without": true, "within": true,
+	"many": true, "much": true, "more": true, "most": true, "some": true, "such": true,
+	"other": true, "each": true, "very": true, "just": true, "only": true, "also": true,
+	"even": true, "well": true, "here": true,
+}
+
+func filterV37Filler(terms []string) []string {
+	var out []string
+	for _, t := range terms {
+		if !v37FillerTerms[t] {
+			out = append(out, t)
+		}
+	}
+	if len(out) == 0 {
+		return terms
+	}
+	return out
 }
 
 // Search ranks evidence for a prompt. An empty prompt or one without repository matches
@@ -187,12 +239,16 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 
 	t := time.Now()
 	terms := lexical.Analyze(prompt)
+	if opts.RaritySupport {
+		terms = filterV37Filler(terms)
+	}
 	res.Trace.Terms = terms
 	res.Trace.Phrases = lexical.ExpandPhrases(prompt)
 	total, err := st.SymbolCount()
 	if err != nil {
 		return res, err
 	}
+	res.Trace.TotalSymbols = total
 	searchTerms := terms
 	if len(terms) > 12 {
 		if focal := focalTerms(prompt); len(focal) >= 2 {
@@ -209,10 +265,15 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 			return res, err
 		}
 	}
-	if len(terms) <= 10 {
+	maxAbsentTerms := 10
+	if opts.MaxAbsentTerms > 0 {
+		maxAbsentTerms = opts.MaxAbsentTerms
+	}
+	if len(terms) <= maxAbsentTerms {
 		absentTerms, _ := absentAnchorTerms(st, prompt, opts.Ablate.NoTranslation)
 		if len(absentTerms) > 0 {
 			opts.hasAbsentAnchor = true
+			res.Trace.HasAbsentAnchor = true
 			var filtered []concept
 			for _, c := range concepts {
 				if !absentTerms[c.term] {
@@ -256,7 +317,7 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	t = time.Now()
 	var exactHits []store.SymbolHit
 	if !opts.Ablate.NoExact {
-		keys := identifierKeys(prompt)
+		keys := identifierKeysWithMembers(prompt, opts.SplitMemberKeys)
 		for _, k := range opts.ExtraExactKeys {
 			if k = store.KeyOf(k); k != "" && !hasString(keys, k) {
 				keys = append(keys, k)
@@ -273,10 +334,12 @@ func Search(ctx context.Context, st *store.Store, prompt string, opts Options) (
 	}
 	res.Trace.Exact = len(exactHits)
 	for _, c := range cands {
-		scoreOwnText(c, concepts)
+		scoreOwnTextWith(c, concepts, total, opts.RaritySupport)
 		if v2 {
-			c.directMatches, c.altMatches = ownMatches(c.hit, terms, opts.Ablate.NoTranslation)
+			c.directMatches, c.altMatches = ownMatchesWithKind(c.hit, terms, opts.Ablate.NoTranslation, opts.RaritySupport)
 			c.promptTerms, c.v2Own, c.tun = len(uniqueStrings(terms)), true, opts.Tuning
+			c.presentConcepts = len(concepts)
+			c.raritySupport, c.hasAbsentAnchor = opts.RaritySupport, opts.hasAbsentAnchor
 		}
 	}
 	res.Trace.Timings["exact"] = time.Since(t)
@@ -443,6 +506,7 @@ func v2Pipeline(ctx context.Context, st *store.Store, prompt string, pool []Evid
 	}
 	selected, excluded, pt := Pack(append(pool, concerns...), PackOptions{
 		Budget: budget, Seen: opts.Seen, Tuning: opts.Tuning, PreferImplementation: opts.PreferImplementation,
+		PreferImplTieBreak: opts.PreferImplTieBreak,
 	})
 	tr.Packing = &pt
 	return selected, excluded, nil
@@ -498,7 +562,7 @@ func buildConcepts(st *store.Store, terms, phrases []string, total int, trans ma
 	var out []concept
 	for _, term := range terms {
 		present, df := freq[term].Doc, freq[term].Symbol
-		c := concept{term: term}
+		c := concept{term: term, symDF: df, docDF: present}
 		if present > 0 && df <= maxDF {
 			c.termPresent = true
 		}
@@ -509,12 +573,19 @@ func buildConcepts(st *store.Store, terms, phrases []string, total int, trans ma
 		for _, en := range translations {
 			if f := freq[en]; f.Doc > 0 && f.Symbol <= maxDF {
 				c.alts = append(c.alts, en)
+				if c.altSymDF == nil {
+					c.altSymDF = map[string]int{}
+					c.altDocDF = map[string]int{}
+				}
+				c.altSymDF[en] = f.Symbol
+				c.altDocDF[en] = f.Doc
 			}
 		}
 		if len(c.alts) > 0 {
 			trans[term] = c.alts
 		}
 		c.weight = idf(df, total)
+		c.salience = conceptSalience(c, freq, total)
 		if c.termPresent || len(c.alts) > 0 {
 			out = append(out, c)
 		}
@@ -524,7 +595,9 @@ func buildConcepts(st *store.Store, terms, phrases []string, total int, trans ma
 			break
 		}
 		if f := freq[en]; f.Doc > 0 && f.Symbol <= maxDF {
-			out = append(out, concept{term: en, termPresent: true, weight: idf(f.Symbol, total)})
+			pc := concept{term: en, termPresent: true, weight: idf(f.Symbol, total), symDF: f.Symbol, docDF: f.Doc}
+			pc.salience = conceptSalience(pc, freq, total)
+			out = append(out, pc)
 			trans["phrase"] = append(trans["phrase"], en)
 		}
 	}
@@ -671,6 +744,16 @@ func isWord(t string) bool {
 }
 
 var identRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]{2,}`)
+var memberIdentRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*(?:(?:\.|::)[A-Za-z_][A-Za-z0-9_]*)*[!?]?`)
+
+var nonMemberDotSuffix = map[string]bool{
+	"com": true, "org": true, "net": true, "io": true, "dev": true, "edu": true, "gov": true,
+	"go": true, "py": true, "js": true, "jsx": true, "ts": true, "tsx": true, "rs": true,
+	"java": true, "kt": true, "cs": true, "rb": true, "php": true, "c": true, "cc": true,
+	"cpp": true, "h": true, "hpp": true, "scala": true, "ex": true, "exs": true, "swift": true,
+	"md": true, "json": true, "yaml": true, "yml": true, "toml": true, "sql": true, "txt": true,
+	"html": true, "css": true, "xml": true, "sh": true,
+}
 
 // identifierKeys finds code-like identifiers in the prompt for exact matching. A token
 // counts only when it carries code signals (underscore, digit or an inner capital), so
@@ -686,6 +769,69 @@ func identifierKeys(prompt string) []string {
 		if !seen[k] {
 			seen[k] = true
 			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
+func identifierKeysWithMembers(prompt string, splitMembers bool) []string {
+	keys := identifierKeys(prompt)
+	if !splitMembers {
+		return keys
+	}
+	seen := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		seen[k] = true
+	}
+	add := func(raw string) {
+		k := store.KeyOf(raw)
+		if k != "" && !seen[k] {
+			seen[k] = true
+			keys = append(keys, k)
+		}
+	}
+	for _, loc := range memberIdentRe.FindAllStringIndex(prompt, -1) {
+		tok := prompt[loc[0]:loc[1]]
+		hasDot := strings.Contains(tok, ".")
+		hasScope := strings.Contains(tok, "::")
+		if hasDot || hasScope {
+			parts := strings.FieldsFunc(tok, func(r rune) bool { return r == '.' || r == ':' })
+			if len(parts) < 2 {
+				continue
+			}
+			first := parts[0]
+			last := parts[len(parts)-1]
+			coreLast := strings.TrimRight(last, "!?")
+			if len(first) < 2 || len(coreLast) < 2 {
+				continue
+			}
+			if !hasScope && hasDot && nonMemberDotSuffix[strings.ToLower(coreLast)] {
+				continue
+			}
+			add(coreLast)
+			if last != coreLast {
+				add(last)
+			}
+			continue
+		}
+		if strings.HasSuffix(tok, "!") {
+			core := strings.TrimSuffix(tok, "!")
+			if len(core) >= 3 {
+				add(tok)
+				if codeLike(core) {
+					add(core)
+				}
+			}
+		} else if strings.HasSuffix(tok, "?") {
+			core := strings.TrimSuffix(tok, "?")
+			if len(core) >= 3 {
+				backticked := loc[0] > 0 && prompt[loc[0]-1] == '`' && loc[1] < len(prompt) && prompt[loc[1]] == '`'
+				trailingRest := strings.TrimSpace(prompt[loc[1]:])
+				atSentenceEnd := trailingRest == "" || trailingRest[0] == '\n'
+				if codeLike(core) || backticked || !atSentenceEnd {
+					add(tok)
+				}
+			}
 		}
 	}
 	return keys
@@ -825,22 +971,56 @@ func ensure(cands map[int64]*candidate, h store.SymbolHit) *candidate {
 
 // hitTerms are the analyzed words of a symbol's own text.
 func hitTerms(h store.SymbolHit) map[string]bool {
+	return hitTermsFor(h, false)
+}
+
+func hitTermsFor(h store.SymbolHit, includeKind bool) map[string]bool {
 	set := map[string]bool{}
 	for _, text := range []string{h.Name, h.Path, h.Signature, h.Doc} {
 		for _, t := range lexical.Analyze(text) {
 			set[t] = true
 		}
 	}
+	if includeKind && h.Kind != "" {
+		k := strings.ToLower(h.Kind)
+		set[k] = true
+		for _, t := range lexical.Analyze(k) {
+			set[t] = true
+		}
+	}
 	return set
+}
+
+var ubiquitousConceptTerms = map[string]bool{
+	"route": true, "order": true, "record": true, "entry": true, "log": true, "list": true,
+	"map": true, "set": true, "key": true, "port": true, "time": true, "date": true,
+	"name": true, "line": true, "row": true, "path": true, "open": true, "show": true,
+	"get": true, "error": true, "item": true, "type": true, "data": true, "code": true,
+	"file": true, "test": true,
+}
+
+func isUbiquitousConceptTerm(term string) bool {
+	return ubiquitousConceptTerms[term] || ubiquitousConceptTerms[lexical.Stem(term)]
+}
+
+func termSalience(symDF, docDF, total int) float64 {
+	if symDF > 0 {
+		return idf(symDF, total) * 2.0
+	}
+	return idf(docDF, total)
 }
 
 // scoreOwnText records which concepts the symbol's own name, path, signature or doc match.
 // A match on the name itself is literal; a match only through a translation is not.
 func scoreOwnText(c *candidate, concepts []concept) {
+	scoreOwnTextWith(c, concepts, 0, false)
+}
+
+func scoreOwnTextWith(c *candidate, concepts []concept, total int, includeKind bool) {
 	if len(concepts) == 0 {
 		return
 	}
-	all := hitTerms(c.hit)
+	all := hitTermsFor(c.hit, includeKind)
 	nameSet := map[string]bool{}
 	for _, t := range lexical.Analyze(c.hit.Name) {
 		nameSet[t] = true
@@ -848,11 +1028,35 @@ func scoreOwnText(c *candidate, concepts []concept) {
 	c.matched = nil
 	c.literal = false
 	c.nameComplete = false
+	c.minSymbolDF = 0
+	c.maxSalience = 0
+	c.matchedDF = nil
+	c.rareDomainMatch = false
 	matchedName := map[string]bool{}
+	rareCeiling := max(6, total/50)
+	recordMatch := func(matchedKey, repoTerm string, symDF, docDF int) {
+		if symDF > 0 {
+			if c.minSymbolDF == 0 || symDF < c.minSymbolDF {
+				c.minSymbolDF = symDF
+			}
+			if c.matchedDF == nil {
+				c.matchedDF = map[string]int{}
+			}
+			c.matchedDF[matchedKey] = symDF
+		}
+		sal := termSalience(symDF, docDF, total)
+		if sal > c.maxSalience {
+			c.maxSalience = sal
+		}
+		if symDF > 0 && symDF <= rareCeiling && sal >= 4.5 && !isUbiquitousConceptTerm(repoTerm) {
+			c.rareDomainMatch = true
+		}
+	}
 	for _, cp := range concepts {
 		switch {
 		case cp.termPresent && all[cp.term]:
 			c.matched = append(c.matched, cp.term)
+			recordMatch(cp.term, cp.term, cp.symDF, cp.docDF)
 			if nameSet[cp.term] {
 				c.literal = true
 				matchedName[cp.term] = true
@@ -862,7 +1066,9 @@ func scoreOwnText(c *candidate, concepts []concept) {
 			// word appearing in the name counts as VERIFIED or as uncommitted-state boost.
 			for _, a := range cp.alts {
 				if all[a] {
-					c.matched = append(c.matched, cp.term+"→"+a)
+					mk := cp.term + "→" + a
+					c.matched = append(c.matched, mk)
+					recordMatch(mk, a, cp.altSymDF[a], cp.altDocDF[a])
 					if nameSet[a] {
 						matchedName[a] = true
 					}
@@ -1278,7 +1484,10 @@ func feedbackMultiplier(c *candidate, mults map[string]float64) (float64, bool) 
 }
 
 func evidenceOf(c *candidate) Evidence {
-	ev := Evidence{Hit: c.hit, Score: c.score, Matched: c.matched, Relations: c.rels, Dirty: c.git}
+	ev := Evidence{
+		Hit: c.hit, Score: c.score, Matched: c.matched, Relations: c.rels, Dirty: c.git,
+		MinSymbolDF: c.minSymbolDF, MaxSalience: c.maxSalience, MatchedDF: c.matchedDF,
+	}
 	ev.Verdict = verdictOf(c)
 	ev.Section = sectionOf(c)
 	ev.ID, ev.Source, ev.Confidence, ev.TokenEstimate = idOf(c.hit), sourceOf(c), confidenceOf(c), tokensOf(c)
@@ -1343,7 +1552,11 @@ const ownAltWeight = 1.0
 // own word (direct) or only through a translation (alt). It reads every prompt term, including the
 // ones the concept distillation drops, so the numerator and the denominator count the same words.
 func ownMatches(h store.SymbolHit, terms []string, noTranslation bool) (direct, alt int) {
-	all := hitTerms(h)
+	return ownMatchesWithKind(h, terms, noTranslation, false)
+}
+
+func ownMatchesWithKind(h store.SymbolHit, terms []string, noTranslation, includeKind bool) (direct, alt int) {
+	all := hitTermsFor(h, includeKind)
 	for _, t := range uniqueStrings(terms) {
 		switch {
 		case all[t]:
@@ -1384,6 +1597,11 @@ func ownTextConfidence(c *candidate) float64 {
 	denom := math.Min(float64(max(c.promptTerms, 1)), t.OwnCoverCap)
 	cover := math.Min(support/denom, 1)
 	conf := t.OwnConfBase + t.OwnConfSpan*cover
+	if c.raritySupport && c.promptTerms <= 6 && !c.hasAbsentAnchor && support >= 1 && c.rareDomainMatch &&
+		repo.Kind(c.hit.Path) != "test" && c.presentConcepts > 0 && c.presentConcepts*2 >= c.promptTerms &&
+		(c.presentConcepts >= 2 || c.promptTerms <= 3) {
+		conf = math.Max(conf, math.Max(t.MinBlockConfidence+0.02, 0.52))
+	}
 	// Length-aware specificity: a long prompt explained by only a couple of its terms is weak evidence,
 	// so it stays below the block gate and can only appear next to a stronger item.
 	if t.LongPromptTerms > 0 && float64(c.promptTerms) >= t.LongPromptTerms && support < t.LongPromptMinSupport &&
