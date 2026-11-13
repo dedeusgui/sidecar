@@ -5,6 +5,30 @@
 Arquitetura e pipeline: [architecture.md](architecture.md). Plano original: [research-plan.md](research-plan.md). Critérios de promoção: [engine-progression.md](../engine-progression.md).
 
 > **Passagem para outro agente:** [docs/v3.7/handoff.md](handoff.md) (estado, bloqueio do P3, números, decisões revertidas e comandos).
+>
+> **Diagnóstico de qualidade da entrega** (símbolo gold perdido pelo packer, gate sem métrica de símbolo, linha de teste ausente errada, sobrecargas): [quality-findings.md](quality-findings.md). Latência: [optimization-backlog.md](optimization-backlog.md).
+
+## Latência do hook: três causas isoladas e corrigidas (sem mudança de saída)
+
+Perfil de CPU do hook quente (`app.Hook` em processo, índice completo) neste repositório e nos checkouts pinados do ten-repos. As três correções abaixo não alteram ranking nem texto entregue: os 150 contextos do ten-repos (V1, V3 e V3.7, positivos e negativos) e os 172 dos fixtures internos são idênticos byte a byte antes e depois (só muda o caminho do binário na dica `ON DEMAND`).
+
+1. **`store.TestFilesReferencing` (caminho compartilhado, inclusive V1).** A consulta juntava cada referência ao arquivo e ao símbolo e só então aplicava `DISTINCT`. Para um nome muito referenciado em testes (`get`, `it`, `assert_equal` no sinatra, ~1.200 referências) custava ~11,7 ms por chamada no SQLite em C e é chamada por semente e por definição. Reescrita com `f.id IN (SELECT r.file_id ...)`: ~0,31 ms, mesmo resultado, sem mudança de schema. Era ~75% do tempo do hook no sinatra.
+2. **`lexical.normalizeRomanceOrthography`.** Construía um `strings.NewReplacer` a cada palavra, para cada candidato. Em prompts longos (voz, ~1.100 caracteres) era ~30% do hook. Agora é construído uma vez.
+3. **`retrieve.ContractEvidence`.** Lia o mesmo arquivo de teste uma vez por definição e varria todo Markdown linha a linha para cada definição. Agora lê cada arquivo uma vez por chamada e pula arquivo ou definição cujo nome não aparece no texto.
+
+| Medida | Motor | Antes | Depois |
+|---|---|---:|---:|
+| ten-repos, 40 positivos, p95 ms (3 execuções antes, 2 depois) | V1 | 119 a 131 | 25 a 38 |
+| | V3 | 229 a 273 | 51 a 52 |
+| | V3.7 | 221 a 240 | 60 a 70 |
+| ten-repos, p50 ms | V1 / V3 / V3.7 | 11 / 23 / 33 | 11 a 13 / 22 a 30 / 29 a 33 |
+| sinatra, 4 prompts, média ms | V1 / V3.7 | 81 / 167 | 22 / 32 |
+| hono, prompt de voz, média ms | V1 / V3.7 | 22 / 109 | 22 / 67 |
+| este repositório, 4 prompts, estágio do motor V3.7, ms | V3.7 | 43 | 32 (só o item 3) |
+
+Gold, top-3 e tokens por gold do ten-repos não mudaram (V3.7 39 / 37 / 320). As medidas são de uma máquina de 4 CPUs com carga variável; a segunda execução "depois" rodou junto com outros processos. A recompilação de SQLite (`sqlite3Reprepare`) apareceu com 1 a 2% nestes perfis, não com os 26 a 30% registrados abaixo: não foi a causa da cauda.
+
+**O que continua aberto em latência (medido, não corrigido):** a V3.7 ainda fica em ~2,5× a V1 no p50 do ten-repos. O que sobra no perfil: `ContractEvidence` roda antes do gate de relevância (prompts que terminam em abstenção pagam por ele) e ainda faz uma varredura completa de `symbols.doc` por definição (`DocstringOwners`, até 12 por prompt); `lexical.Translations` é recalculada por candidato × termo sem memoização (~20% em prompt de voz); `index.Sync` carrega `FileRecords` duas vezes por prompt; a V3.7 empacota três vezes (packer V2, `engine.pack`, `PackWith`) sobre uma janela de 60 itens. Qualquer uma dessas mexe em ordem de estágios ou em resultado e precisa de P1 próprio. Lista completa, com o que foi medido e o que é hipótese: [optimization-backlog.md](optimization-backlog.md).
 
 ## Checkpoint de hardening (rodada atual)
 
