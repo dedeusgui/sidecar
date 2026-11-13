@@ -9,6 +9,7 @@ import (
 	"github.com/dedeusgui/sidecar/internal/engine"
 	"github.com/dedeusgui/sidecar/internal/engine/contract"
 	"github.com/dedeusgui/sidecar/internal/explore/service"
+	"github.com/dedeusgui/sidecar/internal/repo"
 	"github.com/dedeusgui/sidecar/internal/retrieve"
 )
 
@@ -19,8 +20,22 @@ const v37MaxSnippetLines = 24
 // multi-hop flow chains fit within the hook budget.
 func v37ExpansionItems(expansion service.ExpansionResult, registry *contract.EvidenceRegistry[retrieve.Evidence], maxTokens int) ([]ctxbuild.Item, []string) {
 	items, keys := v36ExpansionItems(expansion, registry, maxTokens)
-	if len(items) == 0 && len(expansion.Explore.Files) > 0 {
-		items, keys = compactExpansionSnippets(expansion, registry, maxTokens)
+	if len(expansion.Explore.Files) > 0 {
+		// V3.6 skips a snippet that does not fit whole. Offer those snippets in compacted form with the
+		// budget V3.6 left over, instead of only compacting when V3.6 delivered nothing at all.
+		spent := 0
+		for _, it := range items {
+			spent += ctxbuild.PackItemTokens(it)
+		}
+		taken := make(map[string]bool, len(keys))
+		for _, key := range keys {
+			taken[key] = true
+		}
+		more, moreKeys := compactExpansionSnippets(expansion, registry, maxTokens-spent, taken)
+		items = append(items, more...)
+		keys = append(keys, moreKeys...)
+		sort.Strings(keys)
+		keys = uniqueStrings(keys)
 	}
 	if len(expansion.CallPaths) > 0 {
 		anchorKeys := keys
@@ -92,10 +107,15 @@ func v37EvidenceItem(entry contract.EvidenceEntry[retrieve.Evidence]) ctxbuild.I
 	}
 }
 
-func compactExpansionSnippets(expansion service.ExpansionResult, registry *contract.EvidenceRegistry[retrieve.Evidence], maxTokens int) ([]ctxbuild.Item, []string) {
+// compactExpansionSnippets offers the head of each snippet whose evidence key is not already in taken,
+// within maxTokens. A non-positive budget yields nothing.
+func compactExpansionSnippets(expansion service.ExpansionResult, registry *contract.EvidenceRegistry[retrieve.Evidence], maxTokens int, taken map[string]bool) ([]ctxbuild.Item, []string) {
 	entries := registry.Snapshot()
 	var items []ctxbuild.Item
-	used := map[string]bool{}
+	used := make(map[string]bool, len(taken))
+	for key := range taken {
+		used[key] = true
+	}
 	tokens := 0
 	for _, file := range expansion.Explore.Files {
 		if file.Stale {
@@ -146,7 +166,9 @@ func compactExpansionSnippets(expansion service.ExpansionResult, registry *contr
 	}
 	keys := make([]string, 0, len(used))
 	for key := range used {
-		keys = append(keys, key)
+		if !taken[key] {
+			keys = append(keys, key)
+		}
 	}
 	sort.Strings(keys)
 	return items, keys
@@ -158,9 +180,10 @@ func compactExpansionSnippets(expansion service.ExpansionResult, registry *contr
 // 3. drops TaskBrief "test" orientation items when CONTRACTS ranked evidence already names a test symbol,
 // 4. prices every remaining proposal with exact rendered PackItemTokens.
 func v37PrepareProposals(proposals []ctxbuild.GuidanceProposal, choices []engine.Choice, snippetKeys map[string]string, seen ctxbuild.Seen) ([]ctxbuild.GuidanceProposal, []contract.GuidanceProposal) {
+	// Only a contract that names a test file makes the TaskBrief test pointer redundant.
 	hasContractTest := false
 	for _, c := range choices {
-		if c.Source == "contract" {
+		if c.Source == "contract" && repo.Kind(c.Path) == "test" {
 			hasContractTest = true
 			break
 		}

@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import pathlib
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -27,36 +28,113 @@ def run_step(name, cmd, cwd=ROOT, env=None):
     return dt
 
 
-def check_delivery_gate(summaries, candidate, baseline):
-    """Compare candidate vs baseline across delivery summary strata without hidden regressions."""
+# Thresholds for the delivery gate. They are deliberately explicit: a change to any of them is a
+# visible change to what counts as a regression. Gold path and top-3 gates are strict (no drop at all).
+NEGATIVE_STRATA = ("negative", "hard_negative")
+POSITIVE_METRICS = ("gold_path_delivered", "gold_in_first_3_lines", "orientation_only", "trust_label_conflicts",
+                    "non_deterministic", "tokens_per_gold_delivered", "p95_ms")
+NEGATIVE_METRICS = ("non_empty", "trust_label_conflicts", "non_deterministic")
+TOKEN_TOLERANCE = 0.10      # tokens per delivered gold may grow at most 10% over the baseline
+LATENCY_FACTOR = 1.5        # p95 may be at most 1.5x the baseline ...
+LATENCY_SLACK_MS = 5.0      # ... plus 5 ms, so jitter on sub-10 ms medians is not a regression
+
+
+def merge_latency_runs(runs):
+    """Median p95 per (stratum, engine) across repeated delivery runs; other fields come from the first run.
+
+    A single run's p95 over a few dozen cases swings by tens of percent on a loaded machine, so the gate
+    compares medians. `latency_runs` records how many samples each median used.
+    """
+    samples = {}
+    for run in runs:
+        for row in run["summary"]:
+            samples.setdefault((row["stratum"], row["engine"]), []).append(row["p95_ms"])
+    merged = []
+    for row in runs[0]["summary"]:
+        out = dict(row)
+        values = samples[(row["stratum"], row["engine"])]
+        out["p95_ms"] = statistics.median(values)
+        out["latency_runs"] = len(values)
+        merged.append(out)
+    return merged
+
+
+def run_delivery(name, base_cmd, out_json, runs):
+    """Run one delivery scorecard `runs` times and write it to out_json with median latency."""
+    if runs <= 1:
+        run_step(name, base_cmd + ["--out", str(out_json)])
+        return
+    paths = []
+    for i in range(runs):
+        path = out_json.with_name(f"{out_json.stem}.run{i + 1}.json")
+        run_step(f"{name} run {i + 1}/{runs}", base_cmd + ["--out", str(path)])
+        paths.append(path)
+    data = json.loads(paths[0].read_text())
+    data["summary"] = merge_latency_runs([json.loads(path.read_text()) for path in paths])
+    out_json.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+
+
+def check_delivery_gate(summaries, candidate, baseline, token_tolerance=TOKEN_TOLERANCE,
+                        latency_factor=LATENCY_FACTOR, latency_slack_ms=LATENCY_SLACK_MS):
+    """Compare candidate vs baseline across delivery strata; any gap is a failure, never a silent skip.
+
+    A stratum or engine missing on either side means the comparison is incomplete, so it fails rather
+    than reporting GATE OK on partial evidence. Latency is gated with a tolerance because it is noisy.
+    """
     by_key = {(s["stratum"], s["engine"]): s for s in summaries}
+    engines = {s["engine"] for s in summaries}
     failures = []
+    for engine in (candidate, baseline):
+        if engine not in engines:
+            failures.append(f"{engine}: no delivery summary; the gate cannot compare it")
+    if failures:
+        return failures
     strata = sorted({s["stratum"] for s in summaries})
     for stratum in strata:
         cand = by_key.get((stratum, candidate))
         base = by_key.get((stratum, baseline))
-        if not cand or not base:
+        if cand is None or base is None:
+            side = candidate if cand is None else baseline
+            failures.append(f"{stratum}: missing stratum for {side}; partial results are not a gate pass")
             continue
-        if cand.get("non_deterministic", 0) > 0:
+        negative = stratum in NEGATIVE_STRATA
+        required = NEGATIVE_METRICS if negative else POSITIVE_METRICS
+        absent = [m for m in required if m not in cand or m not in base]
+        if absent:
+            failures.append(f"{stratum}: missing metric(s) {', '.join(absent)} for {candidate} or {baseline}")
+            continue
+        if cand["non_deterministic"] > 0:
             failures.append(f"{stratum}: {candidate} non_deterministic={cand['non_deterministic']}")
-        if cand.get("trust_label_conflicts", 0) > base.get("trust_label_conflicts", 0):
+        if cand["trust_label_conflicts"] > base["trust_label_conflicts"]:
             failures.append(
                 f"{stratum}: {candidate} label conflicts {cand['trust_label_conflicts']} > {baseline} {base['trust_label_conflicts']}"
             )
-        if stratum in ("negative", "hard_negative"):
-            if cand.get("non_empty", 0) > base.get("non_empty", 0):
-                failures.append(
-                    f"{stratum}: {candidate} negative leaks {cand['non_empty']} > {baseline} {base['non_empty']}"
-                )
-        else:
-            if cand.get("gold_path_delivered", 0) < base.get("gold_path_delivered", 0):
-                failures.append(
-                    f"{stratum}: {candidate} gold_path_delivered {cand['gold_path_delivered']} < {baseline} {base['gold_path_delivered']}"
-                )
-            if cand.get("orientation_only", 0) > base.get("orientation_only", 0):
-                failures.append(
-                    f"{stratum}: {candidate} orientation_only {cand['orientation_only']} > {baseline} {base['orientation_only']}"
-                )
+        if negative:
+            if cand["non_empty"] > base["non_empty"]:
+                failures.append(f"{stratum}: {candidate} negative leaks {cand['non_empty']} > {baseline} {base['non_empty']}")
+            continue
+        if cand["gold_path_delivered"] < base["gold_path_delivered"]:
+            failures.append(
+                f"{stratum}: {candidate} gold_path_delivered {cand['gold_path_delivered']} < {baseline} {base['gold_path_delivered']}"
+            )
+        if cand["gold_in_first_3_lines"] < base["gold_in_first_3_lines"]:
+            failures.append(
+                f"{stratum}: {candidate} gold_in_first_3_lines {cand['gold_in_first_3_lines']} < {baseline} {base['gold_in_first_3_lines']}"
+            )
+        if cand["orientation_only"] > base["orientation_only"]:
+            failures.append(
+                f"{stratum}: {candidate} orientation_only {cand['orientation_only']} > {baseline} {base['orientation_only']}"
+            )
+        base_tpg = base["tokens_per_gold_delivered"]
+        if base_tpg > 0 and cand["tokens_per_gold_delivered"] > base_tpg * (1 + token_tolerance):
+            failures.append(
+                f"{stratum}: {candidate} tokens_per_gold_delivered {cand['tokens_per_gold_delivered']:.1f} > "
+                f"{baseline} {base_tpg:.1f} x{1 + token_tolerance:.2f}"
+            )
+        if cand["p95_ms"] > base["p95_ms"] * latency_factor + latency_slack_ms:
+            failures.append(
+                f"{stratum}: {candidate} p95_ms {cand['p95_ms']:.1f} > {baseline} {base['p95_ms']:.1f} x{latency_factor} + {latency_slack_ms}ms"
+            )
     return failures
 
 
@@ -73,7 +151,11 @@ def main(argv=None):
     ap.add_argument("--enforce-gate", action="store_true", help="exit 1 if candidate regresses vs baseline")
     ap.add_argument("--race", action="store_true", help="also run Go race detector on concurrent packages")
     ap.add_argument("--skip-tests", action="store_true", help="skip P0 unit tests and run P1+Studio only")
+    ap.add_argument("--latency-runs", type=int, default=3,
+                    help="repeat each delivery run N times and gate on the median p95 (1 = single run, noisy)")
     args = ap.parse_args(argv)
+    if args.latency_runs < 1:
+        ap.error("--latency-runs must be at least 1")
 
     out_dir = pathlib.Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -96,9 +178,11 @@ def main(argv=None):
 
     studio_inputs = []
     cases_json = out_dir / "delivery-cases.json"
-    run_step(
+    run_delivery(
         "P1 delivery (bench/cases.json)",
-        [str(eval_bin), "--cases", "bench/cases.json", "--delivery", "--delivery-engines", args.engines, "--out", str(cases_json)],
+        [str(eval_bin), "--cases", "bench/cases.json", "--delivery", "--delivery-engines", args.engines],
+        cases_json,
+        args.latency_runs,
     )
     studio_inputs.append(str(cases_json))
 
@@ -109,10 +193,10 @@ def main(argv=None):
 
     if args.external_manifest:
         ext_json = out_dir / "delivery-external.json"
-        cmd = [str(eval_bin), "--external-cases", args.external_manifest, "--delivery", "--delivery-engines", args.engines, "--out", str(ext_json)]
+        cmd = [str(eval_bin), "--external-cases", args.external_manifest, "--delivery", "--delivery-engines", args.engines]
         if args.negatives and (ROOT / args.negatives).is_file():
             cmd += ["--delivery-negatives", args.negatives]
-        run_step("P1 delivery (external manifest)", cmd)
+        run_delivery("P1 delivery (external manifest)", cmd, ext_json, args.latency_runs)
         studio_inputs.append(str(ext_json))
         if args.candidate:
             ext_data = json.loads(ext_json.read_text())
@@ -123,7 +207,7 @@ def main(argv=None):
         e1_manifest = out_dir / "e1-manifest.json"
         run_step("P1 build E1 manifest", [sys.executable, "bench/v3.5/make_e1_manifest.py", "--checkout", str(checkout), "--out", str(e1_manifest)])
         e1_json = out_dir / "delivery-e1.json"
-        run_step("P1 delivery (E1 cohorts)", [str(eval_bin), "--external-cases", str(e1_manifest), "--delivery", "--delivery-engines", args.engines, "--out", str(e1_json)])
+        run_delivery("P1 delivery (E1 cohorts)", [str(eval_bin), "--external-cases", str(e1_manifest), "--delivery", "--delivery-engines", args.engines], e1_json, args.latency_runs)
         studio_inputs.append(str(e1_json))
         if args.candidate:
             e1_data = json.loads(e1_json.read_text())
