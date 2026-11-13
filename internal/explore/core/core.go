@@ -610,7 +610,7 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 		}
 		calleeCands := make([]expansionNode, 0, len(callees))
 		for _, r := range callees {
-			if rec, ok := records[r.SymbolHit.Path]; ok && rec.Kind == "test" {
+			if rec, ok := records[r.Path]; ok && rec.Kind == "test" {
 				continue
 			}
 			calleeCands = append(calleeCands, expansionNode{hit: r.SymbolHit, parent: current.hit, basis: r.Basis,
@@ -618,7 +618,7 @@ func expandCallChain(ctx context.Context, st *store.Store, rel *relationCache, r
 		}
 		callerCands := make([]expansionNode, 0, len(callers))
 		for _, r := range callers {
-			if rec, ok := records[r.SymbolHit.Path]; ok && rec.Kind == "test" {
+			if rec, ok := records[r.Path]; ok && rec.Kind == "test" {
 				continue
 			}
 			callerCands = append(callerCands, expansionNode{hit: r.SymbolHit, parent: current.hit, hasFrom: true, basis: r.Basis,

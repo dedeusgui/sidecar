@@ -1,8 +1,62 @@
 # V3.7 — progresso experimental (checkpoint P0 + P1)
 
-> **Estado:** `SIDECAR_ENGINE=v3.7` implementada como **opt-in** sobre `main@8550eaf`; **V1 continua padrão**. Passou nos portões locais **P0** e **P1** sem regressões frente à `v3` e à `v3.6` nos cortes avaliados. **P3 (piloto agentic pago no `bench/lab/lab.py`) ainda não foi executado** e `golangci-lint` reporta 3 sugestões `staticcheck` descritas abaixo. Não há comprovação de ganho end-to-end com agentes.
+> **Estado:** `SIDECAR_ENGINE=v3.7` implementada como **opt-in** sobre `main@8550eaf`; **V1 continua padrão**. Passa nos portões **P0** (testes, race, lint, registro e freeze) e no **P1 contra V3 e V3.6** (zero regressões; ver [checkpoint](#checkpoint-de-hardening-rodada-atual)). **Contra V1 ainda reprova** (recall e latência nos cortes internos). **P3 (piloto agentic pago) não foi executado** e o encerramento do marco depende dele e dos cortes externos. As afirmações "GATE OK" das seções abaixo vieram do gate anterior, que ignorava estratos ausentes e não comparava top-3, tokens ou latência. Não há comprovação de ganho end-to-end com agentes.
 
 Arquitetura e pipeline: [architecture.md](architecture.md). Plano original: [research-plan.md](research-plan.md). Critérios de promoção: [engine-progression.md](../engine-progression.md).
+
+## Checkpoint de hardening (rodada atual)
+
+Medido com `python3 bench/fast_gate.py --race --engines v1,v2,v3,v3.5,v3.6,v3.7 --candidate v3.7 --baseline v3` (P0 + P1 + Studio, `$0`). "Antes" é o código de `56088bf`. O holdout nunca foi lido. Nenhuma execução agentic paga (P3).
+
+### Resultado (fixtures internos, 40 positivos; negativos difíceis dev + validation, 36 casos)
+
+| Motor | Caminho gold antes → depois | Top-3 antes → depois | Tokens por gold antes → depois |
+|---|---:|---:|---:|
+| V1 (padrão) | 38 → 39 | 34 → 34 | 278 → 288 |
+| V3 | 29 → 35 | 28 → 33 | 187 → 192 |
+| V3.6 | 27 → 33 | 27 → 32 | 236 → 243 |
+| **V3.7** | **30 → 35** | **29 → 33** | **218 → 195** |
+
+- **Gate V3.7 contra V3 e contra V3.6: zero regressões.** Cobre caminho gold, top-3, orientação, conflitos de rótulo, determinismo, tokens por gold (+10%), latência (p95 mediano, 1,5× + 5 ms) e falsos positivos nos negativos difíceis. Resultado: V3.7 deixa 0 de 36 negativos difíceis com saída; a V1 deixa 7.
+- **Gate V3.7 contra V1: ainda reprova.** Caminho gold 35 contra 39, top-3 33 contra 34 nos positivos, e p95 de ~21 ms contra ~10 ms da V1 (estrato `tune`). A V1 segue padrão. A V3.7 não supera a V1 em recall nem em latência nestes cortes.
+
+### O que mudou
+
+1. **Lint:** as 3 issues de `staticcheck` foram corrigidas (`QF1008` em `internal/explore/core/core.go` e `S1011` em `internal/extract/extract.go`). `golangci-lint run ./...` → 0 issues.
+2. **Gate endurecido (`bench/fast_gate.py`):** estrato ou motor ausente falha (antes era pulado em silêncio). Top-3 não pode cair. `tokens_per_gold_delivered` pode subir no máximo 10% sobre a base. p95 precisa ficar em até 1,5× a base + 5 ms, com a mediana de `--latency-runs` (padrão 3) execuções, porque o p95 de uma só execução variou de ~12 a ~25 ms sem mudança de código. Os negativos difíceis dev + validation entram no gate, para que um vazamento reprove sem depender de uma execução manual. O holdout continua fora.
+3. **Dois defeitos em `internal/app/v37.go`, reproduzidos por teste antes da correção** (`internal/app/v37_review_test.go`):
+   - uma escolha `contract` que não era teste suprimia a orientação de teste da TaskBrief; agora só suprime quando o contrato aponta um arquivo de teste;
+   - um trecho grande que a V3.6 pulou por orçamento nunca era oferecido compactado; agora a compactação usa o orçamento que sobra e pula trechos já entregues. Nos fixtures a saída não muda (nenhum trecho grande é disparado): é correção validada por teste, não ganho medido.
+4. **Relações renderizadas pela V3.7** (`v37ActionableRelations`): no máximo 1 por item, na ordem `tested_by` > `called_by` > `calls`. Contenção (`member_of`, `contains`) e co-change (`cochange`) deixam de ser exibidos. O gold não depende disso (está no rótulo `source:`), e a ordem por caminho de teste não mudou nenhum gold. Motivo do corte: relações eram ~20% dos tokens entregues pela V3.7, e `cochange` é a anotação mais frequente, sinal histórico que aponta para o mesmo teste que `tested_by` mostra estaticamente. **Trade-off:** o valor dessas relações para o agente não foi medido. Só o piloto P3 responde isso.
+5. **Léxico PT-BR→EN (`internal/lexical/lexicon_pt_en.tsv`):** +47 entradas gerais desde `56088bf` (42 de comércio, cobrança, logística e prazos, na `b7cc3f8`, e 5 flexões: `cupons`, `unidade`/`unidades`, `quantidade`/`quantidades`, nesta rodada). Essas palavras vieram das falhas dos fixtures internos, então o ganho ali é ajuste em amostra.
+
+### Testado e revertido (medido, não entrou)
+
+- **Ignorar palavras de estrutura em PT no denominador da confiança** (`quanto`, `existem`, `ante`, só na V3.7): +1 gold (E06), mas o custo por gold subiu para 218 e reprovou o gate. Reverter também evitou crescimento do bloco em T02 (167 → 293 tokens, sem ganho). Revertido.
+- **Deduplicar relações repetidas dentro do mesmo bloco:** são 9% das relações e ~1% dos tokens. Não compensa a complexidade. Não feito.
+- **Ordem de relações com `cochange`:** mantido fora (ver item 4). Antes de sair, o estrato `tune` ficou em 221 tokens por gold contra 217 de limite; sem `cochange` ficou em 206.
+
+### Recall restante (V1 acerta, V3.7 não)
+
+- **E06** `quantas tentativas de cobrança antes de desistir`: abstenção. Só um termo forte (`cobrança`) casa, abaixo do gate de bloco.
+- **E12** `marcar a entrega como concluída`: abstenção. `concluída` não tem tradução presente no repositório.
+- **T08** `quantos dias de carência existem para pagamento do boleto?`: nenhuma evidência passa pelos gates V2 (`best_support 0`); é limitação de recuperação em nível de símbolo.
+- **E20** `registro de clientes com email único`: entrega contexto errado (modo LEAN, item de ordenação).
+- **E05** falha em todas as engines (V1 inclusive).
+
+### O que não foi medido nesta sandbox (limitações)
+
+- **ten-repos (39/40), E1 (23/30 positivos e 16/40 negativos), top-3 de `voice_mode` e Explore (`NAV-CLK-01`, `NAV-SER-01`)** dependem de checkouts pinados de repositórios externos. Não estão nesta máquina, e obtê-los exige acesso a repositórios fora do escopo deste ambiente. Nenhum desses números foi alterado nem reproduzido.
+- **CodeGraph** não está instalado. A comparação E2 também depende do corpus externo.
+- **P3 (pago):** não executado. Tentei `bench/lab/lab.py validate-corpus`; ele instala dependências de tarefas (gems Ruby) e reescreve `validation.json`. Interrompi e reverti. Rodar P3 exige autorização explícita de custo (`--max-total-usd`).
+- **Generalização do vocabulário:** não medida. Os cortes externos são a única validação fora da amostra interna.
+- **Negativos E1 (16/40):** não medidos aqui. O vocabulário e a regra de relações novos podem mudar esse número, para cima ou para baixo, e isso é o risco aberto.
+
+### Próximos passos
+
+1. Rodar ten-repos, E1 e E2 quando os checkouts pinados estiverem disponíveis; medir top-3 de `voice_mode` e Explore nesse corte.
+2. Piloto P3 com teto de gasto autorizado: decidir a política de relações pelo custo por tarefa concluída corretamente.
+3. Recall restante: E06, E12, T08 e E20 (lista acima).
 
 ## P0 — Portão imediato local (`$0`)
 
@@ -15,7 +69,7 @@ Executado sobre a árvore de código atual da V3.7:
 | Testes Python do harness/bench | `python3 -m unittest discover -s bench -p 'test_*.py'` | PASS (`50` testes em `0.129s`) |
 | Consistência do registro de benchmarks | `python3 bench/consolidate.py --check` | PASS (`0.08s`) |
 | Manifesto congelado V3.5 | `python3 bench/v3.5/freeze.py verify` | PASS (`0.11s`, coortes E1/E2 e baseline plan conferem) |
-| Lint estático Go | `golangci-lint run ./...` | `3 issues` (`staticcheck`: `QF1008` em `internal/explore/core/core.go:613,621` e `S1011` em `internal/extract/extract.go:204`) |
+| Lint estático Go | `golangci-lint run ./...` | `0 issues` nesta rodada (eram 3 `staticcheck`: `QF1008` em `internal/explore/core/core.go:613,621` e `S1011` em `internal/extract/extract.go:204`, corrigidos) |
 
 *(Nota: P0 será revalidado após os commits de documentação finais antes do push.)*
 
@@ -83,5 +137,5 @@ Gate automático `fast_gate`: `GATE v3.7 vs v3: OK`, `GATE v3.7 vs v3.6: OK`. Em
 
 1. **`sidecar explore` vs `codegraph` no E2:** fechar a diferença residual de 1 fato (`23/26` vs `24/26`) nos casos `NAV-CLK-01` (`parse_args`) e `NAV-SER-01` (`deserializer|from_trait`, `deserialize_any|deserialize`).
 2. **`voice_mode` nas 3 primeiras linhas e `E1` negativos:** melhorar ordenação compacta nos primeiros itens em prompts de voz (`6/10` → manter `10/10` de top3 como na V3 sem perder os snippets úteis) e reduzir os `16/40` falsos positivos na coorte `E1`.
-3. **Lint (`3` itens `staticcheck`):** resolver `QF1008` em `internal/explore/core/core.go:613,621` e `S1011` em `internal/extract/extract.go:204` na próxima iteração de código.
+3. ~~**Lint (`3` itens `staticcheck`):**~~ resolvido no checkpoint de hardening: `golangci-lint` em `0 issues`.
 4. **P2 e P3 pendentes:** validar contrato real no cliente Antigravity/Claude/Codex (`sidecar doctor` + captura real de `hook.jsonl`) e, só depois de fechar os itens 1–3, rodar o piloto agentic pareado (`bench/lab/lab.py`) comparando `OFF`, `V1`, `V3`, `V3.7` e `CG` com `--max-total-usd` explícito.

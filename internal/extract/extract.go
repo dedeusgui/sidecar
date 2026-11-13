@@ -201,9 +201,7 @@ func (g *grammar) extract(src []byte) Result {
 			sym.Doc = lines.docAbove(sym.Line - 1)
 			res.Symbols = append(res.Symbols, sym)
 		}
-		for _, mod := range g.importModules(n, src) {
-			res.Imports = append(res.Imports, mod)
-		}
+		res.Imports = append(res.Imports, g.importModules(n, src)...)
 		for _, r := range g.extraRefs(n, src) {
 			k := refKey{name: r.name, kind: r.kind, line: r.line, start: r.start}
 			if r.name == "" || seenRefs[k] {

@@ -64,7 +64,7 @@ func TestV37PrepareProposalsDropsSeenAndRedundantEntrypoint(t *testing.T) {
 		},
 	}
 	seen := func(key, fp string) bool { return key == "brief|consumer|main.go" }
-	choices := []engine.Choice{{ID: "test-1", Source: "contract"}}
+	choices := []engine.Choice{{ID: "test-1", Source: "contract", Path: "router/router_test.go"}}
 	snippets := map[string]string{"k1": "fp-snippet"}
 
 	got, metas := v37PrepareProposals(proposals, choices, snippets, seen)
