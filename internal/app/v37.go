@@ -20,22 +20,10 @@ const v37MaxSnippetLines = 24
 // multi-hop flow chains fit within the hook budget.
 func v37ExpansionItems(expansion service.ExpansionResult, registry *contract.EvidenceRegistry[retrieve.Evidence], maxTokens int) ([]ctxbuild.Item, []string) {
 	items, keys := v36ExpansionItems(expansion, registry, maxTokens)
-	if len(expansion.Explore.Files) > 0 {
-		// V3.6 skips a snippet that does not fit whole. Offer those snippets in compacted form with the
-		// budget V3.6 left over, instead of only compacting when V3.6 delivered nothing at all.
-		spent := 0
-		for _, it := range items {
-			spent += ctxbuild.PackItemTokens(it)
-		}
-		taken := make(map[string]bool, len(keys))
-		for _, key := range keys {
-			taken[key] = true
-		}
-		more, moreKeys := compactExpansionSnippets(expansion, registry, maxTokens-spent, taken)
-		items = append(items, more...)
-		keys = append(keys, moreKeys...)
-		sort.Strings(keys)
-		keys = uniqueStrings(keys)
+	if len(items) == 0 && len(expansion.Explore.Files) > 0 {
+		// Compacting oversized snippets next to V3.6's whole snippets was tried and reverted: on the external
+		// voice_mode cohort it spent the budget the gold item needed (gold 10 -> 7). See docs/v3.7/progress.md.
+		items, keys = compactExpansionSnippets(expansion, registry, maxTokens, nil)
 	}
 	if len(expansion.CallPaths) > 0 {
 		anchorKeys := keys

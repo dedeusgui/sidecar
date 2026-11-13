@@ -53,19 +53,45 @@ Benchmark local do caminho do hook com índice aquecido (uma consulta, 4 CPUs): 
 - **Descartado:** mudança de schema durante a consulta. `PRAGMA schema_version` ficou em 41 em todas as consultas de um hook quente.
 - **Não identificado:** a causa da recompilação. Hipótese descartada em microbenchmark isolado: consultas FTS5 cacheadas custam ~18,7 µs contra ~20,7 µs sem cache, e consultas em tabela comum cacheadas custam ~2,4 µs sem sinal de recompilação. A recompilação do perfil real não se reproduz fora do hook; a causa continua aberta. Corrigir isso muda o caminho de desempenho do motor padrão e exige PR próprio, com benchmark antes e depois.
 
-### O que não foi medido nesta sandbox (limitações)
+### Cortes externos (medidos nesta rodada, com checkouts pinados)
 
-- **ten-repos (39/40), E1 (23/30 positivos e 16/40 negativos), top-3 de `voice_mode` e Explore (`NAV-CLK-01`, `NAV-SER-01`)** dependem de checkouts pinados de repositórios externos. Não estão nesta máquina, e obtê-los exige acesso a repositórios fora do escopo deste ambiente. Nenhum desses números foi alterado nem reproduzido.
-- **CodeGraph** não está instalado. A comparação E2 também depende do corpus externo.
-- **P3 (pago):** não executado. Tentei `bench/lab/lab.py validate-corpus`; ele instala dependências de tarefas (gems Ruby) e reescreve `validation.json`. Interrompi e reverti. Rodar P3 exige autorização explícita de custo (`--max-total-usd`).
-- **Generalização do vocabulário:** não medida. Os cortes externos são a única validação fora da amostra interna.
-- **Negativos E1 (16/40):** não medidos aqui. O vocabulário e a regra de relações novos podem mudar esse número, para cima ou para baixo, e isso é o risco aberto.
+Os repositórios são públicos e foram obtidos por clone raso no commit fixado de cada manifesto (`bench/ten_repos_cases.json`, `bench/v3.5/e1_cases.json`, `bench/lab/corpus-nav`). Rodada completa: `fast_gate.py --race --external-manifest ... --checkout ... --codegraph ... --candidate v3.7 --baseline v3`.
+
+| Corte | Motor | Gold | Top-3 | Tokens/gold | p95 ms |
+|---|---|---:|---:|---:|---:|
+| ten-repos (40 pos.) | V1 | 37 | 32 | 436 | 102 |
+| | V3 | 35 | 35 | 367 | 180 |
+| | V3.6 | 36 | 34 | 422 | 179 |
+| | **V3.7** | **39** | **37** | **320** | 205 |
+| E1 (30 pos. / 40 neg.) | V1 | 20 | 17 | 572 | 47 |
+| | V3 | 20 | 17 | 407 | 66 |
+| | V3.6 | 22 | 21 | 397 | 96 |
+| | **V3.7** | **23** | **22** | **350** | 92 |
+
+- **E1, negativos com saída:** V3.7 16/40 (V1 28, V3 19, V3.6 18). Os números de gold 23/30 e 16/40 batem com os que este documento já registrava.
+- **Gate V3.7 contra V3.6 nos dois cortes:** zero regressões. Contra V3 no E1: zero regressões. Contra V3 no ten-repos: duas, `messy_pt` p95 (41 contra limite de 38 ms, em 10 casos) e `voice_mode` top-3 (9 contra 10, uma posição).
+- **Contra V1:** gold do ten-repos e do E1 já é igual ou maior. O que reprova é latência (p95 ~2× a V1 no ten-repos e no E1) e o `voice_mode` do ten-repos (top-3 e custo).
+- **E2 (navegação, corpus-nav, 7 tarefas / 26 fatos, CodeGraph 1.6.0 instalado):** V3.7 hook cobre 14 fatos (V1 11, V3 10). `sidecar explore` cobre 23 e CodeGraph 24. Os faltantes são os mesmos já listados: `parse_args` (NAV-CLK-01) e `deserializer|from_trait` (NAV-SER-01). Nenhuma tarefa cobre todos os fatos em nenhum braço.
+
+**Dois achados de ablação que mudaram o motor (ver commit `9e95f03`):**
+
+- Compactar trechos que a V3.6 pulou por orçamento, ao lado dos trechos inteiros da V3.6, gastava o orçamento do item gold: `voice_mode` do ten-repos caiu de 10 para 7. Revertido. A correção estava coberta por teste unitário, mas o benchmark externo mostrou o efeito oposto.
+- A expansão automática (`QuickExpand`) da V3.7 no hook piorava o `voice_mode` (top-3 de 9 com a expansão desligada, contra 6 com ela ligada) e o custo (320 contra 394 tokens por gold no ten-repos), sem ganho líquido de gold. Passou a ser opt-in (`SIDECAR_FEATURES=quickexpand`). V3.5 e V3.6 continuam como antes.
+
+### Limitações que continuam
+
+- **P3 (piloto agentic pago): não executado.** Preparei o harness: o `--agent scripted` validou a infraestrutura com custo zero, e instalei o `bwrap` que o sandbox exige. Quando tentei o piloto real, o preflight de autenticação do sandbox reportou `loggedIn: false` (`authMethod: none`), mesmo com o token copiado para a configuração isolada. Nenhuma execução paga foi iniciada e nenhum gasto foi registrado. Para rodar, é preciso uma credencial que o harness aceite (por exemplo, uma chave de API fornecida como segredo do ambiente) e um teto de gasto explícito.
+- **Latência da V3.7 contra a V1:** o p95 é cerca de 2× o da V1 nos cortes externos. Não atribuo à expansão automática (o ablation com ela desligada não reduziu o p95 de forma clara). A causa não foi isolada.
+- **`voice_mode` top-3:** 9 contra 10 da V3, e 9 contra 9 da V1 nesse corte. Não há correção validada ainda; a ordenação "resumo antes do trecho" foi tentada e revertida (ganho de voz compensado por perda em `direct`).
+- **Vocabulário:** o ganho nos fixtures internos é de ajuste em amostra. Os cortes externos são a validação fora dessa amostra.
+- **Negativos E1 com saída (16/40):** ainda é o maior vazamento da V3.7, mas é menor que o da V1 (28).
 
 ### Próximos passos
 
-1. Rodar ten-repos, E1 e E2 quando os checkouts pinados estiverem disponíveis; medir top-3 de `voice_mode` e Explore nesse corte.
-2. Piloto P3 com teto de gasto autorizado: decidir a política de relações pelo custo por tarefa concluída corretamente.
-3. Recall restante: E06, E12, T08 e E20 (lista acima).
+1. Fornecer uma credencial aceita pelo harness e um teto de gasto para rodar o P3.
+2. Investigar a latência da V3.7 contra a V1 nos cortes externos (perfil por estágio em repositórios grandes).
+3. Investigar `voice_mode` top-3 contra V3 (ordenação e seleção de itens em prompts de voz).
+4. Investigar os fatos faltantes do E2 (`parse_args`, `deserializer|from_trait`) no `explore`.
 
 ## P0 — Portão imediato local (`$0`)
 
