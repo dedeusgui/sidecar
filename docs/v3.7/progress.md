@@ -4,6 +4,8 @@
 
 Arquitetura e pipeline: [architecture.md](architecture.md). Plano original: [research-plan.md](research-plan.md). Critérios de promoção: [engine-progression.md](../engine-progression.md).
 
+> **Passagem para outro agente:** [docs/v3.7/handoff.md](handoff.md) (estado, bloqueio do P3, números, decisões revertidas e comandos).
+
 ## Checkpoint de hardening (rodada atual)
 
 Medido com `python3 bench/fast_gate.py --race --engines v1,v2,v3,v3.5,v3.6,v3.7 --candidate v3.7 --baseline v3` (P0 + P1 + Studio, `$0`). "Antes" é o código de `56088bf`. O holdout nunca foi lido. Nenhuma execução agentic paga (P3).
