@@ -114,6 +114,40 @@ func CognateCandidates(word string) []string {
 	return out
 }
 
+// romanceReplacer is built once: constructing it per word dominated long (voice) prompts.
+var romanceReplacer = strings.NewReplacer(
+	"autentic", "authentic",
+	"autoriz", "authoriz",
+	"inici", "initi",
+	"transac", "transact",
+	"sincron", "synchron",
+	"assincron", "asynchron",
+	"orquestr", "orchestr",
+	"arquitet", "architect",
+	"criptograf", "cryptograph",
+	"cripto", "crypto",
+	"dinam", "dynam",
+	"estatist", "statist",
+	"estrutur", "structur",
+	"especif", "specif",
+	"especial", "special",
+	"excecao", "exception",
+	"excecoes", "exceptions",
+	"conex", "connect",
+	"colec", "collect",
+	"selec", "select",
+	"injec", "inject",
+	"inspec", "inspect",
+	"redirec", "redirect",
+	"projec", "project",
+	"execu", "execut",
+	"diretor", "director",
+	"repositor", "repositor",
+	"dicion", "diction",
+	"comprim", "compress",
+	"credencia", "credential",
+)
+
 // normalizeRomanceOrthography converts systematic PT-BR orthographic patterns to English cognates.
 func normalizeRomanceOrthography(w string) string {
 	s := w
@@ -122,39 +156,7 @@ func normalizeRomanceOrthography(w string) string {
 	} else if len(s) >= 6 && strings.HasPrefix(s, "es") && isConsonant(s[2]) && !strings.HasPrefix(s, "esper") {
 		s = s[1:]
 	}
-	replacer := strings.NewReplacer(
-		"autentic", "authentic",
-		"autoriz", "authoriz",
-		"inici", "initi",
-		"transac", "transact",
-		"sincron", "synchron",
-		"assincron", "asynchron",
-		"orquestr", "orchestr",
-		"arquitet", "architect",
-		"criptograf", "cryptograph",
-		"cripto", "crypto",
-		"dinam", "dynam",
-		"estatist", "statist",
-		"estrutur", "structur",
-		"especif", "specif",
-		"especial", "special",
-		"excecao", "exception",
-		"excecoes", "exceptions",
-		"conex", "connect",
-		"colec", "collect",
-		"selec", "select",
-		"injec", "inject",
-		"inspec", "inspect",
-		"redirec", "redirect",
-		"projec", "project",
-		"execu", "execut",
-		"diretor", "director",
-		"repositor", "repositor",
-		"dicion", "diction",
-		"comprim", "compress",
-		"credencia", "credential",
-	)
-	return replacer.Replace(s)
+	return romanceReplacer.Replace(s)
 }
 
 func isConsonant(b byte) bool {

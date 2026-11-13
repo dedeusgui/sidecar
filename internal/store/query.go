@@ -174,11 +174,11 @@ func (s *Store) CallersOf(id int64, limit int) ([]Related, error) {
 
 // TestFilesReferencing returns the file rows of test files that mention a name.
 func (s *Store) TestFilesReferencing(name string, limit int) ([]SymbolHit, error) {
-	rows, err := s.queryCached(`SELECT DISTINCT `+symbolColumns("s")+`
-		FROM refs r
-		JOIN files f ON f.id = r.file_id AND f.kind = 'test'
+	rows, err := s.queryCached(`SELECT `+symbolColumns("s")+`
+		FROM files f
 		JOIN symbols s ON s.file_id = f.id AND s.kind = 'file'
-		WHERE r.to_name = ? ORDER BY f.path, s.line, s.name, s.kind, s.id LIMIT ?`, name, limit)
+		WHERE f.kind = 'test' AND f.id IN (SELECT r.file_id FROM refs r WHERE r.to_name = ?)
+		ORDER BY f.path, s.line, s.name, s.kind, s.id LIMIT ?`, name, limit)
 	if err != nil {
 		return nil, err
 	}

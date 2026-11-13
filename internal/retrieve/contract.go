@@ -84,9 +84,10 @@ func ContractEvidence(st *store.Store, root string, subjects []store.SymbolHit) 
 	if err != nil {
 		return nil, err
 	}
+	files := newFileReader(root)
 	sets := make([]linkSet, len(subjects))
 	for i, s := range subjects {
-		tests, err := testLinks(st, root, s, textTests)
+		tests, err := testLinks(st, files, s, textTests)
 		if err != nil {
 			return nil, err
 		}
@@ -99,9 +100,20 @@ func ContractEvidence(st *store.Store, root string, subjects []store.SymbolHit) 
 	if err != nil {
 		return nil, err
 	}
+	active := make([]bool, len(subjects))
 	for _, p := range docs {
 		heading, fenced := "", false
-		for n, line := range readLines(root, p) {
+		text := files.text(p)
+		any := false
+		for i, s := range subjects {
+			// mention and arityMention need the name on the line; a route is matched by its normalized path.
+			active[i] = s.Kind == "route" || strings.Contains(text, s.Name)
+			any = any || active[i]
+		}
+		if !any {
+			continue
+		}
+		for n, line := range files.lines(p) {
 			if t := strings.TrimSpace(line); strings.HasPrefix(t, "#") {
 				heading = strings.TrimSpace(strings.TrimLeft(t, "#"))
 			}
@@ -109,6 +121,9 @@ func ContractEvidence(st *store.Store, root string, subjects []store.SymbolHit) 
 				fenced = !fenced
 			}
 			for i, s := range subjects {
+				if !active[i] {
+					continue
+				}
 				status, claim := arityMention(line, s, fenced)
 				if status == "" {
 					status, claim = mention(line, s, docMarkers)
@@ -177,7 +192,7 @@ func testPathsForValues(st *store.Store, root string, subjects []store.SymbolHit
 // testLinks reports the test files that name the definition: those the index links by
 // reference, and for a constant those whose text names it. For a constant with a literal value,
 // a test line that asserts a different literal is a conflict instead of a link.
-func testLinks(st *store.Store, root string, s store.SymbolHit, textTests []string) ([]Finding, error) {
+func testLinks(st *store.Store, files *fileReader, s store.SymbolHit, textTests []string) ([]Finding, error) {
 	if s.Kind == "route" {
 		return nil, nil
 	}
@@ -202,7 +217,13 @@ func testLinks(st *store.Store, root string, s store.SymbolHit, textTests []stri
 	for _, p := range paths {
 		f := finding(s, TestExpected, "test", p, 0)
 		named := false
-		for i, line := range readLines(root, p) {
+		if !strings.Contains(files.text(p), s.Name) {
+			if referenced[p] {
+				out = append(out, f)
+			}
+			continue
+		}
+		for i, line := range files.lines(p) {
 			if !hasWord(line, s.Name) {
 				continue
 			}
@@ -562,17 +583,43 @@ func docPaths(st *store.Store, root string) ([]string, error) {
 	return st.DocPaths(maxDocFiles)
 }
 
-// readLines returns the lines of an indexed file, or nil when it is missing, binary, too large
-// or outside the root. Paths come from the index; the check keeps a bad one inside the root.
-func readLines(root, rel string) []string {
-	if root == "" || !filepath.IsLocal(rel) || !repo.Contained(root, filepath.Join(root, rel)) {
-		return nil
+// fileReader reads each indexed file at most once per ContractEvidence call. A file that is missing,
+// binary, too large or outside the root reads as empty. Paths come from the index; the containment
+// check keeps a bad one inside the root.
+type fileReader struct {
+	root  string
+	texts map[string]string
+	split map[string][]string
+}
+
+func newFileReader(root string) *fileReader {
+	return &fileReader{root: root, texts: map[string]string{}, split: map[string][]string{}}
+}
+
+func (r *fileReader) text(rel string) string {
+	if t, ok := r.texts[rel]; ok {
+		return t
 	}
-	data, reason := repo.ReadSource(filepath.Join(root, rel), maxDocBytes)
-	if reason != "" {
-		return nil
+	t := ""
+	if r.root != "" && filepath.IsLocal(rel) && repo.Contained(r.root, filepath.Join(r.root, rel)) {
+		if data, reason := repo.ReadSource(filepath.Join(r.root, rel), maxDocBytes); reason == "" {
+			t = string(data)
+		}
 	}
-	return strings.Split(string(data), "\n")
+	r.texts[rel] = t
+	return t
+}
+
+func (r *fileReader) lines(rel string) []string {
+	if l, ok := r.split[rel]; ok {
+		return l
+	}
+	var l []string
+	if t := r.text(rel); t != "" {
+		l = strings.Split(t, "\n")
+	}
+	r.split[rel] = l
+	return l
 }
 
 // hasWord reports whether w occurs in s delimited by non-identifier bytes.
