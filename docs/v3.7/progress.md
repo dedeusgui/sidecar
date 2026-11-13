@@ -1,60 +1,62 @@
 # V3.7 — progresso experimental (checkpoint P0 + P1)
 
-> **Estado:** `SIDECAR_ENGINE=v3.7` implementada como **opt-in** sobre `main@8550eaf`; **V1 continua padrão**. Passa nos portões **P0** (testes, race, lint, registro e freeze). No **P1**, o gate endurecido nesta rodada (ver [checkpoint](#checkpoint-de-hardening-rodada-atual)) **bloqueia** o custo por caminho gold entregue frente à `v3`: as afirmações "GATE OK" das seções abaixo vieram do gate anterior, que ignorava estratos ausentes e não comparava top-3, tokens ou latência. **P3 (piloto agentic pago no `bench/lab/lab.py`) ainda não foi executado.** Não há comprovação de ganho end-to-end com agentes.
+> **Estado:** `SIDECAR_ENGINE=v3.7` implementada como **opt-in** sobre `main@8550eaf`; **V1 continua padrão**. Passa nos portões **P0** (testes, race, lint, registro e freeze) e no **P1 contra V3 e V3.6** (zero regressões; ver [checkpoint](#checkpoint-de-hardening-rodada-atual)). **Contra V1 ainda reprova** (recall e latência nos cortes internos). **P3 (piloto agentic pago) não foi executado** e o encerramento do marco depende dele e dos cortes externos. As afirmações "GATE OK" das seções abaixo vieram do gate anterior, que ignorava estratos ausentes e não comparava top-3, tokens ou latência. Não há comprovação de ganho end-to-end com agentes.
 
 Arquitetura e pipeline: [architecture.md](architecture.md). Plano original: [research-plan.md](research-plan.md). Critérios de promoção: [engine-progression.md](../engine-progression.md).
 
 ## Checkpoint de hardening (rodada atual)
 
-Medido com `python3 bench/fast_gate.py --race --candidate v3.7 --baseline v3` (P0 + P1 + Studio, `$0`). Nenhuma execução agentic paga (P3). Antes → depois refere-se ao código de `56088bf`.
+Medido com `python3 bench/fast_gate.py --race --engines v1,v2,v3,v3.5,v3.6,v3.7 --candidate v3.7 --baseline v3` (P0 + P1 + Studio, `$0`). "Antes" é o código de `56088bf`. O holdout nunca foi lido. Nenhuma execução agentic paga (P3).
+
+### Resultado (fixtures internos, 40 positivos; negativos difíceis dev + validation, 36 casos)
+
+| Motor | Caminho gold antes → depois | Top-3 antes → depois | Tokens por gold antes → depois |
+|---|---:|---:|---:|
+| V1 (padrão) | 38 → 39 | 34 → 34 | 278 → 288 |
+| V3 | 29 → 35 | 28 → 33 | 187 → 192 |
+| V3.6 | 27 → 33 | 27 → 32 | 236 → 243 |
+| **V3.7** | **30 → 35** | **29 → 33** | **218 → 195** |
+
+- **Gate V3.7 contra V3 e contra V3.6: zero regressões.** Cobre caminho gold, top-3, orientação, conflitos de rótulo, determinismo, tokens por gold (+10%), latência (p95 mediano, 1,5× + 5 ms) e falsos positivos nos negativos difíceis. Resultado: V3.7 deixa 0 de 36 negativos difíceis com saída; a V1 deixa 7.
+- **Gate V3.7 contra V1: ainda reprova.** Caminho gold 35 contra 39, top-3 33 contra 34 nos positivos, e p95 de ~21 ms contra ~10 ms da V1 (estrato `tune`). A V1 segue padrão. A V3.7 não supera a V1 em recall nem em latência nestes cortes.
 
 ### O que mudou
 
-1. **Lint:** `staticcheck` em `internal/explore/core/core.go` (`QF1008`, uso de `r.Path` no campo embutido `SymbolHit`) e `internal/extract/extract.go` (`S1011`, `append(..., slice...)`). `golangci-lint run ./...` → `0 issues`.
-2. **Gate de entrega endurecido (`bench/fast_gate.py`, `bench/test_fast_gate.py`):** estrato ou motor ausente em um dos lados agora **falha** (antes era pulado em silêncio); top-3 (`gold_in_first_3_lines`) não pode cair; `tokens_per_gold_delivered` pode subir no máximo 10%; p95 precisa ficar em no máximo 1,5× a base + 5 ms. Latência usa a **mediana de 3 execuções** (`--latency-runs`): o p95 de uma única execução variou de ~12 a ~25 ms entre rodadas sem mudança de código.
+1. **Lint:** as 3 issues de `staticcheck` foram corrigidas (`QF1008` em `internal/explore/core/core.go` e `S1011` em `internal/extract/extract.go`). `golangci-lint run ./...` → 0 issues.
+2. **Gate endurecido (`bench/fast_gate.py`):** estrato ou motor ausente falha (antes era pulado em silêncio). Top-3 não pode cair. `tokens_per_gold_delivered` pode subir no máximo 10% sobre a base. p95 precisa ficar em até 1,5× a base + 5 ms, com a mediana de `--latency-runs` (padrão 3) execuções, porque o p95 de uma só execução variou de ~12 a ~25 ms sem mudança de código. Os negativos difíceis dev + validation entram no gate, para que um vazamento reprove sem depender de uma execução manual. O holdout continua fora.
 3. **Dois defeitos em `internal/app/v37.go`, reproduzidos por teste antes da correção** (`internal/app/v37_review_test.go`):
-   - uma escolha `contract` que **não é teste** suprimia a orientação de teste da TaskBrief. Agora só suprime quando o contrato aponta um arquivo de teste;
-   - um trecho grande que a V3.6 pulou por orçamento nunca era oferecido em forma compactada. Agora a compactação usa o orçamento que sobra e pula trechos já entregues. Nos fixtures internos a saída não muda (nenhum trecho grande é disparado): é correção validada por teste unitário, não ganho medido.
-4. **Vocabulário base PT-BR→EN (`internal/lexical/lexicon_pt_en.tsv`):** +42 entradas gerais de comércio, cobrança, logística e prazos (p.ex. `reserva`, `expirar`, `desconto`, `despachar`, `recorrente`, `tentativa`, `unico`). Ver limitação de validação abaixo.
+   - uma escolha `contract` que não era teste suprimia a orientação de teste da TaskBrief; agora só suprime quando o contrato aponta um arquivo de teste;
+   - um trecho grande que a V3.6 pulou por orçamento nunca era oferecido compactado; agora a compactação usa o orçamento que sobra e pula trechos já entregues. Nos fixtures a saída não muda (nenhum trecho grande é disparado): é correção validada por teste, não ganho medido.
+4. **Relações renderizadas pela V3.7** (`v37ActionableRelations`): no máximo 1 por item, na ordem `tested_by` > `called_by` > `calls`. Contenção (`member_of`, `contains`) e co-change (`cochange`) deixam de ser exibidos. O gold não depende disso (está no rótulo `source:`), e a ordem por caminho de teste não mudou nenhum gold. Motivo do corte: relações eram ~20% dos tokens entregues pela V3.7, e `cochange` é a anotação mais frequente, sinal histórico que aponta para o mesmo teste que `tested_by` mostra estaticamente. **Trade-off:** o valor dessas relações para o agente não foi medido. Só o piloto P3 responde isso.
+5. **Léxico PT-BR→EN (`internal/lexical/lexicon_pt_en.tsv`):** +47 entradas gerais desde `56088bf` (42 de comércio, cobrança, logística e prazos, na `b7cc3f8`, e 5 flexões: `cupons`, `unidade`/`unidades`, `quantidade`/`quantidades`, nesta rodada). Essas palavras vieram das falhas dos fixtures internos, então o ganho ali é ajuste em amostra.
 
-### Medições (fixtures internos; holdout nunca usado)
+### Testado e revertido (medido, não entrou)
 
-| Motor | Caminho gold (40) antes → depois | Top-3 antes → depois | Tokens/gold antes → depois |
-|---|---:|---:|---:|
-| V1 | 38 → 39 | 34 → 34 | 278 → 286 |
-| V3 | 29 → 33 | 28 → 31 | 187 → 197 |
-| V3.6 | 27 → 32 | 27 → 31 | 236 → 243 |
-| **V3.7** | **30 → 33** | **29 → 32** | 218 → 231 |
+- **Ignorar palavras de estrutura em PT no denominador da confiança** (`quanto`, `existem`, `ante`, só na V3.7): +1 gold (E06), mas o custo por gold subiu para 218 e reprovou o gate. Reverter também evitou crescimento do bloco em T02 (167 → 293 tokens, sem ganho). Revertido.
+- **Deduplicar relações repetidas dentro do mesmo bloco:** são 9% das relações e ~1% dos tokens. Não compensa a complexidade. Não feito.
+- **Ordem de relações com `cochange`:** mantido fora (ver item 4). Antes de sair, o estrato `tune` ficou em 221 tokens por gold contra 217 de limite; sem `cochange` ficou em 206.
 
-- **Sentinela de falsos positivos** (`--delivery-negatives bench/negatives/hard_negatives.json`, splits dev + validation, 36 casos nos 2 repositórios internos): V3.7 mantém **0** saídas indevidas, antes e depois da mudança de vocabulário; V1 entrega 7.
-- **Gate atual, V3.7 contra V3:** reprova em `tokens_per_gold_delivered` nos 3 estratos positivos (+17%, limite 10%). Não há regressão de gold, top-3, abstenção, determinismo ou latência (p95 mediano 18,0 ms contra 15,0 ms da V3).
-- O mesmo gate contra V1 mostra a perda de recall que a V1 não sofre (30 contra 38 antes da mudança; 33 contra 39 depois). V1 continua a referência de recall, não o baseline do gate.
+### Recall restante (V1 acerta, V3.7 não)
 
-### Diagnóstico das 8 perdas da V3.7 em que a V1 acerta
+- **E06** `quantas tentativas de cobrança antes de desistir`: abstenção. Só um termo forte (`cobrança`) casa, abaixo do gate de bloco.
+- **E12** `marcar a entrega como concluída`: abstenção. `concluída` não tem tradução presente no repositório.
+- **T08** `quantos dias de carência existem para pagamento do boleto?`: nenhuma evidência passa pelos gates V2 (`best_support 0`); é limitação de recuperação em nível de símbolo.
+- **E20** `registro de clientes com email único`: entrega contexto errado (modo LEAN, item de ordenação).
+- **E05** falha em todas as engines (V1 inclusive).
 
-Rastreado até a etapa com o trace de `sidecar explain` sobre repositórios reconstruídos com o mesmo histórico do harness:
+### O que não foi medido nesta sandbox (limitações)
 
-- **7 de 8 são abstenções**: nenhum item chega ao gate de bloco (`MinBlockConfidence` 0,5). A causa é `ownTextConfidence` (V2+): todo termo do prompt entra no denominador, e termos sem tradução no léxico (`reserva`, `expirou`) contam contra o match. Ex.: `release_stock` tem `support=1` sobre `promptTerms=4`, confiança 0,45. A V1 usa cobertura sobre os conceitos do repositório e dá 0,70. O piso de resgate por raridade não dispara porque `stock` não é raro neste fixture (símbolos acima de `max(6, total/50)`).
-- **1 de 8 entrega contexto errado** (E20: `db/migrations.sql` no lugar de um item de clientes).
-- O vocabulário acima recuperou 3 abstenções (E04, E10, T10). Os outros 4 dependem de traduções que o léxico ainda não tem.
-
-### Trade-off aberto: custo por caso com gold
-
-Relações (`cochange:`, `called_by:`, `member_of:`, `contains:`, `tested_by:`) ocupam ~20% dos tokens entregues pela V3.7 (contra ~5% na V3) e explicam quase toda a diferença de ~29 tokens por caso. Elas não carregam o gold (o gold está no rótulo `source:`), então cortá-las reduziria o custo sem mudar a métrica de entrega. Mas são o sinal estrutural que a V3.6/V3.7 acrescentou, e o benchmark de entrega não mede se o agente as usa. **Não foram removidas nesta rodada**: a política de relações precisa de avaliação end-to-end (P3). Repetições da mesma relação dentro do mesmo bloco são 9% das relações (ganho pequeno, ~3 tokens por caso).
-
-### O que não foi medido aqui (limitações)
-
-- **ten-repos (39/40), E1 (23/30 positivos e 16/40 negativos) e top-3 de `voice_mode`** dependem de checkouts pinados de repositórios externos. Eles não estão nesta máquina, e obtê-los exigiria clonar repositórios fora do escopo permitido deste ambiente. Nenhum número desses cortes foi alterado nem reproduzido.
-- **Explore (`NAV-CLK-01`, `NAV-SER-01`)** depende do `corpus-nav` com os mesmos repositórios externos e do CodeGraph. Não foi tocado.
-- **O vocabulário novo é ajuste em amostra.** Ele foi escolhido a partir das palavras que falhavam nos fixtures internos, então o ganho de recall ali não prova generalização. A generalização só se mede nos cortes externos, ainda pendentes.
-- **Holdout** (`bench/cases.json`, 21 casos) não foi usado. O corte `hard_negatives` do holdout (6 prompts) também permanece congelado.
-- **P3 (pago):** não executado.
+- **ten-repos (39/40), E1 (23/30 positivos e 16/40 negativos), top-3 de `voice_mode` e Explore (`NAV-CLK-01`, `NAV-SER-01`)** dependem de checkouts pinados de repositórios externos. Não estão nesta máquina, e obtê-los exige acesso a repositórios fora do escopo deste ambiente. Nenhum desses números foi alterado nem reproduzido.
+- **CodeGraph** não está instalado. A comparação E2 também depende do corpus externo.
+- **P3 (pago):** não executado. Tentei `bench/lab/lab.py validate-corpus`; ele instala dependências de tarefas (gems Ruby) e reescreve `validation.json`. Interrompi e reverti. Rodar P3 exige autorização explícita de custo (`--max-total-usd`).
+- **Generalização do vocabulário:** não medida. Os cortes externos são a única validação fora da amostra interna.
+- **Negativos E1 (16/40):** não medidos aqui. O vocabulário e a regra de relações novos podem mudar esse número, para cima ou para baixo, e isso é o risco aberto.
 
 ### Próximos passos
 
-1. Decidir a política de relações (limitar, agrupar ou manter) com um piloto agentic pareado, comparando custo por tarefa concluída.
-2. Rodar `ten-repos`, E1 e E2 quando os checkouts pinados estiverem disponíveis, e medir top-3 de `voice_mode` nesse corte.
-3. Investigar `NAV-CLK-01` (`parse_args`) e `NAV-SER-01` (`deserializer|from_trait`) no `corpus-nav` com os checkouts.
+1. Rodar ten-repos, E1 e E2 quando os checkouts pinados estiverem disponíveis; medir top-3 de `voice_mode` e Explore nesse corte.
+2. Piloto P3 com teto de gasto autorizado: decidir a política de relações pelo custo por tarefa concluída corretamente.
+3. Recall restante: E06, E12, T08 e E20 (lista acima).
 
 ## P0 — Portão imediato local (`$0`)
 

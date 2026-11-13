@@ -180,7 +180,10 @@ def main(argv=None):
     cases_json = out_dir / "delivery-cases.json"
     run_delivery(
         "P1 delivery (bench/cases.json)",
-        [str(eval_bin), "--cases", "bench/cases.json", "--delivery", "--delivery-engines", args.engines],
+        # Hard negatives (dev + validation only; holdout is never read here) run against every internal
+        # repository, so a false-positive leak fails the gate instead of depending on a manual sentinel run.
+        [str(eval_bin), "--cases", "bench/cases.json", "--delivery", "--delivery-engines", args.engines,
+         "--delivery-negatives", "bench/negatives/hard_negatives.json"],
         cases_json,
         args.latency_runs,
     )

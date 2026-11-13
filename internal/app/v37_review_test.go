@@ -116,3 +116,35 @@ func numberedLines(start, end int) string {
 	}
 	return b.String()
 }
+
+// V3.7 renders only the most actionable relation annotations per item: test pointers and call edges
+// before containment. The fingerprint and the stored relations are untouched, so session dedupe and
+// later stages see the same evidence.
+func TestV37RenderShowsMostActionableRelationsOnly(t *testing.T) {
+	ev := retrieve.Evidence{
+		ID:        "place-order",
+		Hit:       store.SymbolHit{Path: "orders/order_service.go", Kind: "method", Name: "PlaceOrder", Line: 12, EndLine: 15},
+		Section:   ctxbuild.Code,
+		Relations: []string{"contains:Length", "cochange:orders/order_service_test.go(3)", "tested_by:orders/order_service_test.go"},
+	}
+	item := v37EvidenceItem(contract.EvidenceEntry[retrieve.Evidence]{Value: ev})
+	if !strings.Contains(item.Text, "tested_by:orders/order_service_test.go") {
+		t.Fatalf("the test pointer must survive the relation cap, got %q", item.Text)
+	}
+	if strings.Contains(item.Text, "contains:Length") {
+		t.Fatalf("containment must be the first relation dropped, got %q", item.Text)
+	}
+	rendered := 0
+	for _, prefix := range []string{"tested_by:", "called_by:", "calls:", "member_of:", "cochange:", "contains:"} {
+		rendered += strings.Count(item.Text, prefix)
+	}
+	if rendered > v37MaxRelations {
+		t.Fatalf("rendered %d relations, want at most v37MaxRelations=%d: %q", rendered, v37MaxRelations, item.Text)
+	}
+	if item.Fingerprint != ev.Fingerprint() {
+		t.Fatal("fingerprint must not depend on rendered relations")
+	}
+	if len(ev.Relations) != 3 {
+		t.Fatal("the caller's evidence relations must not be mutated")
+	}
+}

@@ -215,3 +215,8 @@ fatura	invoice,bill
 faturas	invoice,bill
 multa	fine,penalty
 juros	interest
+cupons	coupon,coupons
+unidade	unit,units,quantity,qty
+unidades	unit,units,quantity,qty
+quantidade	quantity,qty,amount
+quantidades	quantity,qty,amount

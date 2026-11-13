@@ -83,23 +83,59 @@ func sanitizeTrustLabels(s string) string {
 	return v37EmbeddedLabelReplacer.Replace(s)
 }
 
+// v37MaxRelations caps the relation annotations V3.7 renders per evidence item. Relations are about a
+// fifth of the tokens V3.7 delivers and never carry the gold path (the source label does).
+const v37MaxRelations = 1
+
+// v37RelationOrder lists the relation kinds V3.7 renders, from most to least actionable. Static links only:
+// test pointers and call edges. Containment (member_of, contains) is not rendered because the item's path
+// and signature already place the symbol; co-change (cochange) is historical correlation, the most frequent
+// annotation, and it points at the same test tested_by names statically.
+var v37RelationOrder = []string{"tested_by:", "called_by:", "calls:"}
+
+// v37ActionableRelations returns at most v37MaxRelations rendered relations in actionability order.
+// Kinds outside v37RelationOrder are dropped. It does not mutate its argument.
+func v37ActionableRelations(rels []string) []string {
+	rank := func(r string) int {
+		for i, prefix := range v37RelationOrder {
+			if strings.HasPrefix(r, prefix) {
+				return i
+			}
+		}
+		return -1
+	}
+	var ranked []string
+	for _, r := range rels {
+		if rank(r) >= 0 {
+			ranked = append(ranked, r)
+		}
+	}
+	sort.SliceStable(ranked, func(i, j int) bool { return rank(ranked[i]) < rank(ranked[j]) })
+	if len(ranked) > v37MaxRelations {
+		ranked = ranked[:v37MaxRelations]
+	}
+	return ranked
+}
+
 // v37EvidenceItem renders one registry entry with a single authoritative trust label suffix:
 // relation tags like "docstring path [INFERRED]" are normalized so a single bullet never emits
 // conflicting bracketed confidence badges alongside the packer's [VERIFIED]/[CANDIDATE] suffix.
+// Only the rendered text is capped; the fingerprint and the stored relations are unchanged.
 func v37EvidenceItem(entry contract.EvidenceEntry[retrieve.Evidence]) ctxbuild.Item {
 	value := entry.Value
+	shown := value
 	if len(value.Relations) > 0 {
 		rels := make([]string, len(value.Relations))
 		for i, r := range value.Relations {
 			rels[i] = sanitizeTrustLabels(r)
 		}
-		value.Relations = rels
+		shown.Relations = v37ActionableRelations(rels)
 	}
 	return ctxbuild.Item{
 		Section:     value.Section,
 		Key:         value.Key(),
 		Fingerprint: value.Fingerprint(),
-		Text:        sanitizeTrustLabels(retrieve.DescribeBare(value)),
+		Text:        sanitizeTrustLabels(retrieve.DescribeBare(shown)),
 		Source:      value.Source,
 		Role:        value.Hit.Kind,
 		Qualifier:   evidenceQualifier(entry.Ref),
