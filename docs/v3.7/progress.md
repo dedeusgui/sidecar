@@ -44,6 +44,15 @@ Medido com `python3 bench/fast_gate.py --race --engines v1,v2,v3,v3.5,v3.6,v3.7 
 - **E20** `registro de clientes com email único`: entrega contexto errado (modo LEAN, item de ordenação).
 - **E05** falha em todas as engines (V1 inclusive).
 
+### Latência do hook quente (perfil de CPU, `$0`)
+
+Benchmark local do caminho do hook com índice aquecido (uma consulta, 4 CPUs): V1 ~4,8 ms por execução, V3.7 ~8,9 ms. A diferença de p95 contra a V1 nos cortes internos vem deste mesmo trecho.
+
+- **V3.7:** cerca de 37% das amostras de CPU estão em `explore/service.QuickExpand` (`explore/core.Build`, `expandCallChain`). É a expansão automática que a V3.7 roda no hook e a V1 não roda. Custo do desenho, não defeito.
+- **Ambos os motores:** cerca de 26% (V3.7) e 30% (V1) das amostras estão na recompilação de comandos SQLite (`sqlite3Reprepare` chamado por `sqlite3_step`). Afeta o caminho compartilhado de armazenamento, inclusive o motor padrão.
+- **Descartado:** mudança de schema durante a consulta. `PRAGMA schema_version` ficou em 41 em todas as consultas de um hook quente.
+- **Não identificado:** a causa da recompilação. Hipótese não verificada: comandos que tocam tabelas virtuais FTS5 expiram a cada conexão, e cada hook abre uma conexão nova. Corrigir isso muda o caminho de desempenho do motor padrão e exige PR próprio, com benchmark antes e depois.
+
 ### O que não foi medido nesta sandbox (limitações)
 
 - **ten-repos (39/40), E1 (23/30 positivos e 16/40 negativos), top-3 de `voice_mode` e Explore (`NAV-CLK-01`, `NAV-SER-01`)** dependem de checkouts pinados de repositórios externos. Não estão nesta máquina, e obtê-los exige acesso a repositórios fora do escopo deste ambiente. Nenhum desses números foi alterado nem reproduzido.
