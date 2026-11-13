@@ -5,6 +5,8 @@
 Arquitetura e pipeline: [architecture.md](architecture.md). Plano original: [research-plan.md](research-plan.md). Critérios de promoção: [engine-progression.md](../engine-progression.md).
 
 > **Passagem para outro agente:** [docs/v3.7/handoff.md](handoff.md) (estado, bloqueio do P3, números, decisões revertidas e comandos).
+>
+> **Diagnóstico de qualidade da entrega** (símbolo gold perdido pelo packer, gate sem métrica de símbolo, linha de teste ausente errada, sobrecargas): [quality-findings.md](quality-findings.md). Latência: [optimization-backlog.md](optimization-backlog.md).
 
 ## Latência do hook: três causas isoladas e corrigidas (sem mudança de saída)
 

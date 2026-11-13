@@ -138,5 +138,5 @@ O `ten-manifest.json` é uma cópia de `bench/ten_repos_cases.json` com `path` a
 1. Resolver o login do P3 (§2) com aprovação do usuário; validar com `--agent scripted` antes; depois rodar o piloto de 8 execuções com o teto acordado.
 2. Latência contra V1 (§4.3): três causas corrigidas no PR #30; o que sobra está em [optimization-backlog.md](optimization-backlog.md).
 3. Investigar `voice_mode` top-3 contra V3 (§4.2).
-4. Investigar E06, E12, T08 e E20 (§4.1), sem ajuste em amostra.
+4. Qualidade da entrega: causas de E06, E12, T08, E20 e de quatro símbolos gold perdidos estão em [quality-findings.md](quality-findings.md); começar por medir símbolo gold no gate.
 5. Só então decidir sobre promover a V3.7 (ver critérios em `docs/engine-progression.md`).
