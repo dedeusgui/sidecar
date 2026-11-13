@@ -108,7 +108,7 @@ func runV35(ctx context.Context, st *store.Store, root, prompt string, opts retr
 			}, registry)
 		} else {
 			expansion = service.QuickExpand(ctx, st, service.QuickRequest{
-				Enabled: true, Root: root, Query: prompt, Anchors: v35QuickAnchors(baseRefs, registry),
+				Enabled: quickExpandEnabled(v37), Root: root, Query: prompt, Anchors: v35QuickAnchors(baseRefs, registry),
 				Limits: service.Limits{Timeout: service.QuickMaxDuration, MaxFiles: service.QuickMaxFiles,
 					MaxTokens: min(service.QuickMaxTokens, max(1, decision.Budget*2/3))},
 				AllowCandidateAnchor: v37,
@@ -733,4 +733,11 @@ func preferNamedFiles(choices []engine.Choice, prompt string) []engine.Choice {
 		}
 	}
 	return out
+}
+
+// quickExpandEnabled reports whether the hook runs QuickExpand. V3.7 keeps it off unless the quickexpand
+// feature is requested: on the external cohorts the automatic expansion lowered voice-mode top-3 and cost
+// without adding gold. Other engines are unchanged.
+func quickExpandEnabled(v37 bool) bool {
+	return !v37 || retrieve.FeatureEnabled("quickexpand")
 }
