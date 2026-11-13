@@ -51,7 +51,7 @@ Benchmark local do caminho do hook com índice aquecido (uma consulta, 4 CPUs): 
 - **V3.7:** cerca de 37% das amostras de CPU estão em `explore/service.QuickExpand` (`explore/core.Build`, `expandCallChain`). É a expansão automática que a V3.7 roda no hook e a V1 não roda. Custo do desenho, não defeito.
 - **Ambos os motores:** cerca de 26% (V3.7) e 30% (V1) das amostras estão na recompilação de comandos SQLite (`sqlite3Reprepare` chamado por `sqlite3_step`). Afeta o caminho compartilhado de armazenamento, inclusive o motor padrão.
 - **Descartado:** mudança de schema durante a consulta. `PRAGMA schema_version` ficou em 41 em todas as consultas de um hook quente.
-- **Não identificado:** a causa da recompilação. Hipótese não verificada: comandos que tocam tabelas virtuais FTS5 expiram a cada conexão, e cada hook abre uma conexão nova. Corrigir isso muda o caminho de desempenho do motor padrão e exige PR próprio, com benchmark antes e depois.
+- **Não identificado:** a causa da recompilação. Hipótese descartada em microbenchmark isolado: consultas FTS5 cacheadas custam ~18,7 µs contra ~20,7 µs sem cache, e consultas em tabela comum cacheadas custam ~2,4 µs sem sinal de recompilação. A recompilação do perfil real não se reproduz fora do hook; a causa continua aberta. Corrigir isso muda o caminho de desempenho do motor padrão e exige PR próprio, com benchmark antes e depois.
 
 ### O que não foi medido nesta sandbox (limitações)
 
