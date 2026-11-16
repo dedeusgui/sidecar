@@ -137,7 +137,7 @@ Em `serde-json/src/de.rs` há 109 símbolos `function` e 8 `type`, todos sem pai
 
 `macro_rules!`: 53 definições em `serde-json/src` e `axum/axum/src`, nenhuma no índice. `src/macros.rs` do `serde-json` (10 KB, onde está a macro `json!`, a API mais usada da biblioteca) tem zero símbolos.
 
-**Hipótese (não verificada):** os dois fatos que o `sidecar explore` não cobre no E2 do `serde-json` (`deserializer|from_trait` e `deserialize_any|deserialize`, NAV-SER-01) dependem de ligar um método ao seu `impl`. Fica para a investigação do `explore`.
+**Verificado depois:** os dois fatos que o `sidecar explore` não cobre no E2 do `serde-json` (NAV-SER-01) não dependem disto em primeiro lugar. O arquivo `src/de.rs` nem é mostrado; a causa está no ranking e na ordem dos arquivos. Ver [explore-findings.md](explore-findings.md). O dono do método passa a importar para escolher entre os três `from_str` do arquivo.
 
 ## 6. `type` do TypeScript não é indexado
 
